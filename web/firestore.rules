@@ -1,0 +1,112 @@
+rules_version = '2';
+// ============================================================================
+// Coach Hayes Football — Firestore security rules (Phase 0 draft)
+// ============================================================================
+// Principles from BUILD_BRIEF.md:
+//  - Public content is world-readable (server-rendered + indexable).
+//  - Gated content is NOT client-readable; it is served server-side via the
+//    Admin SDK (which bypasses these rules) behind a tier check + signed URLs.
+//  - Privileged writes (grades, broadcasts, destinations, memberships, orders,
+//    fulfilment) happen ONLY through server routes using the Admin SDK.
+//  - No secret ever lives in a client-readable doc (keys are *Ref pointers).
+// ============================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.admin == true;
+    }
+    function isSelf(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    // Public site config (branding/content) — read all, admin writes.
+    match /site/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Users — a user reads/updates their own profile; admins read all.
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create: if isSelf(uid);
+      allow update: if isSelf(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Memberships — read your own; only the server (Admin SDK) writes them
+    // (Stripe webhooks + Discord sync). No client writes.
+    match /memberships/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if false;
+    }
+
+    // Shows / broadcasts / schedule — public read; admin (server) writes.
+    match /shows/{id}       { allow read: if true; allow write: if isAdmin(); }
+    match /broadcasts/{id}  { allow read: if true; allow write: if isAdmin(); }
+
+    // Destinations carry stream-key POINTERS only, but keep them admin-only.
+    match /destinations/{id} { allow read: if isAdmin(); allow write: if isAdmin(); }
+
+    // Community rooms — public rooms are world-readable; gated rooms are not
+    // (served server-side after a tier check). Writes are server-mediated.
+    match /rooms/{id} {
+      allow read: if resource.data.public == true || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /posts/{id} {
+      // Only public posts are client-readable (indexable). Gated posts come
+      // from the server after verifying the reader's tier.
+      allow read: if resource.data.visibility == 'public' || isAdmin();
+      allow create: if isSignedIn()
+        && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if isAdmin()
+        || (isSignedIn() && resource.data.authorId == request.auth.uid);
+    }
+
+    // Rankings — player pages + published grades are public. MINORS: only
+    // non-removed players are readable; contact fields are never stored.
+    match /players/{id} {
+      allow read: if resource.data.removed != true || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /grades/{id} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow write: if isAdmin();
+    }
+    // Submissions + removal requests — anyone may create (submit film / request
+    // removal); only admins read the queue.
+    match /submissions/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+    match /removalRequests/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Fantasy — levels are public (marketing); entrants are private tracking,
+    // server-written only. NO entry-fee money moves through here.
+    match /leagueLevels/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /entrants/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // Merch — products public; orders are the buyer's own + server-written.
+    match /products/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /orders/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false; // Stripe + POD webhooks via Admin SDK only
+    }
+
+    // Tips — recorded server-side from Stripe webhook; admins read for /admin.
+    match /tips/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Default deny.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

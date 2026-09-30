@@ -1,0 +1,40 @@
+# ── Dependencies ──────────────────────────────────────────────
+node_modules/
+**/node_modules/
+
+# ── Build output ──────────────────────────────────────────────
+.next/
+**/.next/
+out/
+**/out/
+build/
+dist/
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# ── Env / secrets (NEVER commit) ──────────────────────────────
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+**/*.env.local
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# ── OS / editor / tools ───────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.qodo/
+
+# ── Local snapshots ───────────────────────────────────────────
+backups/
+
+# ── Mobile (Expo) ─────────────────────────────────────────────
+mobile/.expo/

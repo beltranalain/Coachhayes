@@ -1,0 +1,1872 @@
+// Persistent browser STUDIO ENGINE (singleton, lives outside React so the
+// broadcast survives navigation). It composites host camera + guests + on-air
+// graphics onto one canvas, mixes audio, and publishes that program feed to
+// Cloudflare Stream over WHIP - no OBS. Guests arrive over Cloudflare Realtime.
+
+import { getIdToken } from "./firebase";
+import { RealtimeSession, whipPublish } from "./realtimeClient";
+
+const WS_BASE = process.env.NEXT_PUBLIC_CHAT_WS_URL || "";
+const ROOM = "main";
+const SIGNAL_ROOM = `rt-${ROOM}`;
+const W = 1280, H = 720;
+
+type Ingest = { whipUrl: string; rtmpsUrl: string; streamKey: string } | null;
+export type Participant = { id: string; name: string; role: string; sessionId?: string; hasVideo: boolean; hasAudio: boolean };
+type Banner = { title: string; subtitle: string } | null;
+type Pinned = { name: string; text: string; source?: string } | null;
+export type Layout = "grid" | "spotlight" | "custom";
+type Rect = { x: number; y: number; w: number; h: number };
+type ReplaySlot = { rec: MediaRecorder | null; chunks: Blob[]; start: number; resolve?: (b: Blob) => void; startRec: () => void };
+
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.min(r, h / 2, w / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function drawCover(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number, y: number, w: number, h: number) {
+  if (!v.videoWidth) { ctx.fillStyle = "#151110"; ctx.fillRect(x, y, w, h); return; }
+  const vr = v.videoWidth / v.videoHeight, dr = w / h;
+  let sw = v.videoWidth, sh = v.videoHeight, sx = 0, sy = 0;
+  if (vr > dr) { sw = v.videoHeight * dr; sx = (v.videoWidth - sw) / 2; }
+  else { sh = v.videoWidth / dr; sy = (v.videoHeight - sh) / 2; }
+  ctx.drawImage(v, sx, sy, sw, sh, x, y, w, h);
+}
+
+// Fit the whole source inside the box (letterboxed) - for screen shares so no
+// content is cropped, since shared screens/tabs come in many aspect ratios.
+function drawContain(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number, y: number, w: number, h: number) {
+  ctx.fillStyle = "#000"; ctx.fillRect(x, y, w, h);
+  if (!v.videoWidth) return;
+  const vr = v.videoWidth / v.videoHeight, dr = w / h;
+  let dw = w, dh = h;
+  if (vr > dr) dh = w / vr; else dw = h * vr;
+  ctx.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
+
+// Rounded-corner variants (match the site's rounded UI). r is corner radius px.
+const TILE_R = 18;
+function drawCoverRounded(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number, y: number, w: number, h: number, r = TILE_R) {
+  ctx.save(); roundRectPath(ctx, x, y, w, h, r); ctx.clip(); drawCover(ctx, v, x, y, w, h); ctx.restore();
+}
+function drawContainRounded(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number, y: number, w: number, h: number, r = TILE_R) {
+  ctx.save(); roundRectPath(ctx, x, y, w, h, r); ctx.clip(); drawContain(ctx, v, x, y, w, h); ctx.restore();
+}
+// Zoomable draw: zoom 1 == cover (fill). zoom < 1 zooms OUT (see more of the
+// frame - fits a second person, letterboxed); zoom > 1 zooms IN (tighter crop).
+function drawZoom(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number, y: number, w: number, h: number, zoom: number, rounded: boolean) {
+  ctx.save();
+  if (rounded) { roundRectPath(ctx, x, y, w, h, TILE_R); ctx.clip(); } else { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); }
+  ctx.fillStyle = "#0E0C0B"; ctx.fillRect(x, y, w, h);
+  if (v.videoWidth) {
+    const scale = Math.max(w / v.videoWidth, h / v.videoHeight) * zoom;
+    const dw = v.videoWidth * scale, dh = v.videoHeight * scale;
+    ctx.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  }
+  ctx.restore();
+}
+
+// Cover-draw any source (image or video) into a box, cropping to fill.
+function coverDraw(ctx: CanvasRenderingContext2D, src: CanvasImageSource, sw: number, sh: number, x: number, y: number, w: number, h: number) {
+  if (!sw || !sh) return;
+  const vr = sw / sh, dr = w / h;
+  let cw = sw, ch = sh, sx = 0, sy = 0;
+  if (vr > dr) { cw = sh * dr; sx = (sw - cw) / 2; } else { ch = sw / dr; sy = (sh - ch) / 2; }
+  ctx.drawImage(src, sx, sy, cw, ch, x, y, w, h);
+}
+
+function hexRgb(hex: string): [number, number, number] {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return [0, 177, 64];
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+const PIN_W = 560, PIN_H = 92;
+
+class StudioEngine {
+  live = false; connecting = false; error = ""; ingest: Ingest = null;
+  layout: Layout = "grid";
+  screenSharing = false;
+  screenLayout: "full" | "pip" | "split" = "pip";
+  recording = false; // local (browser) recording of the program
+  autoClearChat = true; // reset the live chat automatically on Go Live (host pref)
+  cameraOn = true; // host camera live (off actually releases the device - light off)
+  micOn = true; // host microphone live
+  micEnhance = true; // browser noise/echo/gain cleanup + studio-voice compressor
+  private voiceComp: DynamicsCompressorNode | null = null;
+  // Branded scene (background behind host + optional green-screen + frame/logo)
+  sceneEnabled = false;
+  sceneMode: "none" | "chroma" | "ml" = "chroma";
+  chromaColor = "#00b140";
+  // Rotating lower-third ticker (news-style scroll along the bottom)
+  tickerOn = false;
+  tickerLabel = "";
+  private tickerText = "";
+  private tickerX = 0;
+  private tickerLast = 0;
+  // PTI-style rundown rail: a topic list on the right, active topic highlighted
+  // with its image at the top + an optional on-topic timer.
+  rundownEnabled = false;
+  rundownTitle = "RUNDOWN";
+  rundownShowTimer = true;
+  rundownActive = 0;
+  rundownItems: { title: string; image: string; seconds?: number }[] = [];
+  private rundownImgs: (HTMLImageElement | null)[] = [];
+  private rundownActiveSince = 0; // perf timestamp the active topic was set
+  // Intro / "starting soon" bumper: a branded holding screen (or looping intro
+  // video) that goes OUT on the broadcast before the live content starts.
+  bumperEnabled = false;
+  bumperMode: "card" | "video" = "card";
+  private bumperHeadline = "Starting soon";
+  private bumperSubtext = "";
+  private bumperBg: HTMLImageElement | null = null;
+  private bumperVideoUrl = "";
+  private bumperStartsAt = 0; // epoch ms; 0 = no countdown
+  private bumperVideo: HTMLVideoElement | null = null;
+  private bumperAudioSrc: MediaElementAudioSourceNode | null = null;
+  // Neutral display name for the host tile (kept generic, not client-specific).
+  hostName = "Host";
+  banner: Banner = null; pinned: Pinned = null;
+  bannerStyle: "bar" | "rounded" | "pill" = "bar"; // lower-third name-tag shape
+  // Media: roll a video/music file into the live program with its own level.
+  private mediaEl: HTMLVideoElement | null = null;
+  private mediaSrc: MediaElementAudioSourceNode | null = null;
+  private mediaGain: GainNode | null = null;
+  mediaPlaying = false;
+  mediaHasVideo = false;
+  mediaName = "";
+  mediaLevel = 1;
+  // Scene transition: cross-fade from a snapshot of the previous look.
+  transitionStyle: "cut" | "fade" = "fade";
+  transMs = 380;
+  private transCanvas: HTMLCanvasElement | null = null;
+  private transSnap: HTMLCanvasElement | null = null;
+  private transStart = 0;
+  // Instant replay: opt-in rolling buffer of the program (isolated from the
+  // live publish path). Two staggered recorders so a clip always has a header.
+  replayActive = false;
+  private replaySlots: ReplaySlot[] = [];
+  private replayTimers: ReturnType<typeof setTimeout>[] = [];
+  private readonly REPLAY_WINDOW = 40000;
+  // Free "custom" layout: per-tile rectangles (canvas px). Only used when
+  // layout === "custom"; grid/spotlight are unaffected.
+  private tileRects = new Map<string, Rect>();
+  // Vertical (9:16) recording for Shorts - a separate cropped canvas + recorder.
+  verticalRecording = false;
+  private vRec: MediaRecorder | null = null;
+  private vChunks: Blob[] = [];
+  private vCanvas: HTMLCanvasElement | null = null;
+  private vRaf = 0;
+  tipAlert: { name: string; amount: number; message: string } | null = null;
+  private tipTimer: ReturnType<typeof setTimeout> | null = null;
+  // Positions (top-left, canvas px) of the draggable on-air graphics.
+  pinPos = { x: 48, y: H - 210 };
+  bannerPos = { x: 48, y: H - 96 };
+  private bannerRect = { x: 48, y: H - 96, w: 0, h: 56 };
+  pipPos = { x: W - 320 - 22, y: H - 180 - 22 };
+  private pipRect = { x: W - 320 - 22, y: H - 180 - 22, w: 320, h: 180 };
+  readonly width = W; readonly height = H;
+  roster: Participant[] = [];
+  admitted = new Set<string>(); // guest sessionIds currently on the program
+  realtimeReady = false; // true once the SFU session is established
+
+  canvas: HTMLCanvasElement | null = null;
+  private hostVideo: HTMLVideoElement | null = null;
+  private hostStream: MediaStream | null = null;
+  private guestVideos = new Map<string, HTMLVideoElement>();
+  private guestAudio = new Map<string, MediaStreamAudioSourceNode>();
+  // Per-guest gain node (host mute control) + the set of muted guests.
+  private guestGain = new Map<string, GainNode>();
+  private guestLevels = new Map<string, number>(); // per-guest volume (0-1.5), 1 = normal
+  mutedGuests = new Set<string>();
+  // Active-speaker detection: one AnalyserNode per source (key "host" or sessionId),
+  // tapped off the existing audio graph without disturbing the mix routing.
+  private analysers = new Map<string, AnalyserNode>();
+  private audioBuf: Uint8Array | null = null;   // reused time-domain scratch buffer
+  private levels = new Map<string, number>();    // smoothed short-term level per key
+  private activeKey: string | null = null;       // current active-speaker tile key
+  private lastLevelAt = 0;                        // throttle for level sampling
+  private screenStream: MediaStream | null = null;
+  private screenVideo: HTMLVideoElement | null = null;
+  private screenAudioSrc: MediaStreamAudioSourceNode | null = null;
+  private camId?: string; private micId?: string;
+
+  private pc: RTCPeerConnection | null = null;
+  private rtc: RealtimeSession | null = null;
+  private ws: WebSocket | null = null;
+  private subscribedGuests = new Set<string>();
+  private previewPulled = new Set<string>(); // guests whose video we pulled for the pre-admit preview
+
+  private recorder: MediaRecorder | null = null;
+  private recChunks: Blob[] = [];
+  private sceneBg: HTMLImageElement | null = null;
+  private sceneFrame: HTMLImageElement | null = null;
+  private sceneLogo: HTMLImageElement | null = null;
+  private brandLogo: HTMLImageElement | null = null; // shown on the "Camera off" card
+  private brandAccent = "#F5A524"; // on-air graphics (banner, pinned comment) use the brand accent
+  hostZoom = 1; // host camera framing (software crop): 1 = fill, <1 zoom out, >1 zoom in
+  // Hardware/lens zoom, if the webcam exposes it. Lowering this genuinely WIDENS
+  // the field of view (fits more people) - software can't do that.
+  camZoom: { supported: boolean; min: number; max: number; step: number; value: number } = { supported: false, min: 1, max: 1, step: 1, value: 1 };
+  private keyCanvas: HTMLCanvasElement | null = null;
+  private segmenter: any = null;
+  private segReady = false;
+  private segLoading = false;
+  private inputCanvas: HTMLCanvasElement | null = null;
+  private maskCanvas: HTMLCanvasElement | null = null;
+  private audioCtx: AudioContext | null = null;
+  private audioDest: MediaStreamAudioDestinationNode | null = null;
+  private hostAudioSrc: MediaStreamAudioSourceNode | null = null;
+  private hostGain: GainNode | null = null;
+  hostLevel = 1; // host mic volume in the program mix (0-1.5), 1 = normal
+  // Soundboard: decoded effect buffers (by pad id) + currently-playing sources.
+  private soundBuffers = new Map<string, AudioBuffer>();
+  private soundSources = new Set<AudioBufferSourceNode>();
+  private raf = 0;
+  private started = false;
+  private subs = new Set<() => void>();
+  private ctx2d: CanvasRenderingContext2D | null = null;
+  private lastDraw = 0;
+  private clock: ScriptProcessorNode | null = null;
+
+  subscribe(fn: () => void) { this.subs.add(fn); return () => { this.subs.delete(fn); }; }
+  private emit() { this.subs.forEach((f) => f()); }
+
+  async init() {
+    if (this.started) return;
+    this.started = true;
+    try { this.autoClearChat = localStorage.getItem("cwac-autoclear-chat") !== "0"; } catch {}
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = W; this.canvas.height = H;
+    this.hostVideo = document.createElement("video");
+    this.hostVideo.muted = true; (this.hostVideo as any).playsInline = true;
+    this.audioCtx = new AudioContext();
+    this.audioDest = this.audioCtx.createMediaStreamDestination();
+    await this.ensureCamera();
+    this.startCompositing();
+    this.fetchIngest();
+    this.connectStudio();
+  }
+
+  async ensureCamera(camId?: string, micId?: string) {
+    if (camId) this.camId = camId; if (micId) this.micId = micId;
+    try {
+      const next = await navigator.mediaDevices.getUserMedia({
+        video: this.camId ? { deviceId: { exact: this.camId } } : true,
+        audio: this.micConstraints(),
+      });
+      if (this.pc && this.live) {
+        const senders = this.pc.getSenders();
+        next.getAudioTracks().forEach((track) => { const s = senders.find((x) => x.track?.kind === "audio"); if (s) s.replaceTrack(track); });
+      }
+      // Also swap the tracks published to the guest-studio SFU, so guests always
+      // see/hear the CURRENT camera+mic. Without this, switching cameras (or
+      // starting on a black "OBS Virtual Camera") leaves guests on a stale/black
+      // feed because the old track was stopped below.
+      if (this.rtc?.pc) {
+        const rs = this.rtc.pc.getSenders();
+        next.getVideoTracks().forEach((track) => { const s = rs.find((x) => x.track?.kind === "video"); if (s) s.replaceTrack(track).catch(() => {}); });
+        next.getAudioTracks().forEach((track) => { const s = rs.find((x) => x.track?.kind === "audio"); if (s) s.replaceTrack(track).catch(() => {}); });
+      }
+      this.hostStream?.getTracks().forEach((t) => t.stop());
+      this.hostStream = next;
+      this.readCamZoom(next.getVideoTracks()[0]);
+      if (this.hostVideo) { this.hostVideo.srcObject = next; this.hostVideo.play().catch(() => {}); }
+      // (re)wire host audio into the mix
+      if (this.audioCtx && this.audioDest) {
+        try { this.hostAudioSrc?.disconnect(); } catch {}
+        try { this.analysers.get("host")?.disconnect(); } catch {}
+        this.analysers.delete("host");
+        if (next.getAudioTracks().length) {
+          this.hostAudioSrc = this.audioCtx.createMediaStreamSource(next);
+          if (!this.hostGain) { this.hostGain = this.audioCtx.createGain(); this.hostGain.gain.value = this.hostLevel; this.hostGain.connect(this.audioDest); }
+          this.connectHostChain();
+          this.attachAnalyser("host", this.hostAudioSrc);
+        }
+      }
+      // republish host video to guests if in realtime
+      this.error = "";
+      this.emit();
+      return next;
+    } catch { this.error = "Camera/microphone access is required."; this.emit(); return null; }
+  }
+
+  // Turn the host camera off (stops the device so the light goes off) or back
+  // on. The program shows a "Camera off" placeholder while off.
+  async setCameraOn(on: boolean) {
+    if (on === this.cameraOn) return;
+    this.cameraOn = on; this.emit();
+    if (!on) {
+      this.hostStream?.getVideoTracks().forEach((t) => { t.stop(); this.hostStream?.removeTrack(t); });
+      if (this.hostVideo) this.hostVideo.srcObject = this.hostStream;
+      return;
+    }
+    try {
+      const cam = await navigator.mediaDevices.getUserMedia({ video: this.camId ? { deviceId: { exact: this.camId } } : true });
+      const track = cam.getVideoTracks()[0];
+      if (track && this.hostStream) {
+        this.hostStream.addTrack(track);
+        this.readCamZoom(track);
+        if (this.hostVideo) { this.hostVideo.srcObject = this.hostStream; this.hostVideo.play().catch(() => {}); }
+      }
+      this.error = ""; this.emit();
+    } catch { this.error = "Camera access is required."; this.cameraOn = false; this.emit(); }
+  }
+
+  // Turn the host microphone off (stops the device) or back on. Off = silence
+  // in the program + monitor.
+  async setMicOn(on: boolean) {
+    if (on === this.micOn) return;
+    this.micOn = on; this.emit();
+    if (!on) {
+      try { this.hostAudioSrc?.disconnect(); } catch {}
+      this.hostStream?.getAudioTracks().forEach((t) => { t.stop(); this.hostStream?.removeTrack(t); });
+      return;
+    }
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: this.micConstraints() });
+      const track = mic.getAudioTracks()[0];
+      if (track && this.hostStream) {
+        this.hostStream.addTrack(track);
+        if (this.audioCtx && this.audioDest) {
+          try { this.hostAudioSrc?.disconnect(); } catch {}
+          try { this.analysers.get("host")?.disconnect(); } catch {}
+          this.analysers.delete("host");
+          this.hostAudioSrc = this.audioCtx.createMediaStreamSource(new MediaStream([track]));
+          if (!this.hostGain) { this.hostGain = this.audioCtx.createGain(); this.hostGain.gain.value = this.hostLevel; this.hostGain.connect(this.audioDest); }
+          this.connectHostChain();
+          this.attachAnalyser("host", this.hostAudioSrc);
+        }
+      }
+      this.error = ""; this.emit();
+    } catch { this.error = "Microphone access is required."; this.micOn = false; this.emit(); }
+  }
+
+  // Mic capture constraints. With enhancement on, ask the browser for its native
+  // noise suppression, echo cancellation and auto gain (great for a talker in a
+  // room); off gives the raw device (better for a pro mic/interface).
+  private micConstraints(): MediaTrackConstraints | boolean {
+    const c: MediaTrackConstraints = {};
+    if (this.micId) c.deviceId = { exact: this.micId };
+    if (this.micEnhance) { c.noiseSuppression = true; c.echoCancellation = true; c.autoGainControl = true; }
+    return this.micId || this.micEnhance ? c : true;
+  }
+
+  // Wire the host mic into the mix, optionally through a gentle "studio voice"
+  // compressor (evens out loud/quiet moments) when enhancement is on.
+  private connectHostChain() {
+    if (!this.audioCtx || !this.hostAudioSrc || !this.hostGain) return;
+    try { this.hostAudioSrc.disconnect(); } catch {}
+    try { this.voiceComp?.disconnect(); } catch {}
+    if (this.micEnhance) {
+      if (!this.voiceComp) {
+        const c = this.audioCtx.createDynamicsCompressor();
+        c.threshold.value = -24; c.knee.value = 30; c.ratio.value = 3; c.attack.value = 0.003; c.release.value = 0.25;
+        this.voiceComp = c;
+      }
+      this.hostAudioSrc.connect(this.voiceComp);
+      this.voiceComp.connect(this.hostGain);
+    } else {
+      this.hostAudioSrc.connect(this.hostGain);
+    }
+  }
+
+  // Toggle mic enhancement. Re-acquires the mic so the browser constraints apply.
+  async setMicEnhance(on: boolean) {
+    this.micEnhance = on;
+    this.emit();
+    await this.ensureCamera();
+  }
+
+  // The brand logo to show on the "Camera off" card (from branding config).
+  setBrandLogo(url: string) { this.brandLogo = url ? this.loadImg(url) : null; }
+  setBrandAccent(color: string) { this.brandAccent = color || "#F5A524"; }
+  // The host's display name (tile label, chat, guest roster). Re-announces to the
+  // room so a change shows up for guests immediately.
+  setHostName(name: string) {
+    const n = (name || "").trim() || "Host";
+    if (n === this.hostName) return;
+    this.hostName = n;
+    try {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const me: Participant = { id: "host", name: n, role: "host", sessionId: this.rtc?.sessionId, hasVideo: true, hasAudio: true };
+        this.ws.send(JSON.stringify({ type: "studio", action: "update", participant: me }));
+      }
+    } catch {}
+    this.emit();
+  }
+  setHostZoom(z: number) { this.hostZoom = Math.max(1, Math.min(3, z)); this.emit(); }
+
+  // Read the webcam's optical/digital zoom range (if any) so the UI can offer a
+  // real wide/tight control. Not all webcams support it.
+  private readCamZoom(track?: MediaStreamTrack) {
+    try {
+      const caps = track?.getCapabilities?.() as any;
+      const set = track?.getSettings?.() as any;
+      if (caps && caps.zoom && typeof caps.zoom.max === "number" && caps.zoom.max > (caps.zoom.min ?? 1)) {
+        this.camZoom = { supported: true, min: caps.zoom.min ?? 1, max: caps.zoom.max, step: caps.zoom.step || 0.1, value: set?.zoom ?? caps.zoom.min ?? 1 };
+      } else {
+        this.camZoom = { supported: false, min: 1, max: 1, step: 1, value: 1 };
+      }
+    } catch { this.camZoom = { supported: false, min: 1, max: 1, step: 1, value: 1 }; }
+    this.emit();
+  }
+  // Set the webcam's lens zoom (lower = wider field of view = fits more people).
+  async setCameraZoomHw(v: number) {
+    const track = this.hostStream?.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      await (track as any).applyConstraints({ advanced: [{ zoom: v }] });
+      this.camZoom = { ...this.camZoom, value: v };
+      this.emit();
+    } catch { /* not supported */ }
+  }
+
+  private startCompositing() {
+    this.ctx2d = this.canvas!.getContext("2d");
+    const loop = () => { this.renderFrame(); this.raf = requestAnimationFrame(loop); };
+    loop();
+    this.startBackgroundClock();
+  }
+
+  // Draw one composited frame. Called by both requestAnimationFrame (smooth
+  // while the tab is focused) and an audio-clock (keeps firing when the tab is
+  // backgrounded). The timestamp gate caps to ~30fps and de-dupes the two.
+  private renderFrame() {
+    const ctx = this.ctx2d; if (!ctx) return;
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    if (now - this.lastDraw < 1000 / 30) return;
+    this.lastDraw = now;
+    this.drawProgram(ctx);
+    // Cross-fade: fade the pre-switch snapshot out over the new look.
+    if (this.transSnap) {
+      const p = Math.min(1, (now - this.transStart) / this.transMs);
+      ctx.save(); ctx.globalAlpha = 1 - p; ctx.drawImage(this.transSnap, 0, 0, W, H); ctx.restore();
+      if (p >= 1) this.transSnap = null;
+    }
+  }
+
+  // Snapshot the current frame so the next state change cross-fades from it.
+  beginTransition() {
+    if (this.transitionStyle === "cut" || !this.canvas) return;
+    try {
+      if (!this.transCanvas) { this.transCanvas = document.createElement("canvas"); this.transCanvas.width = W; this.transCanvas.height = H; }
+      const c = this.transCanvas.getContext("2d"); if (!c) return;
+      c.clearRect(0, 0, W, H); c.drawImage(this.canvas, 0, 0, W, H);
+      this.transSnap = this.transCanvas;
+      this.transStart = typeof performance !== "undefined" ? performance.now() : 0;
+    } catch {}
+  }
+  setTransitionStyle(s: "cut" | "fade") { this.transitionStyle = s; this.emit(); }
+
+  // Draw the current program look (all the mode branches). renderFrame wraps
+  // this and applies the transition overlay.
+  private drawProgram(ctx: CanvasRenderingContext2D) {
+    // Intro/"starting soon" bumper replaces the whole program visually when on.
+    if (this.bumperEnabled) { this.drawBumper(ctx); return; }
+
+    // A rolling media video fills the program while it plays (audio-only media
+    // just mixes over the current camera, so no video takeover in that case).
+    if (this.mediaPlaying && this.mediaHasVideo && this.mediaEl && this.mediaEl.videoWidth) {
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+      drawCover(ctx, this.mediaEl, 0, 0, W, H);
+      this.drawGraphics(ctx);
+      return;
+    }
+
+    // Branded scene takes over the frame when enabled (host over a background).
+    if (this.sceneEnabled) { this.drawScene(ctx); this.drawGraphics(ctx); return; }
+
+    // Refresh audio levels / active-speaker (throttled internally to ~7x/sec).
+    this.updateLevels();
+
+    ctx.fillStyle = "#0A0908"; ctx.fillRect(0, 0, W, H);
+    // Each tile carries its video, display name, and a stable key ("host" or the
+    // guest sessionId) used for name labels and active-speaker highlighting.
+    const tiles: { video: HTMLVideoElement; name: string; key: string }[] = [];
+    if (this.hostVideo) tiles.push({ video: this.hostVideo, name: this.hostName, key: "host" });
+    // Only ADMITTED guests composite into the program. Others may have a video
+    // pulled for the host's pre-admit preview, but must not go on air.
+    this.guestVideos.forEach((v, sid) => { if (this.admitted.has(sid)) tiles.push({ video: v, name: this.guestName(sid), key: sid }); });
+
+    if (this.screenSharing && this.screenVideo && this.screenVideo.videoWidth) {
+      this.drawScreenLayout(ctx, tiles);
+    } else {
+      const n = tiles.length || 1;
+      const gap = 10;
+      if (this.layout === "custom") {
+        tiles.forEach((t, i) => {
+          const rct = this.tileRect(t.key, i);
+          this.paintTile(ctx, t, rct.x, rct.y, rct.w, rct.h, true);
+          this.drawTileLabel(ctx, t.name, t.key, rct.x, rct.y, rct.w, rct.h);
+        });
+      } else if (this.layout === "spotlight" && tiles.length > 1) {
+        const strip = 300;
+        const bigW = W - strip - gap;
+        this.paintTile(ctx, tiles[0], 0, 0, bigW, H, false);
+        this.drawTileLabel(ctx, tiles[0].name, tiles[0].key, 0, 0, bigW, H);
+        const ch = (H - gap * (n - 2)) / (n - 1);
+        tiles.slice(1).forEach((t, i) => {
+          const ty = i * (ch + gap);
+          this.paintTile(ctx, t, W - strip, ty, strip, ch, true);
+          this.drawTileLabel(ctx, t.name, t.key, W - strip, ty, strip, ch);
+        });
+      } else if (tiles.length === 1) {
+        this.paintTile(ctx, tiles[0], 0, 0, W, H, false); // single camera fills the frame
+        this.drawTileLabel(ctx, tiles[0].name, tiles[0].key, 0, 0, W, H, 0);
+      } else if (n === 1) {
+        // No tiles yet (host video not ready) - keep the empty backdrop.
+      } else {
+        const cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
+        const cw = (W - gap * (cols - 1)) / cols, chh = (H - gap * (rows - 1)) / rows;
+        tiles.forEach((t, i) => {
+          const c = i % cols, r = Math.floor(i / cols);
+          const tx = c * (cw + gap), ty = r * (chh + gap);
+          this.paintTile(ctx, t, tx, ty, cw, chh, true);
+          this.drawTileLabel(ctx, t.name, t.key, tx, ty, cw, chh);
+        });
+      }
+    }
+    this.drawGraphics(ctx);
+  }
+
+  // Draw a tile's video - or a "Camera off" placeholder for the host tile when
+  // the camera is turned off - into the given box.
+  private paintTile(ctx: CanvasRenderingContext2D, t: { video: HTMLVideoElement; key: string }, x: number, y: number, w: number, h: number, rounded: boolean) {
+    if (t.key === "host" && !this.cameraOn) {
+      ctx.save();
+      if (rounded) { roundRectPath(ctx, x, y, w, h, TILE_R); ctx.clip(); }
+      // Dark radial backdrop.
+      const cx = x + w / 2;
+      const g = ctx.createRadialGradient(cx, y + h * 0.42, 10, cx, y + h * 0.42, Math.max(w, h) * 0.6);
+      g.addColorStop(0, "#1B1613"); g.addColorStop(1, "#0B0A09");
+      ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+
+      // Breathing pulse (drives the logo opacity + a soft ring).
+      const now = typeof performance !== "undefined" ? performance.now() : 0;
+      const pulse = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(now / 850));
+      const unit = Math.min(w, h);
+      const logo = this.brandLogo;
+      const fs = Math.max(13, Math.round(unit * 0.055));
+      let midY = y + h / 2;
+
+      if (logo?.complete && logo.naturalWidth) {
+        const aspect = logo.naturalHeight / logo.naturalWidth || 1;
+        const baseLw = Math.min(unit * 0.30, 220);
+        const baseLh = baseLw * aspect;
+        const centerY = y + h / 2 - baseLh * 0.4;
+        const scale = 1 + 0.05 * Math.sin(now / 700); // gentle breathing scale
+        const lw = baseLw * scale, lh = baseLh * scale;
+        // soft pulsing halo behind the logo
+        ctx.save();
+        const halo = ctx.createRadialGradient(cx, centerY, 4, cx, centerY, baseLw * 0.95);
+        halo.addColorStop(0, `rgba(245,165,36,${0.18 * pulse})`);
+        halo.addColorStop(1, "rgba(245,165,36,0)");
+        ctx.fillStyle = halo; ctx.fillRect(cx - baseLw, centerY - baseLw, baseLw * 2, baseLw * 2);
+        ctx.restore();
+        // rounded logo (matches the platform's rounded tiles)
+        ctx.save();
+        roundRectPath(ctx, cx - lw / 2, centerY - lh / 2, lw, lh, Math.min(lw, lh) * 0.18);
+        ctx.clip();
+        ctx.globalAlpha = 0.75 + 0.25 * pulse;
+        ctx.drawImage(logo, cx - lw / 2, centerY - lh / 2, lw, lh);
+        ctx.restore();
+        ctx.globalAlpha = 1;
+        midY = centerY + baseLh * 0.6 + fs;
+      } else {
+        // No logo set: a pulsing amber ring as the mark.
+        const r = unit * 0.09;
+        midY = y + h / 2 - r * 0.4;
+        ctx.beginPath(); ctx.arc(cx, midY, r, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(245,165,36,${0.5 + 0.5 * pulse})`;
+        ctx.lineWidth = Math.max(2, unit * 0.012); ctx.stroke();
+        midY = midY + r + fs * 1.4;
+      }
+
+      ctx.fillStyle = "#F3EFE7";
+      ctx.font = `700 ${fs}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("Camera off", cx, midY);
+      ctx.restore();
+      return;
+    }
+    // The host tile honors the zoom control (1 = fill; <1 zooms out to fit a
+    // second person; >1 zooms in). Guests always fill.
+    const zoom = t.key === "host" ? this.hostZoom : 1;
+    if (zoom !== 1) drawZoom(ctx, t.video, x, y, w, h, zoom, rounded);
+    else if (rounded) drawCoverRounded(ctx, t.video, x, y, w, h);
+    else drawCover(ctx, t.video, x, y, w, h);
+  }
+
+  // A silent ScriptProcessorNode fires on the audio thread, which browsers do
+  // NOT throttle when the tab is hidden - so the canvas keeps compositing (and
+  // captureStream keeps producing frames) even after switching windows/tabs.
+  private startBackgroundClock() {
+    if (!this.audioCtx || this.clock) return;
+    try {
+      const sp = this.audioCtx.createScriptProcessor(1024, 1, 1);
+      sp.onaudioprocess = () => this.renderFrame();
+      const mute = this.audioCtx.createGain(); mute.gain.value = 0;
+      sp.connect(mute); mute.connect(this.audioCtx.destination);
+      this.clock = sp;
+    } catch { /* ScriptProcessor unsupported - rAF still covers the visible case */ }
+  }
+
+  // ---- Active-speaker detection ----
+  // Tap a small AnalyserNode off an existing source node. The source stays
+  // connected to audioDest (the mix) untouched; the analyser is a passive
+  // fan-out branch, so it never affects what listeners hear or what's recorded.
+  private attachAnalyser(key: string, src: AudioNode) {
+    if (!this.audioCtx) return;
+    try {
+      const an = this.audioCtx.createAnalyser();
+      an.fftSize = 256;             // small FFT - we only need a coarse RMS
+      an.smoothingTimeConstant = 0.5;
+      src.connect(an);              // extra branch; does not replace src->dest
+      this.analysers.set(key, an);
+      if (!this.audioBuf || this.audioBuf.length < an.fftSize) this.audioBuf = new Uint8Array(an.fftSize);
+    } catch { /* analyser unsupported - active-speaker just stays disabled */ }
+  }
+
+  // Sample every analyser a few times/sec, compute a smoothed RMS level, and pick
+  // the loudest tile above a threshold as the active speaker (debounced via the
+  // smoothing + hysteresis so the amber ring doesn't flicker between talkers).
+  private updateLevels() {
+    if (!this.analysers.size) { this.activeKey = null; return; }
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    if (now - this.lastLevelAt < 140) return; // ~7x/sec
+    this.lastLevelAt = now;
+
+    let buf = this.audioBuf;
+    if (!buf || buf.length < 256) { buf = this.audioBuf = new Uint8Array(256); }
+
+    let best: string | null = null, bestLvl = 0;
+    this.analysers.forEach((an, key) => {
+      const n = Math.min(an.fftSize, buf!.length);
+      an.getByteTimeDomainData(buf as any);
+      let sum = 0;
+      for (let i = 0; i < n; i++) { const s = (buf![i] - 128) / 128; sum += s * s; }
+      const rms = Math.sqrt(sum / n);
+      // Exponential smoothing so short spikes/gaps don't cause flicker.
+      const prev = this.levels.get(key) || 0;
+      const lvl = prev * 0.6 + rms * 0.4;
+      this.levels.set(key, lvl);
+      if (lvl > bestLvl) { bestLvl = lvl; best = key; }
+    });
+
+    const THRESHOLD = 0.045;
+    if (best !== null && bestLvl >= THRESHOLD) {
+      // Hysteresis: only switch away from the current speaker if a clearly
+      // louder tile takes over (>1.4x), otherwise hold the current one.
+      if (this.activeKey && this.activeKey !== best) {
+        const cur = this.levels.get(this.activeKey) || 0;
+        if (bestLvl > cur * 1.4) this.activeKey = best;
+      } else {
+        this.activeKey = best;
+      }
+    } else if (bestLvl < THRESHOLD * 0.7) {
+      this.activeKey = null;
+    }
+  }
+
+  // ---- Name label + active-speaker ring for a tile ----
+  // Draws a subtle lower-left name chip inside the tile, and (if this tile's key
+  // is the active speaker) an amber rounded border around the tile.
+  private drawTileLabel(ctx: CanvasRenderingContext2D, name: string, key: string, x: number, y: number, w: number, h: number, r = TILE_R) {
+    // Active-speaker ring (drawn on the tile edge, inside the clip bounds).
+    if (key && this.activeKey === key) {
+      ctx.save();
+      const inset = 1.5;
+      roundRectPath(ctx, x + inset, y + inset, w - inset * 2, h - inset * 2, Math.max(0, r - inset));
+      ctx.lineWidth = 3; ctx.strokeStyle = this.brandAccent; ctx.stroke();
+      ctx.restore();
+    }
+    if (!name) return;
+    // Scale the chip down when tiles get small (many guests on screen).
+    const small = Math.min(w, h) < 260;
+    const fs = small ? 16 : 22;
+    const padX = small ? 9 : 13, padY = small ? 5 : 7, m = small ? 8 : 12;
+    ctx.save();
+    ctx.font = `600 ${fs}px Inter, sans-serif`;
+    ctx.textBaseline = "middle";
+    // Truncate to fit within the tile width.
+    const maxTextW = w - m * 2 - padX * 2;
+    let label = name;
+    if (ctx.measureText(label).width > maxTextW) {
+      while (label.length > 1 && ctx.measureText(label + "…").width > maxTextW) label = label.slice(0, -1);
+      label = label + "…";
+    }
+    const tw = ctx.measureText(label).width;
+    const chipH = fs + padY * 2, chipW = tw + padX * 2;
+    const cx = x + m, cy = y + h - m - chipH;
+    roundRectPath(ctx, cx, cy, chipW, chipH, chipH / 2);
+    ctx.fillStyle = "rgba(10,9,8,.72)"; ctx.fill();
+    ctx.fillStyle = "#F3EFE7";
+    ctx.fillText(label, cx + padX, cy + chipH / 2 + 0.5);
+    ctx.restore();
+  }
+
+  // Resolve a guest's display name from the roster (fallback "Guest").
+  private guestName(sid: string): string {
+    const g = this.roster.find((p) => p.sessionId === sid);
+    return (g?.name || "").trim() || "Guest";
+  }
+
+  // News-style ticker: a colored label box + text scrolling right-to-left along
+  // the very bottom. Drawn on top of everything, in every scene mode.
+  private drawTicker(ctx: CanvasRenderingContext2D) {
+    if (!this.tickerOn || !this.tickerText) return;
+    const h = 46, y = H - h;
+    ctx.save();
+    ctx.textBaseline = "middle";
+    // Bar background + amber top accent line.
+    ctx.fillStyle = "rgba(10,9,8,.92)"; ctx.fillRect(0, y, W, h);
+    ctx.fillStyle = this.brandAccent; ctx.fillRect(0, y, W, 2);
+
+    // Left label box.
+    let textStart = 0;
+    if (this.tickerLabel) {
+      ctx.font = "700 22px Anton, sans-serif";
+      const lw = ctx.measureText(this.tickerLabel.toUpperCase()).width + 40;
+      ctx.fillStyle = this.brandAccent; ctx.fillRect(0, y, lw, h);
+      ctx.fillStyle = "#151107"; ctx.fillText(this.tickerLabel.toUpperCase(), 20, y + h / 2 + 1);
+      textStart = lw;
+    }
+
+    // Scrolling text region (clipped so it slides under the label).
+    ctx.beginPath(); ctx.rect(textStart, y, W - textStart, h); ctx.clip();
+    ctx.font = "500 22px Inter, sans-serif"; ctx.fillStyle = "#F3EFE7";
+    const tw = ctx.measureText(this.tickerText).width;
+    const gap = 90;
+    // Continuous marquee: the scroll position is a pure function of the clock,
+    // so it never drifts, hitches, or resets - regardless of how evenly frames
+    // are delivered (rAF + audio clock). The text is tiled across the whole
+    // visible width so the loop is seamless and never-ending.
+    const period = tw + gap;
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    const offset = period > 0 ? ((now * 70) / 1000) % period : 0; // 70px/s
+    const startX = textStart + 24 - offset;
+    const copies = Math.ceil((W - textStart) / period) + 2;
+    for (let i = -1; i < copies; i++) {
+      ctx.fillText(this.tickerText, startX + i * period, y + h / 2 + 1);
+    }
+    ctx.restore();
+  }
+
+  // Draw a small platform badge centered at (cx, cy) on the pinned lower-third,
+  // matching the source logos in the chat lists. Returns true if it drew one.
+  private drawSourceBadge(ctx: CanvasRenderingContext2D, source: string | undefined, cx: number, cy: number, size: number): boolean {
+    const s = source || "site";
+    ctx.save();
+    if (s === "youtube") {
+      const w = size * 1.35, h = size * 0.95;
+      roundRectPath(ctx, cx - w / 2, cy - h / 2, w, h, 6);
+      ctx.fillStyle = "#FF0033"; ctx.fill();
+      const t = h * 0.26;
+      ctx.fillStyle = "#fff"; ctx.beginPath();
+      ctx.moveTo(cx - t * 0.55, cy - t); ctx.lineTo(cx - t * 0.55, cy + t); ctx.lineTo(cx + t * 0.9, cy); ctx.closePath(); ctx.fill();
+      ctx.restore(); return true;
+    }
+    if (s === "twitch") {
+      const r = size / 2;
+      roundRectPath(ctx, cx - r, cy - r, size, size, 5);
+      ctx.fillStyle = "#9146FF"; ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.font = `700 ${Math.round(size * 0.72)}px Inter, sans-serif`;
+      ctx.textAlign = "center"; ctx.fillText("t", cx, cy + 1); ctx.textAlign = "left";
+      ctx.restore(); return true;
+    }
+    if (s === "facebook") {
+      ctx.beginPath(); ctx.arc(cx, cy, size / 2, 0, Math.PI * 2); ctx.fillStyle = "#1877F2"; ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.font = `700 ${Math.round(size * 0.72)}px Georgia, serif`;
+      ctx.textAlign = "center"; ctx.fillText("f", cx, cy + 1); ctx.textAlign = "left";
+      ctx.restore(); return true;
+    }
+    // Site: use the brand logo if set, clipped into a circle.
+    if (this.brandLogo?.complete && this.brandLogo.naturalWidth) {
+      const r = size / 2;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+      const asp = this.brandLogo.naturalHeight / this.brandLogo.naturalWidth || 1;
+      let dw = size, dh = size * asp; if (dh < size) { dh = size; dw = size / asp; }
+      ctx.drawImage(this.brandLogo, cx - dw / 2, cy - dh / 2, dw, dh);
+      ctx.restore(); return true;
+    }
+    ctx.restore(); return false;
+  }
+
+  private drawGraphics(ctx: CanvasRenderingContext2D) {
+    ctx.textBaseline = "middle";
+    this.drawRundown(ctx);
+    this.drawTicker(ctx);
+    if (this.pinned) {
+      const { x, y } = this.pinPos, w = PIN_W, h = PIN_H;
+      // Pill-shaped lower-third (rounded capsule) with an amber outline.
+      roundRectPath(ctx, x, y, w, h, h / 2);
+      ctx.fillStyle = "rgba(10,9,8,.9)"; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = this.brandAccent; ctx.stroke();
+      // Source badge (YouTube/Twitch/Facebook/site) so viewers see where the
+      // comment came from - matches the source logos shown in the chat lists.
+      const badgeR = 26, bx = x + 34, by = y + h / 2;
+      const textX = this.drawSourceBadge(ctx, this.pinned.source, bx, by, badgeR) ? bx + badgeR : x + 34;
+      ctx.textAlign = "left";
+      ctx.fillStyle = this.brandAccent; ctx.font = "700 20px Inter, sans-serif"; ctx.fillText(this.pinned.name.toUpperCase(), textX, y + 30);
+      ctx.fillStyle = "#F3EFE7"; ctx.font = "400 22px Inter, sans-serif";
+      ctx.fillText(this.pinned.text.slice(0, 44), textX, y + 62);
+    }
+    if (this.tipAlert) {
+      const { name, amount, message } = this.tipAlert;
+      const bw = 620, bh = message ? 128 : 92, x = (W - bw) / 2, y = 40;
+      ctx.save();
+      roundRectPath(ctx, x, y, bw, bh, 18);
+      ctx.fillStyle = this.brandAccent; ctx.fill();
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#151107"; ctx.font = "700 40px Anton, sans-serif";
+      ctx.fillText(`${name} tipped $${amount.toFixed(2)}`, W / 2, y + 42);
+      if (message) { ctx.font = "400 24px Inter, sans-serif"; ctx.fillText(message.slice(0, 60), W / 2, y + 90); }
+      ctx.textAlign = "left"; ctx.restore();
+    }
+    if (this.banner) {
+      const { x, y } = this.bannerPos, ph = 56;
+      // Measure both blocks first so the chosen shape (bar/rounded/pill) can
+      // round the whole banner cleanly via a clip.
+      ctx.font = "400 34px Anton, sans-serif";
+      const tw = ctx.measureText(this.banner.title.toUpperCase()).width + 44;
+      let sw = 0;
+      if (this.banner.subtitle) { ctx.font = "500 18px Inter, sans-serif"; sw = ctx.measureText(this.banner.subtitle).width + 40; }
+      const total = tw + sw;
+      const r = this.bannerStyle === "pill" ? ph / 2 : this.bannerStyle === "rounded" ? 12 : 0;
+      // Colored blocks inside a rounded clip.
+      ctx.save();
+      roundRectPath(ctx, x, y, total, ph, r); ctx.clip();
+      ctx.fillStyle = this.brandAccent; ctx.fillRect(x, y, tw, ph);
+      if (sw) { ctx.fillStyle = "rgba(10,9,8,.9)"; ctx.fillRect(x + tw, y, sw, ph); }
+      ctx.restore();
+      // Text on top.
+      ctx.fillStyle = "#151107"; ctx.font = "400 34px Anton, sans-serif";
+      ctx.fillText(this.banner.title.toUpperCase(), x + 22, y + ph / 2 + 2);
+      if (sw) { ctx.fillStyle = "#F3EFE7"; ctx.font = "500 18px Inter, sans-serif"; ctx.fillText(this.banner.subtitle, x + tw + 20, y + ph / 2 + 1); }
+      this.bannerRect = { x, y, w: total, h: ph };
+    }
+  }
+
+  setBanner(title: string, subtitle: string) { this.banner = title.trim() ? { title, subtitle } : null; this.emit(); }
+  setBannerStyle(s: "bar" | "rounded" | "pill") { this.bannerStyle = s; this.emit(); }
+
+  // ---- Media: play a video/music file live ----
+  // Plays a picked file into the program. A video fills the screen while it
+  // runs; an audio-only file mixes over the current camera. Audio goes to the
+  // broadcast (not the host's speakers) to avoid mic feedback - use the level
+  // slider and watch the Program preview.
+  playMedia(file: File) { this._startMedia(URL.createObjectURL(file), file.name); }
+  playMediaBlob(blob: Blob, name: string) { this._startMedia(URL.createObjectURL(blob), name); }
+  private _startMedia(url: string, name: string) {
+    this.stopMedia();
+    if (!this.audioCtx || !this.audioDest) { try { URL.revokeObjectURL(url); } catch {} return; }
+    const el = document.createElement("video");
+    el.src = url; el.playsInline = true; el.muted = false;
+    (el as any)._objUrl = url;
+    el.onloadedmetadata = () => { this.mediaHasVideo = el.videoWidth > 0; this.emit(); };
+    el.onended = () => this.stopMedia();
+    this.mediaEl = el;
+    this.mediaName = name;
+    try {
+      this.mediaSrc = this.audioCtx.createMediaElementSource(el);
+      this.mediaGain = this.audioCtx.createGain();
+      this.mediaGain.gain.value = this.mediaLevel;
+      this.mediaSrc.connect(this.mediaGain);
+      this.mediaGain.connect(this.audioDest); // out to the broadcast
+    } catch { this.mediaSrc = null; this.mediaGain = null; }
+    this.audioCtx.resume().catch(() => {});
+    el.play().catch(() => {});
+    this.mediaPlaying = true;
+    this.emit();
+  }
+  setMediaLevel(v: number) { this.mediaLevel = v; if (this.mediaGain) this.mediaGain.gain.value = v; this.emit(); }
+  stopMedia() {
+    if (this.mediaGain) { try { this.mediaGain.disconnect(); } catch {} this.mediaGain = null; }
+    if (this.mediaSrc) { try { this.mediaSrc.disconnect(); } catch {} this.mediaSrc = null; }
+    if (this.mediaEl) {
+      try { this.mediaEl.pause(); } catch {}
+      const u = (this.mediaEl as any)._objUrl; if (u) { try { URL.revokeObjectURL(u); } catch {} }
+      this.mediaEl.src = ""; this.mediaEl = null;
+    }
+    this.mediaPlaying = false; this.mediaHasVideo = false; this.mediaName = "";
+    this.emit();
+  }
+
+  // ---- Instant replay (opt-in, isolated from the live WHIP publish) ----
+  // Runs two MediaRecorders on a separate capture of the program canvas,
+  // staggered by half the window, so at any moment one holds ~20-40s with a
+  // valid file header. Grabbing a clip stops the fuller one (flushing a valid
+  // webm) and restarts it. A bug here can't affect the live stream.
+  startReplayBuffer() {
+    if (this.replayActive || !this.canvas || !this.audioDest) return;
+    if (typeof MediaRecorder === "undefined") { this.error = "Replay isn't supported in this browser."; this.emit(); return; }
+    try {
+      const cs = this.canvas.captureStream(24);
+      const out = new MediaStream(cs.getVideoTracks());
+      this.audioDest.stream.getAudioTracks().forEach((t) => out.addTrack(t));
+      const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm";
+      const makeSlot = (delay: number): ReplaySlot => {
+        const slot: ReplaySlot = { rec: null, chunks: [], start: 0, startRec: () => {} };
+        slot.startRec = () => {
+          try {
+            const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 2_500_000 });
+            slot.rec = rec; slot.chunks = []; slot.start = performance.now();
+            rec.ondataavailable = (e) => { if (e.data && e.data.size) slot.chunks.push(e.data); };
+            rec.onstop = () => { const b = new Blob(slot.chunks, { type: "video/webm" }); const r = slot.resolve; slot.resolve = undefined; if (r) r(b); };
+            rec.start();
+          } catch {}
+        };
+        this.replayTimers.push(setTimeout(() => {
+          slot.startRec();
+          this.replayTimers.push(setInterval(() => {
+            if (slot.resolve) return; // a clip is flushing; don't rotate now
+            try { slot.rec?.stop(); } catch {}
+            this.replayTimers.push(setTimeout(() => slot.startRec(), 60));
+          }, this.REPLAY_WINDOW) as unknown as ReturnType<typeof setTimeout>);
+        }, delay));
+        return slot;
+      };
+      this.replaySlots = [makeSlot(0), makeSlot(this.REPLAY_WINDOW / 2)];
+      this.replayActive = true; this.emit();
+    } catch { this.error = "Could not start replay."; this.emit(); }
+  }
+
+  stopReplayBuffer() {
+    this.replayTimers.forEach((t) => { clearTimeout(t); clearInterval(t as unknown as ReturnType<typeof setInterval>); });
+    this.replayTimers = [];
+    this.replaySlots.forEach((s) => { try { s.rec?.stop(); } catch {} });
+    this.replaySlots = [];
+    this.replayActive = false; this.emit();
+  }
+
+  // Flush the fuller recorder into a valid webm blob (and restart it).
+  private async grabClip(): Promise<Blob | null> {
+    if (!this.replayActive || this.replaySlots.length === 0) return null;
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    const cand = this.replaySlots.filter((s) => s.rec && !s.resolve).sort((a, b) => (now - b.start) - (now - a.start))[0];
+    if (!cand || !cand.rec) return null;
+    const blob = await new Promise<Blob>((res) => { cand.resolve = res; try { cand.rec!.stop(); } catch { cand.resolve = undefined; res(new Blob()); } });
+    cand.startRec();
+    return blob && blob.size ? blob : null;
+  }
+
+  // Roll the last ~30s back onto the broadcast.
+  async replayNow() {
+    const blob = await this.grabClip();
+    if (blob) this.playMediaBlob(blob, "Instant replay");
+    else { this.error = "No replay captured yet - give the buffer a few seconds."; this.emit(); }
+  }
+
+  // Download the last ~30s as a clip (great for Shorts).
+  async saveClip() {
+    const blob = await this.grabClip();
+    if (!blob) { this.error = "No replay captured yet - give the buffer a few seconds."; this.emit(); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+    a.href = url; a.download = `clip-${stamp}.webm`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+  }
+
+  hideBanner() { this.banner = null; this.emit(); }
+  setPinned(name: string, text: string, source?: string) { this.pinned = { name, text, source }; this.emit(); }
+  clearPinned() { this.pinned = null; this.emit(); }
+  // Pop a tip alert onto the broadcast for a few seconds (auto-clears).
+  showTipAlert(name: string, amount: number, message: string) {
+    this.tipAlert = { name, amount, message };
+    if (this.tipTimer) clearTimeout(this.tipTimer);
+    this.tipTimer = setTimeout(() => { this.tipAlert = null; this.emit(); }, 9000);
+    this.emit();
+  }
+  clearGraphics() { this.banner = null; this.pinned = null; this.emit(); }
+  setLayout(l: Layout) { this.layout = l; this.emit(); }
+
+  // ---- Custom (free) layout: drag to move, wheel/slider to resize ----
+  private tileRect(key: string, i: number): Rect {
+    const existing = this.tileRects.get(key);
+    if (existing) return existing;
+    const w = 520, h = Math.round((w * 9) / 16);
+    const def: Rect = { x: Math.min(40 + i * 40, W - w), y: Math.min(40 + i * 40, H - h), w, h };
+    this.tileRects.set(key, def);
+    return def;
+  }
+  // Topmost tile under a point (later-drawn tiles win), or null.
+  hitTile(x: number, y: number): string | null {
+    if (this.layout !== "custom") return null;
+    const keys: string[] = [];
+    if (this.hostVideo) keys.push("host");
+    this.guestVideos.forEach((_v, sid) => keys.push(sid));
+    for (let i = keys.length - 1; i >= 0; i--) {
+      const r = this.tileRects.get(keys[i]);
+      if (r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return keys[i];
+    }
+    return null;
+  }
+  tileBox(key: string): Rect { return this.tileRects.get(key) || { x: 0, y: 0, w: 0, h: 0 }; }
+  setTilePos(key: string, x: number, y: number) {
+    const r = this.tileRects.get(key); if (!r) return;
+    r.x = Math.max(-r.w * 0.5, Math.min(x, W - r.w * 0.5));
+    r.y = Math.max(-r.h * 0.5, Math.min(y, H - r.h * 0.5));
+    this.emit();
+  }
+  // Resize around the tile's center, keeping 16:9. factor > 1 grows.
+  resizeTile(key: string, factor: number) {
+    const r = this.tileRects.get(key); if (!r) return;
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    const w = Math.max(160, Math.min(W, r.w * factor));
+    r.w = w; r.h = Math.round((w * 9) / 16); r.x = cx - r.w / 2; r.y = cy - r.h / 2;
+    this.emit();
+  }
+
+  // ---- Vertical (9:16) recording for Shorts/TikTok/Reels ----
+  // Center-crops the landscape program into a 720x1280 canvas and records it
+  // locally. Runs separately from the live stream.
+  startVerticalRecording() {
+    if (this.verticalRecording || !this.canvas || !this.audioDest) return;
+    if (typeof MediaRecorder === "undefined") { this.error = "Vertical recording isn't supported in this browser."; this.emit(); return; }
+    try {
+      const vc = document.createElement("canvas"); vc.width = 720; vc.height = 1280; this.vCanvas = vc;
+      const vctx = vc.getContext("2d");
+      if (!vctx) return;
+      const draw = () => {
+        if (!this.canvas) return;
+        const srcW = (this.canvas.height * 9) / 16; // center column that is 9:16
+        const sx = (this.canvas.width - srcW) / 2;
+        vctx.drawImage(this.canvas, sx, 0, srcW, this.canvas.height, 0, 0, 720, 1280);
+        this.vRaf = requestAnimationFrame(draw);
+      };
+      draw();
+      const out = new MediaStream(vc.captureStream(30).getVideoTracks());
+      this.audioDest.stream.getAudioTracks().forEach((t) => out.addTrack(t));
+      const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm";
+      this.vRec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+      this.vChunks = [];
+      this.vRec.ondataavailable = (e) => { if (e.data && e.data.size) this.vChunks.push(e.data); };
+      this.vRec.onstop = () => {
+        const blob = new Blob(this.vChunks, { type: "video/webm" }); this.vChunks = [];
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+        a.href = url; a.download = `vertical-${stamp}.webm`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 15000);
+      };
+      this.vRec.start(1000);
+      this.verticalRecording = true; this.emit();
+    } catch { this.error = "Could not start vertical recording."; this.emit(); }
+  }
+  stopVerticalRecording() {
+    if (!this.verticalRecording) return;
+    if (this.vRaf) { cancelAnimationFrame(this.vRaf); this.vRaf = 0; }
+    try { this.vRec?.stop(); } catch {}
+    this.vRec = null; this.vCanvas = null; this.verticalRecording = false; this.emit();
+  }
+
+  // ---- Branded scene ----
+  private loadImg(dataUrl: string): HTMLImageElement | null {
+    if (!dataUrl) return null;
+    const img = new Image();
+    img.src = dataUrl;
+    return img;
+  }
+  setScene(cfg: Partial<{ enabled: boolean; mode: "none" | "chroma" | "ml"; chroma: string; background: string; frame: string; logo: string; tickerOn: boolean; tickerLabel: string; ticker: string }>) {
+    if (typeof cfg.enabled === "boolean") this.sceneEnabled = cfg.enabled;
+    if (cfg.mode) this.sceneMode = cfg.mode;
+    if (cfg.chroma) this.chromaColor = cfg.chroma;
+    if (cfg.background !== undefined) this.sceneBg = this.loadImg(cfg.background);
+    if (cfg.frame !== undefined) this.sceneFrame = this.loadImg(cfg.frame);
+    if (cfg.logo !== undefined) this.sceneLogo = this.loadImg(cfg.logo);
+    if (typeof cfg.tickerOn === "boolean") this.tickerOn = cfg.tickerOn;
+    if (cfg.tickerLabel !== undefined) this.tickerLabel = cfg.tickerLabel;
+    if (cfg.ticker !== undefined) this.setTickerText(cfg.ticker);
+    this.emit();
+  }
+  setSceneEnabled(v: boolean) { this.sceneEnabled = v; this.emit(); }
+  setSceneMode(m: "none" | "chroma" | "ml") { this.sceneMode = m; this.emit(); }
+  setChromaColor(c: string) { this.chromaColor = c; this.emit(); }
+
+  // ---- Rundown (PTI-style topic rail) ----
+  setRundown(cfg: Partial<{ enabled: boolean; title: string; showTimer: boolean; activeIndex: number; items: { title: string; image: string; seconds?: number }[] }>) {
+    if (typeof cfg.enabled === "boolean") this.rundownEnabled = cfg.enabled;
+    if (cfg.title !== undefined) this.rundownTitle = cfg.title;
+    if (typeof cfg.showTimer === "boolean") this.rundownShowTimer = cfg.showTimer;
+    if (cfg.items !== undefined) {
+      // Reuse already-decoded images when a topic's image is unchanged, so
+      // editing a title doesn't reload every picture each keystroke.
+      const prev = this.rundownItems, prevImgs = this.rundownImgs;
+      this.rundownItems = cfg.items;
+      this.rundownImgs = cfg.items.map((it, i) =>
+        prev[i] && prev[i].image === it.image && prevImgs[i] ? prevImgs[i] : this.loadImg(it.image)
+      );
+    }
+    if (cfg.activeIndex !== undefined) {
+      const max = Math.max(0, this.rundownItems.length - 1);
+      const next = Math.max(0, Math.min(cfg.activeIndex, max));
+      if (next !== this.rundownActive) this.setRundownActive(next, false); // resets timer only on a real change
+    }
+    this.emit();
+  }
+  // Set the current topic (highlighted + image shown) and restart its timer.
+  setRundownActive(i: number, emit = true) {
+    const max = Math.max(0, this.rundownItems.length - 1);
+    this.rundownActive = Math.max(0, Math.min(i, max));
+    this.rundownActiveSince = typeof performance !== "undefined" ? performance.now() : 0;
+    if (emit) this.emit();
+  }
+  setRundownEnabled(v: boolean) { this.rundownEnabled = v; if (v) this.rundownActiveSince = typeof performance !== "undefined" ? performance.now() : 0; this.emit(); }
+
+  private drawRundown(ctx: CanvasRenderingContext2D) {
+    if (!this.rundownEnabled || this.rundownItems.length === 0) return;
+    const colW = 300, x0 = W - colW, pad = 18;
+    ctx.save();
+    // Rail background.
+    ctx.fillStyle = "rgba(10,9,8,.92)"; ctx.fillRect(x0, 0, colW, H);
+    ctx.fillStyle = this.brandAccent; ctx.fillRect(x0, 0, 4, H); // left accent edge
+    let y = 0;
+
+    // Active topic image across the top of the rail.
+    const active = this.rundownImgs[this.rundownActive];
+    const imgH = Math.round(colW * 0.6);
+    if (active?.complete && active.naturalWidth) {
+      coverDraw(ctx, active, active.naturalWidth, active.naturalHeight, x0 + 4, 0, colW - 4, imgH);
+      y = imgH;
+    } else {
+      y = 8;
+    }
+
+    // Topic clock. If the active topic has a length, count DOWN from it and turn
+    // red in the final 10s (and at 0). Otherwise count UP as "time on topic".
+    if (this.rundownShowTimer) {
+      const now = typeof performance !== "undefined" ? performance.now() : 0;
+      const elapsed = Math.max(0, Math.floor((now - this.rundownActiveSince) / 1000));
+      const dur = Math.max(0, Math.floor(this.rundownItems[this.rundownActive]?.seconds || 0));
+      let secs: number, danger = false, over = false;
+      if (dur > 0) {
+        const remain = dur - elapsed;
+        if (remain >= 0) {
+          secs = remain;
+          danger = remain <= 10; // warn in the final 10s
+        } else {
+          secs = -remain; // count how far past the segment length we are
+          over = true;
+        }
+      } else {
+        secs = elapsed;
+      }
+      const mm = Math.floor(secs / 60), ss = secs % 60;
+      const clock = `${over ? "+" : ""}${mm}:${ss.toString().padStart(2, "0")}`;
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.font = "400 46px Anton, sans-serif";
+      // Red in the final 10s; stays red while running overtime (+m:ss).
+      ctx.fillStyle = danger || over ? "#E8402A" : "#F3EFE7";
+      y += 52;
+      ctx.fillText(clock, x0 + pad, y);
+      y += 10;
+    } else {
+      y += 8;
+    }
+
+    // Header label.
+    ctx.font = "400 26px Anton, sans-serif";
+    ctx.fillStyle = this.brandAccent;
+    y += 30;
+    ctx.fillText((this.rundownTitle || "RUNDOWN").toUpperCase(), x0 + pad, y);
+    y += 14;
+
+    // Topic list. The active row gets an accent highlight bar; the rest are
+    // cream text. Rows are sized to fit the remaining rail height.
+    const remaining = H - y - pad;
+    const rowH = Math.max(30, Math.min(46, Math.floor(remaining / this.rundownItems.length)));
+    const fs = Math.min(30, rowH - 8);
+    ctx.font = `400 ${fs}px Anton, sans-serif`;
+    for (let i = 0; i < this.rundownItems.length; i++) {
+      const rowY = y + i * rowH;
+      if (rowY + rowH > H) break; // don't spill past the frame
+      const label = (this.rundownItems[i].title || "").toUpperCase();
+      const isActive = i === this.rundownActive;
+      if (isActive) {
+        ctx.fillStyle = this.brandAccent;
+        ctx.fillRect(x0 + 4, rowY, colW - 4, rowH);
+        ctx.fillStyle = "#151107";
+      } else {
+        ctx.fillStyle = "#F3EFE7";
+      }
+      ctx.fillText(this.fitText(ctx, label, colW - pad - pad), x0 + pad, rowY + rowH - 10);
+    }
+    ctx.restore();
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  }
+
+  // Truncate a label with an ellipsis so it fits maxW at the current font.
+  private fitText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string {
+    if (ctx.measureText(text).width <= maxW) return text;
+    let s = text;
+    while (s.length > 1 && ctx.measureText(s + "...").width > maxW) s = s.slice(0, -1);
+    return s + "...";
+  }
+
+  // Join the ticker lines into one scrolling string (separated by a bullet).
+  private setTickerText(raw: string) {
+    const items = raw.split("\n").map((s) => s.trim()).filter(Boolean);
+    this.tickerText = items.join("      •      ");
+  }
+
+  private drawScene(ctx: CanvasRenderingContext2D) {
+    if (this.sceneBg?.complete && this.sceneBg.naturalWidth) coverDraw(ctx, this.sceneBg, this.sceneBg.naturalWidth, this.sceneBg.naturalHeight, 0, 0, W, H);
+    else { ctx.fillStyle = "#0A0908"; ctx.fillRect(0, 0, W, H); }
+
+    const host = this.hostVideo;
+    if (host && host.videoWidth) {
+      if (this.sceneMode === "chroma") this.drawChromaHost(ctx, host);
+      else if (this.sceneMode === "ml") this.drawMlHost(ctx, host);
+      else drawCover(ctx, host, 0, 0, W, H);
+    }
+
+    if (this.sceneFrame?.complete && this.sceneFrame.naturalWidth) ctx.drawImage(this.sceneFrame, 0, 0, W, H);
+    if (this.sceneLogo?.complete && this.sceneLogo.naturalWidth) {
+      const lw = 170, lh = lw * (this.sceneLogo.naturalHeight / this.sceneLogo.naturalWidth || 0.4);
+      ctx.drawImage(this.sceneLogo, (W - lw) / 2, 22, lw, lh);
+    }
+  }
+
+  // ---- Intro / "starting soon" bumper ----
+  // A card (still image + headline/subtext + optional countdown) is the SAFE
+  // default: it never taints the canvas so captureStream()/WHIP keep working.
+  // An optional looping intro VIDEO is supported too, but the URL must be
+  // CORS-enabled (crossOrigin="anonymous") or drawing it would taint the canvas
+  // and break the broadcast - the UI documents this.
+  setBumper(cfg: Partial<{ enabled: boolean; mode: "card" | "video"; headline: string; subtext: string; background: string; videoUrl: string; startsAt: number }>) {
+    if (typeof cfg.enabled === "boolean") this.bumperEnabled = cfg.enabled;
+    if (cfg.mode) this.bumperMode = cfg.mode;
+    if (cfg.headline !== undefined) this.bumperHeadline = cfg.headline;
+    if (cfg.subtext !== undefined) this.bumperSubtext = cfg.subtext;
+    if (cfg.background !== undefined) this.bumperBg = this.loadImg(cfg.background);
+    if (cfg.videoUrl !== undefined) this.bumperVideoUrl = cfg.videoUrl;
+    if (cfg.startsAt !== undefined) this.bumperStartsAt = Number(cfg.startsAt) || 0;
+    this.syncBumperVideo();
+    this.emit();
+  }
+
+  // Create/tear down the looping intro video element and its audio branch as the
+  // url/enabled/mode change. Audio is routed into the program mix (audioDest)
+  // ONLY while the bumper is enabled + in video mode; otherwise it's detached so
+  // it never lingers in the mix once the bumper is off.
+  private syncBumperVideo() {
+    const wantVideo = this.bumperEnabled && this.bumperMode === "video" && !!this.bumperVideoUrl;
+
+    // URL changed - rebuild the element from scratch (a MediaElementSource can be
+    // created only once per element, so a new url means a new element).
+    if (this.bumperVideo && this.bumperVideo.src !== this.bumperVideoUrl) {
+      this.teardownBumperVideo();
+    }
+
+    if (wantVideo) {
+      if (!this.bumperVideo) {
+        const v = document.createElement("video");
+        v.crossOrigin = "anonymous"; // required so drawing it doesn't taint the canvas
+        v.loop = true; v.muted = false; v.autoplay = true;
+        (v as any).playsInline = true;
+        v.src = this.bumperVideoUrl;
+        this.bumperVideo = v;
+        // Route its audio into the program mix (created once per element).
+        if (this.audioCtx && this.audioDest) {
+          try {
+            this.bumperAudioSrc = this.audioCtx.createMediaElementSource(v);
+            this.bumperAudioSrc.connect(this.audioDest);
+          } catch { this.bumperAudioSrc = null; }
+        }
+      }
+      this.bumperVideo.play().catch(() => {});
+    } else if (this.bumperVideo) {
+      // Not wanted right now: pause + detach audio, but keep card fallback safe.
+      try { this.bumperVideo.pause(); } catch {}
+      if (!this.bumperEnabled || this.bumperMode !== "video") this.teardownBumperVideo();
+    }
+  }
+
+  private teardownBumperVideo() {
+    if (this.bumperAudioSrc) { try { this.bumperAudioSrc.disconnect(); } catch {} this.bumperAudioSrc = null; }
+    if (this.bumperVideo) { try { this.bumperVideo.pause(); } catch {} this.bumperVideo.src = ""; this.bumperVideo = null; }
+  }
+
+  // Wrap text to fit a max width, shrinking the font until it fits in maxLines.
+  private wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    const lines: string[] = [];
+    let cur = words[0];
+    for (let i = 1; i < words.length; i++) {
+      const test = cur + " " + words[i];
+      if (ctx.measureText(test).width <= maxWidth) cur = test;
+      else { lines.push(cur); cur = words[i]; }
+    }
+    lines.push(cur);
+    return lines.slice(0, maxLines);
+  }
+
+  private formatCountdown(ms: number): string {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return h > 0 ? `Starting in ${h}:${pad(m)}:${pad(s)}` : `Starting in ${pad(m)}:${pad(s)}`;
+  }
+
+  private drawBumper(ctx: CanvasRenderingContext2D) {
+    // Video mode: draw the looping intro full-frame if it's ready, else fall back
+    // to the card look so viewers never see a blank frame while it buffers.
+    if (this.bumperMode === "video" && this.bumperVideo && this.bumperVideo.videoWidth) {
+      drawCover(ctx, this.bumperVideo, 0, 0, W, H);
+      return;
+    }
+
+    // Card mode (and video fallback): background image cover-filled, else a dark
+    // radial gradient on-brand (#1A1614 -> #0B0A09).
+    if (this.bumperBg?.complete && this.bumperBg.naturalWidth) {
+      coverDraw(ctx, this.bumperBg, this.bumperBg.naturalWidth, this.bumperBg.naturalHeight, 0, 0, W, H);
+      // Slight scrim so text stays legible over any image.
+      ctx.fillStyle = "rgba(10,9,8,.45)"; ctx.fillRect(0, 0, W, H);
+    } else {
+      const g = ctx.createRadialGradient(W / 2, H / 2, 80, W / 2, H / 2, W * 0.72);
+      g.addColorStop(0, "#1A1614"); g.addColorStop(1, "#0B0A09");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+
+    // Logo (reuse the scene logo if one is set), centered near the top.
+    let topY = 150;
+    if (this.sceneLogo?.complete && this.sceneLogo.naturalWidth) {
+      const lw = 200, lh = lw * (this.sceneLogo.naturalHeight / this.sceneLogo.naturalWidth || 0.4);
+      ctx.drawImage(this.sceneLogo, (W - lw) / 2, 70, lw, lh);
+      topY = 70 + lh + 60;
+    }
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+
+    // Headline: big Anton uppercase, scaled/wrapped to fit.
+    const headline = (this.bumperHeadline || "").trim().toUpperCase();
+    if (headline) {
+      const maxW = W - 200;
+      let fs = 92;
+      let lines: string[] = [];
+      // Shrink the font until the wrapped headline fits in at most 2 lines.
+      for (; fs >= 40; fs -= 6) {
+        ctx.font = `${fs}px Anton, sans-serif`;
+        lines = this.wrapLines(ctx, headline, maxW, 2);
+        const widest = Math.max(...lines.map((l) => ctx.measureText(l).width));
+        if (widest <= maxW && lines.length <= 2) break;
+      }
+      ctx.font = `${fs}px Anton, sans-serif`;
+      ctx.fillStyle = "#F3EFE7";
+      const lineH = fs * 1.06;
+      const blockH = lineH * lines.length;
+      let y = Math.max(topY + fs, H / 2 - blockH / 2 + fs);
+      lines.forEach((l) => { ctx.fillText(l, W / 2, y); y += lineH; });
+      topY = y + 6;
+    } else {
+      topY = Math.max(topY, H / 2);
+    }
+
+    // Subtext: Inter, muted cream.
+    const subtext = (this.bumperSubtext || "").trim();
+    if (subtext) {
+      ctx.font = "400 26px Inter, sans-serif";
+      ctx.fillStyle = "rgba(243,239,231,.66)";
+      const subLines = this.wrapLines(ctx, subtext, W - 260, 2);
+      subLines.forEach((l) => { ctx.fillText(l, W / 2, topY); topY += 34; });
+      topY += 8;
+    }
+
+    // Live countdown to the scheduled start, in amber.
+    if (this.bumperStartsAt > 0) {
+      const remaining = this.bumperStartsAt - Date.now();
+      if (remaining > 0) {
+        ctx.font = "600 30px Inter, sans-serif";
+        ctx.fillStyle = this.brandAccent;
+        ctx.fillText(this.formatCountdown(remaining), W / 2, topY + 10);
+      }
+    }
+
+    ctx.textAlign = "left";
+    ctx.restore();
+  }
+
+  // Lazily load MediaPipe's selfie segmentation model (from CDN, on first use).
+  private async ensureSegmenter() {
+    if (this.segReady || this.segLoading) return;
+    this.segLoading = true;
+    try {
+      const V = "0.10.14";
+      const vision: any = await import(/* webpackIgnore: true */ `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${V}/vision_bundle.mjs`);
+      const fileset = await vision.FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${V}/wasm`);
+      const opts = (delegate: "GPU" | "CPU") => ({
+        baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite", delegate },
+        runningMode: "VIDEO" as const,
+        outputConfidenceMasks: true,
+        outputCategoryMask: false,
+      });
+      try {
+        this.segmenter = await vision.ImageSegmenter.createFromOptions(fileset, opts("GPU"));
+      } catch {
+        this.segmenter = await vision.ImageSegmenter.createFromOptions(fileset, opts("CPU"));
+      }
+      this.segReady = true;
+    } catch {
+      this.error = "Couldn't load the AI background. Check your connection and try again.";
+    } finally {
+      this.segLoading = false;
+      this.emit();
+    }
+  }
+
+  // AI virtual background: segment the person out (no green screen) and draw
+  // them over the scene background - like Zoom/Meet.
+  private drawMlHost(ctx: CanvasRenderingContext2D, v: HTMLVideoElement) {
+    if (!this.segReady) { this.ensureSegmenter(); drawCover(ctx, v, 0, 0, W, H); return; }
+    const IW = 640, IH = 360;
+    if (!this.inputCanvas) { this.inputCanvas = document.createElement("canvas"); this.inputCanvas.width = IW; this.inputCanvas.height = IH; }
+    const ictx = this.inputCanvas.getContext("2d", { willReadFrequently: true });
+    if (!ictx) { drawCover(ctx, v, 0, 0, W, H); return; }
+    coverDraw(ictx, v, v.videoWidth, v.videoHeight, 0, 0, IW, IH);
+
+    let result: any;
+    try { result = this.segmenter.segmentForVideo(this.inputCanvas, performance.now()); } catch { drawCover(ctx, v, 0, 0, W, H); return; }
+    const mask = result?.confidenceMasks?.[0];
+    if (!mask) { try { result?.close?.(); } catch {} drawCover(ctx, v, 0, 0, W, H); return; }
+
+    const floats = mask.getAsFloat32Array();
+    const mw = mask.width, mh = mask.height;
+    if (!this.maskCanvas) this.maskCanvas = document.createElement("canvas");
+    if (this.maskCanvas.width !== mw || this.maskCanvas.height !== mh) { this.maskCanvas.width = mw; this.maskCanvas.height = mh; }
+    const mctx = this.maskCanvas.getContext("2d")!;
+    const id = mctx.createImageData(mw, mh);
+    const dd = id.data;
+    for (let i = 0; i < floats.length; i++) { dd[i * 4] = 255; dd[i * 4 + 1] = 255; dd[i * 4 + 2] = 255; dd[i * 4 + 3] = Math.round(floats[i] * 255); }
+    mctx.putImageData(id, 0, 0);
+    try { result.close(); } catch {}
+
+    // Keep only the person (mask alpha) in the framed host, then draw over the bg.
+    ictx.globalCompositeOperation = "destination-in";
+    ictx.drawImage(this.maskCanvas, 0, 0, mw, mh, 0, 0, IW, IH);
+    ictx.globalCompositeOperation = "source-over";
+    ctx.drawImage(this.inputCanvas, 0, 0, IW, IH, 0, 0, W, H);
+  }
+
+  // Green-screen key: knock out the chroma color so the background shows through.
+  private drawChromaHost(ctx: CanvasRenderingContext2D, v: HTMLVideoElement) {
+    const pw = 640, ph = 360;
+    if (!this.keyCanvas) { this.keyCanvas = document.createElement("canvas"); this.keyCanvas.width = pw; this.keyCanvas.height = ph; }
+    const k = this.keyCanvas.getContext("2d", { willReadFrequently: true });
+    if (!k) { drawCover(ctx, v, 0, 0, W, H); return; }
+    coverDraw(k, v, v.videoWidth, v.videoHeight, 0, 0, pw, ph);
+    const img = k.getImageData(0, 0, pw, ph);
+    const d = img.data;
+    const [r0, g0, b0] = hexRgb(this.chromaColor);
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const dist = Math.abs(r - r0) + Math.abs(g - g0) + Math.abs(b - b0);
+      if (dist < 180 && g > r + 18 && g > b + 18) d[i + 3] = 0;
+    }
+    k.putImageData(img, 0, 0);
+    ctx.drawImage(this.keyCanvas, 0, 0, pw, ph, 0, 0, W, H);
+  }
+
+  // ---- Screen / tab / window share (host) ----
+  async startScreenShare() {
+    try {
+      const s = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true } as MediaStreamConstraints);
+      this.screenStream = s;
+      if (!this.screenVideo) {
+        this.screenVideo = document.createElement("video");
+        this.screenVideo.muted = true; this.screenVideo.autoplay = true; (this.screenVideo as any).playsInline = true;
+      }
+      this.screenVideo.srcObject = s; this.screenVideo.play().catch(() => {});
+      // Mix shared tab/system audio into the program (e.g. a video's sound).
+      if (this.audioCtx && this.audioDest && s.getAudioTracks().length) {
+        try { this.screenAudioSrc = this.audioCtx.createMediaStreamSource(new MediaStream(s.getAudioTracks())); this.screenAudioSrc.connect(this.audioDest); } catch {}
+      }
+      // The browser's own "Stop sharing" ends the track.
+      s.getVideoTracks()[0]?.addEventListener("ended", () => this.stopScreenShare());
+      this.screenSharing = true; this.emit();
+    } catch { /* user cancelled the picker */ }
+  }
+
+  stopScreenShare() {
+    this.screenStream?.getTracks().forEach((t) => t.stop());
+    this.screenStream = null;
+    if (this.screenVideo) this.screenVideo.srcObject = null;
+    try { this.screenAudioSrc?.disconnect(); } catch {}
+    this.screenAudioSrc = null;
+    this.screenSharing = false; this.emit();
+  }
+
+  setScreenLayout(l: "full" | "pip" | "split") { this.screenLayout = l; this.emit(); }
+
+  private drawScreenLayout(ctx: CanvasRenderingContext2D, people: { video: HTMLVideoElement; name: string; key: string }[]) {
+    const screen = this.screenVideo!;
+    if (this.screenLayout === "split") {
+      const gap = 10, sw = Math.round(W * 0.64);
+      drawContainRounded(ctx, screen, 0, 0, sw, H);
+      const n = Math.max(people.length, 1);
+      const cw = W - sw - gap, chh = (H - gap * (n - 1)) / n;
+      people.forEach((t, i) => {
+        const ty = i * (chh + gap);
+        drawCoverRounded(ctx, t.video, sw + gap, ty, cw, chh);
+        this.drawTileLabel(ctx, t.name, t.key, sw + gap, ty, cw, chh);
+      });
+    } else {
+      drawContain(ctx, screen, 0, 0, W, H); // full-bleed shared screen
+      if (this.screenLayout === "pip" && people.length) {
+        const pw = 320, ph = 180, gap = 14;
+        const list = people.slice(0, 2);
+        const groupH = list.length * ph + (list.length - 1) * gap;
+        // Keep the (draggable) group on-canvas.
+        const x = Math.max(0, Math.min(W - pw, this.pipPos.x));
+        const y = Math.max(0, Math.min(H - groupH, this.pipPos.y));
+        this.pipPos = { x, y };
+        this.pipRect = { x, y, w: pw, h: groupH };
+        list.forEach((t, i) => {
+          const by = y + i * (ph + gap);
+          drawCoverRounded(ctx, t.video, x, by, pw, ph, 16);
+          roundRectPath(ctx, x, by, pw, ph, 16);
+          ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,.18)"; ctx.stroke();
+          this.drawTileLabel(ctx, t.name, t.key, x, by, pw, ph, 16);
+        });
+      }
+    }
+  }
+
+  // ---- Draggable pinned comment (canvas-space px) ----
+  pinBox() { return { x: this.pinPos.x, y: this.pinPos.y, w: PIN_W, h: PIN_H }; }
+  hitPin(cx: number, cy: number) {
+    if (!this.pinned) return false;
+    const b = this.pinBox();
+    return cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
+  }
+  setPinPos(x: number, y: number) {
+    this.pinPos = {
+      x: Math.max(0, Math.min(W - PIN_W, x)),
+      y: Math.max(0, Math.min(H - PIN_H, y)),
+    };
+    this.emit();
+  }
+
+  // ---- Draggable banner (lower-third) ----
+  bannerBox() { return { ...this.bannerRect }; }
+  hitBanner(cx: number, cy: number) {
+    if (!this.banner) return false;
+    const b = this.bannerRect;
+    return b.w > 0 && cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
+  }
+  setBannerPos(x: number, y: number) {
+    const w = this.bannerRect.w || 200, h = this.bannerRect.h || 56;
+    this.bannerPos = {
+      x: Math.max(0, Math.min(W - w, x)),
+      y: Math.max(0, Math.min(H - h, y)),
+    };
+    this.emit();
+  }
+
+  // ---- Draggable PIP camera box (only in screen-share PIP mode) ----
+  pipBox() { return { ...this.pipRect }; }
+  hitPip(cx: number, cy: number) {
+    if (!(this.screenSharing && this.screenLayout === "pip")) return false;
+    const b = this.pipRect;
+    return cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
+  }
+  setPipPos(x: number, y: number) {
+    this.pipPos = {
+      x: Math.max(0, Math.min(W - this.pipRect.w, x)),
+      y: Math.max(0, Math.min(H - this.pipRect.h, y)),
+    };
+    this.emit();
+  }
+
+  async fetchIngest(): Promise<Ingest> {
+    try {
+      const token = await getIdToken();
+      const res = await fetch("/api/stream/ingest", { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store" });
+      const d = await res.json();
+      this.ingest = d.configured && d.ingest?.whipUrl ? { whipUrl: d.ingest.whipUrl, rtmpsUrl: d.ingest.rtmpsUrl, streamKey: d.ingest.streamKey } : null;
+    } catch { this.ingest = null; }
+    this.emit(); return this.ingest;
+  }
+
+  private async connectStudio() {
+    // Realtime: publish host, prepare to pull guests (no-op if not configured).
+    try {
+      const session = new RealtimeSession((sid, track) => this.onGuestTrack(sid, track));
+      this.rtc = session;
+      if (this.hostStream) await session.publish(this.hostStream); // creates the SFU session
+      this.realtimeReady = Boolean(session.sessionId);
+    } catch { this.rtc = null; this.realtimeReady = false; }
+    this.emit();
+
+    // Signaling: announce host, receive roster, subscribe to guests.
+    if (!WS_BASE) return;
+    // Never stack a second host socket (defensive - the singleton persists).
+    try { this.ws?.close(); } catch { /* none */ }
+    const sock = new WebSocket(`${WS_BASE}/room/${SIGNAL_ROOM}/ws`);
+    this.ws = sock;
+    const me: Participant = { id: "host", name: this.hostName, role: "host", sessionId: this.rtc?.sessionId, hasVideo: true, hasAudio: true };
+    sock.onopen = () => sock.send(JSON.stringify({ type: "studio", action: "join", participant: me }));
+    // On reload/close, tell the room the host left so no stale "host" lingers
+    // (a ghost host session is one thing that makes a guest's video freeze).
+    if (typeof window !== "undefined") {
+      window.addEventListener("pagehide", () => {
+        try { sock.send(JSON.stringify({ type: "studio", action: "leave" })); sock.close(); } catch { /* gone */ }
+      }, { once: true });
+    }
+    sock.onmessage = (e) => {
+      let d: any; try { d = JSON.parse(e.data); } catch { return; }
+      if (d.type === "studio" && d.action === "roster") {
+        this.roster = d.participants.filter((p: Participant) => p.role === "guest");
+        const present = new Set(this.roster.map((g) => g.sessionId).filter(Boolean) as string[]);
+        // Clean up anyone who was on the program but has since left the room.
+        Array.from(this.admitted).forEach((sid) => { if (!present.has(sid)) this.removeGuest(sid); });
+        // Safety preview: pull each waiting guest's VIDEO ONLY (no audio, so it
+        // never hits the broadcast) so the host can see them before admitting.
+        this.roster.forEach((g) => {
+          const sid = g.sessionId;
+          if (sid && g.hasVideo && this.rtc && !this.previewPulled.has(sid) && !this.admitted.has(sid)) {
+            this.previewPulled.add(sid);
+            this.rtc.pull(sid, ["video"]).catch(() => this.previewPulled.delete(sid));
+          }
+        });
+        // Drop preview state/video for guests who left before being admitted.
+        Array.from(this.previewPulled).forEach((sid) => {
+          if (!present.has(sid) && !this.admitted.has(sid)) { this.previewPulled.delete(sid); this.dropGuestVideo(sid); }
+        });
+        this.emit();
+      }
+    };
+  }
+
+  private onGuestTrack(sid: string, track: MediaStreamTrack) {
+    if (track.kind === "video") {
+      let v = this.guestVideos.get(sid);
+      if (!v) { v = document.createElement("video"); v.muted = true; v.autoplay = true; (v as any).playsInline = true; this.guestVideos.set(sid, v); }
+      const ms = (v.srcObject as MediaStream) || new MediaStream();
+      ms.addTrack(track); v.srcObject = ms; v.play().catch(() => {});
+      this.emit();
+    } else if (track.kind === "audio" && this.audioCtx && this.audioDest) {
+      try {
+        const src = this.audioCtx.createMediaStreamSource(new MediaStream([track]));
+        const gain = this.audioCtx.createGain();
+        gain.gain.value = this.mutedGuests.has(sid) ? 0 : (this.guestLevels.get(sid) ?? 1);
+        src.connect(gain); gain.connect(this.audioDest);
+        this.guestAudio.set(sid, src);
+        this.guestGain.set(sid, gain);
+        this.attachAnalyser(sid, src);
+      } catch {}
+    }
+  }
+
+  // ---- Green room: host admits/removes guests to/from the program ----
+  admitGuest(sessionId: string) {
+    if (!sessionId || !this.rtc || this.admitted.has(sessionId)) return;
+    const g = this.roster.find((p) => p.sessionId === sessionId);
+    if (!g) return;
+    this.admitted.add(sessionId);
+    this.subscribedGuests.add(sessionId);
+    // Video was usually already pulled for the preview - only pull what's missing
+    // (adding their audio to the broadcast). Pulls are serialized, so this is safe.
+    const names: string[] = [];
+    if (g.hasVideo && !this.previewPulled.has(sessionId)) names.push("video");
+    if (g.hasAudio) names.push("audio");
+    if (names.length) this.rtc.pull(sessionId, names).catch(() => {});
+    this.emit();
+  }
+
+  // Stop + drop a guest's (preview) video element without touching admit/audio.
+  private dropGuestVideo(sessionId: string) {
+    const v = this.guestVideos.get(sessionId);
+    if (v) { try { (v.srcObject as MediaStream)?.getTracks().forEach((t) => t.stop()); } catch {} v.srcObject = null; this.guestVideos.delete(sessionId); }
+  }
+  // The live MediaStream for a guest (for the host's pre-admit preview tile).
+  guestStream(sessionId: string): MediaStream | null {
+    return (this.guestVideos.get(sessionId)?.srcObject as MediaStream) || null;
+  }
+
+  removeGuest(sessionId: string) {
+    this.admitted.delete(sessionId);
+    this.subscribedGuests.delete(sessionId);
+    this.previewPulled.delete(sessionId);
+    const v = this.guestVideos.get(sessionId);
+    if (v) { try { (v.srcObject as MediaStream)?.getTracks().forEach((t) => t.stop()); } catch {} v.srcObject = null; this.guestVideos.delete(sessionId); }
+    const a = this.guestAudio.get(sessionId);
+    if (a) { try { a.disconnect(); } catch {} this.guestAudio.delete(sessionId); }
+    const gn = this.guestGain.get(sessionId);
+    if (gn) { try { gn.disconnect(); } catch {} this.guestGain.delete(sessionId); }
+    this.mutedGuests.delete(sessionId);
+    const an = this.analysers.get(sessionId);
+    if (an) { try { an.disconnect(); } catch {} this.analysers.delete(sessionId); }
+    this.levels.delete(sessionId);
+    if (this.activeKey === sessionId) this.activeKey = null;
+    this.emit();
+  }
+
+  // ---- Host mute controls: silence a guest in the program mix (gain 0)
+  // without dropping their connection. "Mute all" applies to everyone on air.
+  isGuestMuted(sessionId: string) { return this.mutedGuests.has(sessionId); }
+  muteGuest(sessionId: string) {
+    this.mutedGuests.add(sessionId);
+    const g = this.guestGain.get(sessionId); if (g) g.gain.value = 0;
+    this.emit();
+  }
+  unmuteGuest(sessionId: string) {
+    this.mutedGuests.delete(sessionId);
+    const g = this.guestGain.get(sessionId); if (g) g.gain.value = this.guestLevels.get(sessionId) ?? 1;
+    this.emit();
+  }
+
+  // ---- Audio levels (program mix) ----
+  setHostLevel(v: number) {
+    this.hostLevel = v;
+    if (this.hostGain) this.hostGain.gain.value = v;
+    this.emit();
+  }
+  getGuestLevel(sessionId: string) { return this.guestLevels.get(sessionId) ?? 1; }
+  setGuestLevel(sessionId: string, v: number) {
+    this.guestLevels.set(sessionId, v);
+    if (!this.mutedGuests.has(sessionId)) {
+      const g = this.guestGain.get(sessionId); if (g) g.gain.value = v;
+    }
+    this.emit();
+  }
+  toggleGuestMute(sessionId: string) {
+    if (this.mutedGuests.has(sessionId)) this.unmuteGuest(sessionId); else this.muteGuest(sessionId);
+  }
+  muteAllGuests() { this.admitted.forEach((sid) => this.muteGuest(sid)); }
+  unmuteAllGuests() { Array.from(this.mutedGuests).forEach((sid) => this.unmuteGuest(sid)); }
+
+  inviteUrl() { return typeof window !== "undefined" ? window.location.origin + "/join/" + ROOM : ""; }
+
+  async goLive() {
+    if (this.live || this.connecting) return;
+    this.connecting = true; this.error = ""; this.emit();
+    try {
+      this.audioCtx?.resume().catch(() => {}); // keep the background clock alive
+      this.startBackgroundClock();
+      const ingest = this.ingest || (await this.fetchIngest());
+      if (!ingest?.whipUrl) throw new Error("Cloudflare Stream is not connected.");
+      const canvasStream = this.canvas!.captureStream(30);
+      const out = new MediaStream(canvasStream.getVideoTracks());
+      this.audioDest!.stream.getAudioTracks().forEach((t) => out.addTrack(t));
+      this.pc = await whipPublish(ingest.whipUrl, out);
+      this.pc.onconnectionstatechange = () => {
+        if (this.pc && (this.pc.connectionState === "failed" || this.pc.connectionState === "disconnected")) { this.live = false; this.emit(); }
+      };
+      this.live = true;
+      if (this.autoClearChat) this.clearChat(); // fresh chat for each new broadcast (host pref)
+    } catch (e: any) { this.error = e.message || "Could not go live."; this.pc?.close(); this.pc = null; }
+    finally { this.connecting = false; this.emit(); }
+  }
+
+  // Wipe the live-chat history (host-only; relayed to the Worker with the admin
+  // token). Called automatically on Go Live and from the Chat tab's button.
+  setAutoClearChat(v: boolean) {
+    this.autoClearChat = v;
+    try { localStorage.setItem("cwac-autoclear-chat", v ? "1" : "0"); } catch {}
+    this.emit();
+  }
+
+  async clearChat() {
+    try {
+      const token = await getIdToken();
+      await fetch("/api/chat/moderate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: "clear", room: "live" }),
+      });
+    } catch { /* best-effort */ }
+  }
+
+  // ---- Local recording: save the program to a file on the host's computer ----
+  startRecording() {
+    if (this.recording || !this.canvas || !this.audioDest) return;
+    try {
+      const canvasStream = this.canvas.captureStream(30);
+      const out = new MediaStream(canvasStream.getVideoTracks());
+      this.audioDest.stream.getAudioTracks().forEach((t) => out.addTrack(t));
+      const mime = typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+        ? "video/webm;codecs=vp9,opus" : "video/webm";
+      this.recorder = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
+      this.recChunks = [];
+      this.recorder.ondataavailable = (e) => { if (e.data.size) this.recChunks.push(e.data); };
+      this.recorder.onstop = () => {
+        const blob = new Blob(this.recChunks, { type: "video/webm" });
+        this.recChunks = [];
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+        a.href = url; a.download = `broadcast-${stamp}.webm`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 15000);
+      };
+      this.recorder.start(1000);
+      this.recording = true; this.emit();
+    } catch {
+      this.error = "Local recording isn't supported in this browser."; this.emit();
+    }
+  }
+
+  stopRecording() {
+    if (!this.recording) return;
+    try { this.recorder?.stop(); } catch {}
+    this.recorder = null;
+    this.recording = false; this.emit();
+  }
+
+  // ---- Soundboard: short effects that go OUT in the broadcast + recording ----
+  // Decode a data-URL audio clip once and cache it under its pad id.
+  async loadSound(id: string, url: string) {
+    if (!this.audioCtx || this.soundBuffers.has(id) || !url) return;
+    try {
+      const res = await fetch(url);
+      const arr = await res.arrayBuffer();
+      const buf = await this.audioCtx.decodeAudioData(arr);
+      this.soundBuffers.set(id, buf);
+    } catch { /* unsupported/corrupt clip - just skip it */ }
+  }
+
+  // Play a cached effect: routed to audioDest (broadcast + recording) AND to the
+  // audioCtx destination (so the host hears it in their own monitor).
+  playSound(id: string) {
+    const buf = this.soundBuffers.get(id);
+    if (!buf || !this.audioCtx || !this.audioDest) return;
+    this.audioCtx.resume().catch(() => {});
+    const src = this.audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(this.audioDest);
+    src.connect(this.audioCtx.destination);
+    this.soundSources.add(src);
+    src.onended = () => { try { src.disconnect(); } catch {} this.soundSources.delete(src); };
+    try { src.start(); } catch {}
+  }
+
+  stopSounds() {
+    this.soundSources.forEach((src) => { try { src.stop(); } catch {} try { src.disconnect(); } catch {} });
+    this.soundSources.clear();
+  }
+
+  unloadSound(id: string) { this.soundBuffers.delete(id); }
+
+  stop() { this.pc?.close(); this.pc = null; this.live = false; this.emit(); }
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __sccBroadcast: StudioEngine | undefined;
+}
+export const broadcast: StudioEngine =
+  typeof window !== "undefined" ? (globalThis.__sccBroadcast ??= new StudioEngine()) : new StudioEngine();

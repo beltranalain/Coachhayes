@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "Your Studio",
+    "slug": "your-studio-app",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/images/icon.png",
+    "scheme": "yourstudio",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0908",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourstudio.app",
+      "icon": "./assets/images/icon.png",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses your camera so you can join the show as a guest.",
+        "NSMicrophoneUsageDescription": "This app uses your microphone so you can join the show as a guest."
+      }
+    },
+    "android": {
+      "package": "com.yourstudio.app",
+      "permissions": ["CAMERA", "RECORD_AUDIO"],
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0908",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0A0908",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200
+        }
+      ],
+      "expo-video",
+      "expo-web-browser",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.yourstudio.app",
+          "enableGooglePay": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#F5A524"
+        }
+      ],
+      "expo-font",
+      "@config-plugins/react-native-webrtc"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

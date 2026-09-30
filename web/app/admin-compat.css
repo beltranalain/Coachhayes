@@ -1,0 +1,180 @@
+/* ============================================================================
+   LEGACY-ADMIN COMPATIBILITY LAYER
+   Restyles the old /admin page classes to the Hayes Control Room design.
+   Scoped under .hzadmin so it beats globals.css (0,2,0 > 0,1,0). Page markup
+   and engine are unchanged - only the look.
+   ============================================================================ */
+
+/* Shell foot + mobile */
+.hzadmin .cr-foot{display:flex;flex-direction:column;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--hair)}
+.hzadmin .cr-mobilebar{display:none}
+.hzadmin .cr-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:60}
+.hzadmin nav a .ic{opacity:.4}
+.hzadmin nav a.on .ic{opacity:1}
+
+/* Page topbar (each legacy page renders its own) */
+.hzadmin .admin-topbar{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+/* When ControlRoom is embedded in the new shell, hide its own top bar (the shell
+   provides the page header) so there aren't two stacked headers. */
+.hzadmin .studio-embed > .admin-topbar{display:none}
+.hzadmin .admin-topbar h1{font-size:24px}
+.hzadmin .admin-topbar .sub{font-size:13px;color:var(--sub);margin-top:3px}
+.hzadmin .admin-actions{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* Panels / cards */
+.hzadmin .panel{background:var(--card);border:1px solid var(--hair);border-radius:16px;padding:22px;margin-bottom:16px}
+.hzadmin .panel h2,.hzadmin .panel h3{font-size:15.5px;margin-bottom:4px}
+.hzadmin .panel-sub{font-size:12.5px;color:var(--sub);margin-bottom:16px}
+.hzadmin .panel-split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.hzadmin .two-col{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
+@media(max-width:900px){.hzadmin .two-col,.hzadmin .panel-split{grid-template-columns:1fr}}
+
+/* KPI / stat cards */
+.hzadmin .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px}
+.hzadmin .stat-card{background:var(--card);border:1px solid var(--hair);border-radius:16px;padding:18px 20px}
+.hzadmin .stat-card .k{font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.05em;text-transform:uppercase}
+.hzadmin .stat-card .v{font-family:var(--fdisp);font-weight:600;font-size:30px;letter-spacing:-.04em;line-height:1;margin-top:8px}
+.hzadmin .stat-card .d{font-size:12px;color:var(--sub);margin-top:6px}
+
+/* Buttons */
+.hzadmin .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:980px;font-weight:600;font-size:13.5px;border:1px solid transparent;cursor:pointer;transition:background .15s,border-color .15s,opacity .15s;line-height:1;white-space:nowrap}
+.hzadmin .btn-primary{background:var(--acc);color:var(--accInk)}
+.hzadmin .btn-primary:hover{filter:brightness(1.05)}
+.hzadmin .btn-ghost{background:transparent;border-color:var(--hair);color:var(--ink)}
+.hzadmin .btn-ghost:hover{border-color:var(--acc);color:var(--acc)}
+.hzadmin .btn-danger,.hzadmin .btn.red{background:var(--live);color:#fff}
+.hzadmin .btn-live{background:var(--live);color:#fff}
+.hzadmin .btn-sm{padding:8px 14px;font-size:12.5px}
+.hzadmin .btn-xs{padding:6px 11px;font-size:12px}
+.hzadmin .btn[disabled]{opacity:.5;cursor:not-allowed}
+
+/* Forms */
+.hzadmin .form-field{margin-bottom:16px}
+.hzadmin .form-field label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:600}
+.hzadmin .form-field input,.hzadmin .form-field textarea,.hzadmin .form-field select,
+.hzadmin input[type=text],.hzadmin input[type=email],.hzadmin input[type=password],
+.hzadmin input[type=number],.hzadmin input[type=url],.hzadmin input[type=datetime-local],.hzadmin input[type=date]{
+  width:100%;padding:10px 13px;border-radius:10px;background:var(--soft);border:1px solid var(--hair);color:var(--ink);font:inherit;font-size:14px}
+.hzadmin .form-field textarea{min-height:110px;resize:vertical}
+.hzadmin .form-field input:focus,.hzadmin .form-field textarea:focus,.hzadmin .form-field select:focus,.hzadmin input:focus{outline:none;border-color:var(--acc)}
+.hzadmin .form-note{color:var(--sub);font-size:12px;margin-top:6px}
+.hzadmin .form-error{color:var(--live);font-size:13px;margin-top:8px}
+.hzadmin .form-ok{color:var(--green);font-size:13px;margin-top:8px}
+
+/* Callouts / notices */
+.hzadmin .notice,.hzadmin .callout{background:var(--soft);border:1px solid var(--hair);border-left:3px solid var(--amber);border-radius:12px;padding:13px 16px;font-size:13.5px;color:var(--ink);line-height:1.5}
+.hzadmin .notice strong{font-weight:600}
+
+/* Rows (destinations, users, etc.) */
+.hzadmin .dest-row,.hzadmin .charge-row,.hzadmin .check-row,.hzadmin .color-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--hair)}
+.hzadmin .dest-row:last-child,.hzadmin .charge-row:last-child{border-bottom:0}
+.hzadmin .dest-name{font-weight:600;font-size:14px}
+.hzadmin .dest-meta{font-size:12.5px;color:var(--sub);margin-top:2px}
+
+/* Live pill / dots */
+.hzadmin .live-pill{display:inline-flex;align-items:center;gap:8px;background:var(--soft);color:var(--sub);border:1px solid var(--hair);border-radius:980px;padding:7px 14px;font-size:12.5px;font-weight:600}
+.hzadmin .live-pill.is-live{background:var(--live);color:#fff;border-color:transparent}
+.hzadmin .live-pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.hzadmin .live-pill.is-live .dot{animation:pulse 1.6s infinite}
+.hzadmin .health-dot{width:9px;height:9px;border-radius:50%;background:var(--green)}
+
+/* Toggle switch */
+.hzadmin .toggle{position:relative;width:42px;height:24px;border-radius:980px;background:var(--hair);border:1px solid var(--hair);cursor:pointer;flex-shrink:0;transition:background .15s}
+.hzadmin .toggle.on,.hzadmin .toggle[aria-checked=true],.hzadmin .toggle[data-on=true]{background:var(--acc)}
+.hzadmin .toggle::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.hzadmin .toggle.on::after,.hzadmin .toggle[aria-checked=true]::after,.hzadmin .toggle[data-on=true]::after{transform:translateX(18px)}
+
+/* Text helpers */
+.hzadmin .muted{color:var(--sub)}
+.hzadmin .sub{color:var(--sub)}
+
+/* Uploaders / previews */
+.hzadmin .uploader{border:1px dashed var(--hair);border-radius:12px;padding:16px;display:flex;gap:14px;align-items:center;background:var(--soft)}
+.hzadmin .up-t{font-weight:600;font-size:13.5px}
+.hzadmin .up-s{font-size:12px;color:var(--sub);margin-top:3px}
+.hzadmin .logo-prev,.hzadmin .cover-thumb{border-radius:10px;border:1px solid var(--hair);object-fit:cover;background:var(--soft)}
+.hzadmin .published{color:var(--green);font-size:12px;font-weight:600}
+
+/* Costs page */
+.hzadmin .charge-tag{flex-shrink:0;font-size:12px;font-weight:600;padding:5px 11px;border-radius:980px;border:1px solid var(--hair);color:var(--ink)}
+.hzadmin .charge-tag.free{color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,transparent);background:color-mix(in srgb,var(--green) 10%,transparent)}
+.hzadmin .vs-box{border:1px solid var(--hair);border-radius:12px;padding:14px 16px;background:var(--soft)}
+.hzadmin .vs-box.you{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.hzadmin .vs-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--sub)}
+.hzadmin .vs-num{font-family:var(--fdisp);font-size:28px;line-height:1;margin-top:8px}
+.hzadmin .vs-note{font-size:12px;color:var(--sub);margin-top:8px}
+
+/* Help / SOP */
+.hzadmin .sop-list{list-style:none;display:flex;flex-direction:column;gap:7px;font-size:14px}
+.hzadmin .sop-list li{position:relative;padding-left:16px;color:var(--ink)}
+.hzadmin .sop-list li::before{content:"";position:absolute;left:2px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--acc)}
+.hzadmin .sop-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--sub);margin-bottom:6px}
+
+/* Tables */
+.hzadmin table{width:100%;border-collapse:collapse;font-size:13.5px}
+.hzadmin th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--hair)}
+.hzadmin td{padding:11px 12px;border-bottom:1px solid var(--hair)}
+.hzadmin .user-av{width:30px;height:30px;border-radius:50%;background:linear-gradient(140deg,var(--acc),var(--ink))}
+.hzadmin .u-date{color:var(--sub);font-size:12.5px}
+.hzadmin .row-actions{display:flex;gap:8px;justify-content:flex-end}
+
+/* ============================================================================
+   ControlRoom studio — remaining legacy classes mapped to the Hayes tokens.
+   These were falling through to globals.css (old brand font/colors) — e.g. the
+   green "YouTube" used the Anton display font. Now they use var(--fdisp/…).
+   ============================================================================ */
+.hzadmin .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.hzadmin .filter-btn{padding:8px 15px;border-radius:980px;background:var(--soft);border:1px solid var(--hair);color:var(--sub);font-weight:600;font-size:12.5px;cursor:pointer;transition:background .15s,border-color .15s,color .15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.hzadmin .filter-btn:hover{color:var(--ink);border-color:var(--acc)}
+.hzadmin .filter-btn.active{background:var(--acc);border-color:var(--acc);color:var(--accInk)}
+
+.hzadmin .player-wrap{position:relative;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000;border:1px solid var(--hair)}
+.hzadmin .player-wrap iframe,.hzadmin .player-wrap canvas,.hzadmin .player-wrap video{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+.hzadmin .live-aud{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.hzadmin .la-item{flex:1;min-width:140px;display:flex;flex-direction:column;border:1px solid var(--hair);border-radius:12px;padding:11px 14px;background:var(--soft);font-size:13px;color:var(--ink)}
+.hzadmin .la-item b{font-family:var(--fdisp);font-weight:600;font-size:22px;line-height:1;margin-bottom:3px;letter-spacing:-.03em}
+.hzadmin .la-item small{color:var(--sub);font-size:11.5px;margin-top:2px}
+.hzadmin .la-item.free b{color:var(--green)}
+.hzadmin .la-item.paid b{color:var(--amber)}
+
+.hzadmin .deliver-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+.hzadmin .deliver-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+
+.hzadmin .copybox{display:flex;gap:8px;align-items:stretch}
+.hzadmin .copybox input{flex:1;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;background:var(--soft);border:1px solid var(--hair);border-radius:10px;padding:9px 12px;color:var(--ink)}
+
+.hzadmin .modal-backdrop{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px}
+.hzadmin .modal-card{background:var(--card);border:1px solid var(--hair);border-radius:16px;padding:22px;max-width:460px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+
+/* chat source badges + tips */
+.hzadmin .src{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--sub);border:1px solid var(--hair);border-radius:4px;padding:1px 5px;margin-right:7px}
+.hzadmin .src-ic{margin-right:7px;display:inline-flex;vertical-align:middle;flex-shrink:0}
+.hzadmin .src-ic svg{display:block;border-radius:4px}
+.hzadmin .src-logo{width:18px;height:18px;border-radius:4px;object-fit:cover;margin-right:7px;vertical-align:middle;display:inline-block;flex-shrink:0}
+.hzadmin .tipamt{display:inline-block;background:color-mix(in srgb,var(--green) 20%,transparent);color:var(--green);font-weight:700;font-size:12px;padding:2px 9px;border-radius:999px;margin-right:8px}
+.hzadmin .rec-dot{width:9px;height:9px;border-radius:50%;background:var(--live);display:inline-block;margin-right:7px;animation:pulse 1.4s infinite;vertical-align:middle}
+.hzadmin .pill.draft{background:var(--soft);color:var(--sub)}
+
+/* moderation */
+.hzadmin .mod-row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.hzadmin .mod-actions{display:flex;gap:6px;flex-shrink:0}
+
+/* rundown editor */
+.hzadmin .rundown-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.hzadmin .rundown-btns{display:flex;gap:6px;flex-wrap:wrap}
+.hzadmin .rundown-fields{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.hzadmin .rundown-thumb{flex:0 0 96px;aspect-ratio:16/9;border-radius:6px;border:1px solid var(--hair);background:var(--soft) center/cover no-repeat;display:grid;place-items:center;font-size:10px;color:var(--dim)}
+.hzadmin .rundown-len{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub)}
+
+/* scenes */
+.hzadmin .scene-uploads{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.hzadmin .scene-up-btns{display:flex;gap:8px}
+.hzadmin .scene-prev{aspect-ratio:16/9;border-radius:8px;border:1px solid var(--hair);background:var(--soft) center/cover no-repeat;display:grid;place-items:center;font-size:11px;color:var(--dim)}
+
+/* sound pads */
+.hzadmin .sound-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin-top:14px}
+.hzadmin .sound-label{color:var(--ink);font-weight:600;font-size:12.5px}
+.hzadmin .sound-x{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:1px solid var(--hair);background:color-mix(in srgb,var(--card) 80%,transparent);color:var(--sub);font-size:15px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0}
+
+.hzadmin .track{flex:1;height:2px;background:var(--hair);position:relative;max-width:620px;border-radius:2px}

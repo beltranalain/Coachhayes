@@ -1,0 +1,41 @@
+CREATOR LIVE PLATFORM — TEMPLATE LICENSE (DRAFT)
+
+Copyright (c) {{YEAR}} {{LICENSOR}}. All rights reserved.
+
+This is a proprietary software template. It is provided to a licensed customer
+("Licensee") under the following terms. This document is a DRAFT for
+convenience; have your own legal counsel review and adapt it before commercial
+use.
+
+1. GRANT. Subject to payment and these terms, Licensor grants Licensee a
+   non-exclusive, non-transferable license to use, configure, and deploy this
+   software to operate Licensee's OWN creator platform (the "Permitted Use").
+
+2. RESTRICTIONS. Licensee may NOT:
+   (a) resell, sublicense, redistribute, or share the source code, in whole or
+       in part, to any third party;
+   (b) offer the software itself (or a substantially similar derivative) as a
+       template, boilerplate, or product to others;
+   (c) remove or alter this license or any proprietary notices.
+   Licensee MAY modify the code for their own deployment and rebrand it.
+
+3. NUMBER OF DEPLOYMENTS. Unless otherwise agreed in writing, this license
+   covers a single production brand/deployment operated by Licensee.
+
+4. THIRD-PARTY SERVICES. The software integrates with third-party services
+   (e.g., Firebase, Cloudflare, Stripe, YouTube). Licensee is responsible for
+   their own accounts, keys, fees, and compliance with those services' terms.
+
+5. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+6. LIMITATION OF LIABILITY. IN NO EVENT SHALL LICENSOR BE LIABLE FOR ANY CLAIM,
+   DAMAGES, OR OTHER LIABILITY ARISING FROM OR IN CONNECTION WITH THE SOFTWARE
+   OR ITS USE.
+
+7. OWNERSHIP. Licensor retains all right, title, and interest in the software,
+   including all intellectual property rights, except for the limited license
+   granted above.
+
+Replace {{YEAR}} and {{LICENSOR}} before distribution.
