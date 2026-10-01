@@ -1,9 +1,49 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, adminConfigured } from "@/lib/firebaseAdmin";
 import { requireRole } from "@/lib/requireAdmin";
-import { defaultOrder, slugify, sanitizeCategories, sanitizeCategoryNotes, recommendedOverall, type Chip } from "@/lib/rankings";
+import { defaultOrder, slugify, sanitizeCategories, sanitizeCategoryNotes, recommendedOverall, CHIP_META, CATEGORIES, type Chip } from "@/lib/rankings";
+import { getSiteConfig } from "@/lib/siteConfig";
 
 const CHIPS: Chip[] = ["bronze", "silver", "gold", "blue"];
+
+// Build an announcement post body for a newly-ranked player (no emojis).
+function playerPostText(f: Record<string, any>): string {
+  const lines: string[] = [];
+  const meta = [f.position, f.school, f.classYear ? `Class of ${f.classYear}` : ""].filter(Boolean).join(" · ");
+  lines.push(`New in the rankings: ${f.name}`);
+  if (meta) lines.push(meta);
+  lines.push(`Overall grade: ${CHIP_META[f.chip as Chip]?.label || f.chip}`);
+  const cats = CATEGORIES
+    .filter((c) => f.categories && f.categories[c.key])
+    .map((c) => `${c.label}: ${CHIP_META[f.categories[c.key] as Chip]?.label || f.categories[c.key]}`);
+  if (cats.length) lines.push(cats.join(" · "));
+  if (f.commit) lines.push(`Committed: ${f.commit}`);
+  lines.push(`Full breakdown: /rankings/${f.slug}`);
+  return lines.join("\n");
+}
+
+// Create a community feed post announcing a new player. Best-effort: any failure
+// here must not block the player from being saved.
+async function announcePlayer(db: FirebaseFirestore.Firestore, playerId: string, f: Record<string, any>) {
+  try {
+    let author = "Coach Hayes Football"; let picture: string | null = null;
+    try { const { branding } = await getSiteConfig(); if (branding?.siteName) author = branding.siteName; if (branding?.logo) picture = branding.logo; } catch {}
+    const clip = typeof f.videoUrl === "string" && /^https?:\/\//.test(f.videoUrl) ? f.videoUrl.slice(0, 500) : null;
+    const now = Date.now();
+    await db.collection("posts").add({
+      uid: "system-rankings", author, picture,
+      text: playerPostText(f), ts: now,
+      likes: 0, likedBy: [], commentCount: 0, room: "general", savedBy: [],
+      image: null, clip, poll: null,
+      kind: "player", playerId, playerSlug: f.slug,
+      player: {
+        name: f.name, position: f.position || "", classYear: f.classYear || "",
+        school: f.school || "", commit: f.commit || "", commitLogo: f.commitLogo || "", slug: f.slug || "",
+        chip: f.chip, categories: f.categories || {}, categoryNotes: f.categoryNotes || {},
+      },
+    });
+  } catch {}
+}
 async function gate(request: Request) {
   if (!adminConfigured) return { error: NextResponse.json({ error: "Not configured." }, { status: 400 }) };
   const role = await requireRole(request);
@@ -60,6 +100,8 @@ export async function POST(request: Request) {
     }
     const ref = await g.db!.collection("players").add({ ...fields, order: defaultOrder(chip, now), createdAt: now });
     if (b.fromSubmissionId) await g.db!.collection("submissions").doc(String(b.fromSubmissionId)).set({ status: "published", playerId: ref.id }, { merge: true });
+    // Auto-announce the new player in the community feed (published players only).
+    if (fields.published && !fields.removed && b.announce !== false) await announcePlayer(g.db!, ref.id, fields);
     return NextResponse.json({ ok: true, id: ref.id });
   } catch { return NextResponse.json({ error: "Save failed." }, { status: 500 }); }
 }

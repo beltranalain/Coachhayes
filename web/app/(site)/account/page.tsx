@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import GoogleIcon from "@/components/hayes/GoogleIcon";
-import { firebaseConfigured, getFirebaseAuth } from "@/lib/firebase";
+import { firebaseConfigured, getFirebaseAuth, getIdToken } from "@/lib/firebase";
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -29,15 +29,30 @@ export default function AccountPage() {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tier, setTier] = useState<string | null>(null);
+  const [isTeam, setIsTeam] = useState(false);
+  // Edit display name
+  const [editing, setEditing] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [nameMsg, setNameMsg] = useState("");
 
   useEffect(() => {
     if (!firebaseConfigured) return;
     const auth = getFirebaseAuth();
     if (!auth) { setReady(true); return; }
     getRedirectResult(auth).catch(() => {});
-    const unsub = onAuthStateChanged(auth, (u) => { setViewer(u); setReady(true); });
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setViewer(u); setReady(true);
+      if (u) {
+        try { const t = await getIdToken(); const r = await fetch("/api/membership/me", { headers: t ? { Authorization: `Bearer ${t}` } : {}, cache: "no-store" }); const d = await r.json(); setTier(d.effective || null); setIsTeam(!!d.isTeam); }
+        catch {}
+      } else { setTier(null); setIsTeam(false); }
+    });
     return () => unsub();
   }, []);
+
+  const TIER_LABEL: Record<string, string> = { coordinator: "The Coordinator", timmy: "Po’ Lil Timmy" };
 
   async function google() {
     const auth = getFirebaseAuth();
@@ -73,6 +88,29 @@ export default function AccountPage() {
     } finally { setBusy(false); }
   }
 
+  function startEdit() {
+    setNewName(viewer?.displayName || "");
+    setNameMsg("");
+    setEditing(true);
+  }
+  async function saveName(e: React.FormEvent) {
+    e.preventDefault();
+    const auth = getFirebaseAuth();
+    if (!auth?.currentUser) return;
+    const trimmed = newName.trim();
+    if (!trimmed) { setNameMsg("Enter a name."); return; }
+    if (trimmed.length > 40) { setNameMsg("Keep it under 40 characters."); return; }
+    setSavingName(true); setNameMsg("");
+    try {
+      await updateProfile(auth.currentUser, { displayName: trimmed });
+      await auth.currentUser.reload();
+      setViewer(auth.currentUser);
+      setEditing(false);
+    } catch {
+      setNameMsg("Could not update your name. Try again.");
+    } finally { setSavingName(false); }
+  }
+
   const displayName = viewer?.displayName || viewer?.email?.split("@")[0] || "member";
 
   return (
@@ -87,19 +125,46 @@ export default function AccountPage() {
       ) : viewer ? (
         // ---- Signed in ----
         <div className="card">
-          <span className="badge timmy" style={{ marginBottom: 14 }}>Free member</span>
-          <h2 style={{ marginBottom: 6 }}>You’re in, {displayName}.</h2>
-          <p style={{ color: "var(--sub)", marginBottom: 20 }}>
-            Signed in as {viewer.email}. Your free account works across the site, the community and the live chat.
-          </p>
+          <span className={`badge ${tier === "coordinator" ? "coord" : "timmy"}`} style={{ marginBottom: 14 }}>
+            {isTeam ? "Team" : tier ? TIER_LABEL[tier] || "Member" : "Free member"}
+          </span>
+          {editing ? (
+            <form onSubmit={saveName} style={{ margin: "4px 0 20px" }}>
+              <label style={{ display: "block", color: "var(--sub)", fontSize: 13, marginBottom: 8 }}>Display name — this is what people see on your posts and in chat.</label>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <input className="acc-in" style={{ flex: "1 1 220px", minWidth: 200 }} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Your name" maxLength={40} autoFocus />
+                <button className="pill" type="submit" disabled={savingName}>{savingName ? "Saving…" : "Save name"}</button>
+                <button className="pill soft" type="button" onClick={() => setEditing(false)}>Cancel</button>
+              </div>
+              {nameMsg && <p style={{ color: "var(--live)", fontSize: 13, marginTop: 10 }}>{nameMsg}</p>}
+            </form>
+          ) : (
+            <>
+              <h2 style={{ marginBottom: 6 }}>You’re in, {displayName}.</h2>
+              <p style={{ color: "var(--sub)", marginBottom: 20 }}>
+                Signed in as {viewer.email}.{" "}
+                {isTeam
+                  ? "You’re on the team — every room, including the Film Room, is open to you."
+                  : tier === "coordinator"
+                    ? "The Coordinator is active — the Film Room and every members’ room are unlocked."
+                    : tier
+                      ? "Your membership is active. The Film Room unlocks with The Coordinator."
+                      : "Your free account works across the site, the community and the live chat."}
+              </p>
+            </>
+          )}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Link className="pill" href="/membership">Upgrade membership</Link>
+            {tier !== "coordinator" && !isTeam && <Link className="pill" href="/membership">Upgrade membership</Link>}
+            {!editing && <button className="pill soft" onClick={startEdit}>Edit name</button>}
+            <Link className="pill soft" href="/community">Go to the community</Link>
             <Link className="pill soft" href="/live">Go to live</Link>
             <button className="pill soft" onClick={() => { const a = getFirebaseAuth(); if (a) signOut(a); }}>Sign out</button>
           </div>
-          <p style={{ color: "var(--sub)", fontSize: 13, marginTop: 18 }}>
-            Paid tiers (Po’ Lil Timmy · The Coordinator) turn on with checkout in the membership phase.
-          </p>
+          {!tier && !isTeam && (
+            <p style={{ color: "var(--sub)", fontSize: 13, marginTop: 18 }}>
+              Paid tiers (Po’ Lil Timmy · The Coordinator) unlock members’ rooms like the Film Room. Stripe checkout turns on in the membership phase.
+            </p>
+          )}
         </div>
       ) : (
         // ---- Signed out: create account / sign in ----

@@ -67,18 +67,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(person) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(crumb) }} />
 
-      <p style={{ fontSize: 13, color: "var(--sub)", marginBottom: 14 }}>
-        <Link className="link" href="/rankings">Rankings</Link> · <Link className="link" href={`/rankings/class/${p.classYear}`}>Class of {p.classYear}</Link>
-      </p>
-
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 8, marginTop: 8 }}>
         <span className="chip lg" style={{ background: chip.ring, border: `3px solid ${chip.ring}`, width: 54, height: 54, borderRadius: "50%", display: "inline-block", flexShrink: 0 }} />
         <div>
           <h1 style={{ fontSize: "clamp(30px,5vw,48px)", letterSpacing: "-.03em", lineHeight: 1.05 }}>{p.name}</h1>
           <p style={{ color: "var(--sub)", fontSize: 17, marginTop: 4 }}>
-            {p.position} · {p.school}{p.state ? `, ${p.state}` : ""} · Class of {p.classYear}
+            {[p.position, p.school ? `${p.school}${p.state ? `, ${p.state}` : ""}` : "", `Class of ${p.classYear}`].filter(Boolean).join(" · ")}
           </p>
-          <span className="badge coord" style={{ marginTop: 10, background: `color-mix(in srgb, ${chip.ring} 16%, transparent)`, color: chip.ring }}>{chip.label}</span>
         </div>
       </div>
 
@@ -117,21 +112,33 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
                 <span style={{ color: "var(--sub)", marginLeft: 10 }}>Score {recommendedOverall(p.categories).avg.toFixed(1)}</span>
               </div>
             </div>
+            {p.commitLogo && (
+              <div className="pbcommitwrap">
+                <img className="pbcommit xl" src={p.commitLogo} alt={p.commit || ""} title={p.commit || ""} />
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 10 }}>The film says</h2>
-        <p style={{ whiteSpace: "pre-line", lineHeight: 1.6 }}>{p.bio}</p>
-        {p.strengths && p.strengths.length > 0 && (
-          <ul style={{ marginTop: 14, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
-            {p.strengths.map((s, i) => <li key={i}>{s}</li>)}
-          </ul>
-        )}
-      </div>
+      {p.bio && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <p className="rkkick" style={{ color: chip.ring }}>The film says</p>
+          <p style={{ whiteSpace: "pre-line", lineHeight: 1.7, fontSize: 16, marginTop: 6 }}>{p.bio}</p>
+          {p.strengths && p.strengths.length > 0 && (
+            <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 11, borderTop: "1px solid var(--hair2)", paddingTop: 16 }}>
+              {p.strengths.map((s, i) => (
+                <div key={i} style={{ display: "flex", gap: 11, alignItems: "flex-start" }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: chip.ring, marginTop: 7, flexShrink: 0 }} />
+                  <span style={{ lineHeight: 1.5 }}>{s}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {(p.heightIn || p.weightLb || p.fortyYd || (p.traits && p.traits.length)) && (
+      {Boolean(p.heightIn || p.weightLb || p.fortyYd || (p.traits && p.traits.length)) && (
         <div className="card" style={{ marginTop: 16 }}>
           <h2 style={{ fontSize: 18, marginBottom: 12 }}>Measurables</h2>
           <div className="g4">
