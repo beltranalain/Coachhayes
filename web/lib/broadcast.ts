@@ -16,6 +16,9 @@ export type Participant = { id: string; name: string; role: string; sessionId?: 
 type Banner = { title: string; subtitle: string } | null;
 type Pinned = { name: string; text: string; source?: string } | null;
 export type Layout = "grid" | "spotlight" | "custom";
+// Program transitions. All but "cut" cross-animate a snapshot of the previous
+// look over the freshly-drawn new look (see renderFrame).
+export type TransitionStyle = "cut" | "fade" | "dip" | "slide" | "wipe" | "zoom";
 type Rect = { x: number; y: number; w: number; h: number };
 type ReplaySlot = { rec: MediaRecorder | null; chunks: Blob[]; start: number; resolve?: (b: Blob) => void; startRec: () => void };
 
@@ -72,12 +75,14 @@ function drawZoom(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number,
   ctx.restore();
 }
 
-// Cover-draw any source (image or video) into a box, cropping to fill.
-function coverDraw(ctx: CanvasRenderingContext2D, src: CanvasImageSource, sw: number, sh: number, x: number, y: number, w: number, h: number) {
+// Cover-draw any source (image or video) into a box, cropping to fill. zoom > 1
+// tightens the source crop (zooms IN) around the center; zoom 1 = plain cover.
+function coverDraw(ctx: CanvasRenderingContext2D, src: CanvasImageSource, sw: number, sh: number, x: number, y: number, w: number, h: number, zoom = 1) {
   if (!sw || !sh) return;
   const vr = sw / sh, dr = w / h;
   let cw = sw, ch = sh, sx = 0, sy = 0;
   if (vr > dr) { cw = sh * dr; sx = (sw - cw) / 2; } else { ch = sw / dr; sy = (sh - ch) / 2; }
+  if (zoom > 1) { const nw = cw / zoom, nh = ch / zoom; sx += (cw - nw) / 2; sy += (ch - nh) / 2; cw = nw; ch = nh; }
   ctx.drawImage(src, sx, sy, cw, ch, x, y, w, h);
 }
 
@@ -105,6 +110,21 @@ class StudioEngine {
   sceneEnabled = false;
   sceneMode: "none" | "chroma" | "ml" = "chroma";
   chromaColor = "#00b140";
+  // Talk-show layout extras (all optional, drawn over the program):
+  //  - supporters ticker: a bottom marquee of recent tips (real data only)
+  //  - side panel: a branded placeholder panel in the gap beside a windowed camera
+  //  - show clock: a simple elapsed count-up timer
+  supportersOn = false;
+  recentTips: { name: string; amount: number }[] = [];
+  panelOn = false;
+  panelTitle = "";
+  private panelImg: HTMLImageElement | null = null;
+  clockOn = false;
+  private clockStart = 0;
+  // Free image overlay: any graphic the admin places + sizes anywhere on the
+  // program (logo, sponsor, player cut-out). Position + width are fractions.
+  private overlayImg: HTMLImageElement | null = null;
+  overlayBox: { x: number; y: number; w: number } = { x: 0.04, y: 0.08, w: 0.20 };
   // Rotating lower-third ticker (news-style scroll along the bottom)
   tickerOn = false;
   tickerLabel = "";
@@ -143,8 +163,8 @@ class StudioEngine {
   mediaHasVideo = false;
   mediaName = "";
   mediaLevel = 1;
-  // Scene transition: cross-fade from a snapshot of the previous look.
-  transitionStyle: "cut" | "fade" = "fade";
+  // Scene transition: animate a snapshot of the previous look over the new one.
+  transitionStyle: TransitionStyle = "fade";
   transMs = 380;
   private transCanvas: HTMLCanvasElement | null = null;
   private transSnap: HTMLCanvasElement | null = null;
@@ -193,6 +213,16 @@ class StudioEngine {
   private levels = new Map<string, number>();    // smoothed short-term level per key
   private activeKey: string | null = null;       // current active-speaker tile key
   private lastLevelAt = 0;                        // throttle for level sampling
+
+  // Public: the host mic's smoothed input level (0-1), for the Studio mic meter.
+  hostInputLevel(): number { return this.micOn ? (this.levels.get("host") || 0) : 0; }
+
+  // Browsers start an AudioContext suspended until a user gesture. Resume it so
+  // the analyser (and thus the mic meter) produces data during preview, not just
+  // after Go Live. Safe to call repeatedly / before init.
+  async resumeAudio(): Promise<void> {
+    try { if (this.audioCtx && this.audioCtx.state === "suspended") await this.audioCtx.resume(); } catch {}
+  }
   private screenStream: MediaStream | null = null;
   private screenVideo: HTMLVideoElement | null = null;
   private screenAudioSrc: MediaStreamAudioSourceNode | null = null;
@@ -212,6 +242,10 @@ class StudioEngine {
   private brandLogo: HTMLImageElement | null = null; // shown on the "Camera off" card
   private brandAccent = "#F5A524"; // on-air graphics (banner, pinned comment) use the brand accent
   hostZoom = 1; // host camera framing (software crop): 1 = fill, <1 zoom out, >1 zoom in
+  // Where the host camera sits inside the branded scene, as fractions of the
+  // frame (0..1). {0,0,1,1} = full frame; smaller boxes leave room for graphics.
+  // The admin positions/sizes this freely; presets are just quick starting points.
+  camBox: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: 1, h: 1 };
   // Hardware/lens zoom, if the webcam exposes it. Lowering this genuinely WIDENS
   // the field of view (fits more people) - software can't do that.
   camZoom: { supported: boolean; min: number; max: number; step: number; value: number } = { supported: false, min: 1, max: 1, step: 1, value: 1 };
@@ -445,11 +479,46 @@ class StudioEngine {
     if (now - this.lastDraw < 1000 / 30) return;
     this.lastDraw = now;
     this.drawProgram(ctx);
-    // Cross-fade: fade the pre-switch snapshot out over the new look.
+    // Transition: the new look is already drawn above; animate the pre-switch
+    // snapshot away over it per the chosen style.
     if (this.transSnap) {
-      const p = Math.min(1, (now - this.transStart) / this.transMs);
-      ctx.save(); ctx.globalAlpha = 1 - p; ctx.drawImage(this.transSnap, 0, 0, W, H); ctx.restore();
-      if (p >= 1) this.transSnap = null;
+      const raw = Math.min(1, (now - this.transStart) / this.transMs);
+      // easeInOutQuad for smooth motion on the moving styles.
+      const p = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
+      const snap = this.transSnap;
+      ctx.save();
+      switch (this.transitionStyle) {
+        case "slide": // old look slides off to the left, revealing the new one
+          ctx.drawImage(snap, -p * W, 0, W, H);
+          break;
+        case "wipe": { // new look wipes in from the left under the old
+          const x = p * W;
+          ctx.beginPath(); ctx.rect(x, 0, W - x, H); ctx.clip();
+          ctx.drawImage(snap, 0, 0, W, H);
+          break;
+        }
+        case "zoom": { // old look pushes in slightly and dissolves
+          const s = 1 + 0.18 * p;
+          ctx.globalAlpha = 1 - p;
+          ctx.drawImage(snap, -(s - 1) * W / 2, -(s - 1) * H / 2, W * s, H * s);
+          break;
+        }
+        case "dip": // dip through black: old -> black -> new (uses linear raw)
+          if (raw < 0.5) {
+            ctx.drawImage(snap, 0, 0, W, H);
+            ctx.globalAlpha = raw * 2; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+          } else {
+            ctx.globalAlpha = (1 - raw) * 2; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+          }
+          break;
+        case "fade":
+        default:
+          ctx.globalAlpha = 1 - p;
+          ctx.drawImage(snap, 0, 0, W, H);
+          break;
+      }
+      ctx.restore();
+      if (raw >= 1) this.transSnap = null;
     }
   }
 
@@ -464,17 +533,28 @@ class StudioEngine {
       this.transStart = typeof performance !== "undefined" ? performance.now() : 0;
     } catch {}
   }
-  setTransitionStyle(s: "cut" | "fade") { this.transitionStyle = s; this.emit(); }
+  setTransitionStyle(s: TransitionStyle) {
+    this.transitionStyle = s;
+    // Dip needs longer (two phases through black); moving wipes/slides a touch
+    // longer than a plain dissolve so the motion reads.
+    this.transMs = s === "dip" ? 620 : s === "fade" ? 380 : 440;
+    this.emit();
+  }
 
   // Draw the current program look (all the mode branches). renderFrame wraps
   // this and applies the transition overlay.
   private drawProgram(ctx: CanvasRenderingContext2D) {
+    // Refresh audio levels / active-speaker every frame (throttled internally to
+    // ~7x/sec) so the mic meter stays live in ALL modes, not just plain camera.
+    this.updateLevels();
+
     // Intro/"starting soon" bumper replaces the whole program visually when on.
     if (this.bumperEnabled) { this.drawBumper(ctx); return; }
 
-    // A rolling media video fills the program while it plays (audio-only media
-    // just mixes over the current camera, so no video takeover in that case).
-    if (this.mediaPlaying && this.mediaHasVideo && this.mediaEl && this.mediaEl.videoWidth) {
+    // A rolling media video fills the program while it plays - UNLESS a branded
+    // scene is on, in which case the video becomes the scene background and the
+    // host composites over it (see drawScene). Audio-only media never takes over.
+    if (this.mediaPlaying && this.mediaHasVideo && this.mediaEl && this.mediaEl.videoWidth && !this.sceneEnabled) {
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
       drawCover(ctx, this.mediaEl, 0, 0, W, H);
       this.drawGraphics(ctx);
@@ -483,9 +563,6 @@ class StudioEngine {
 
     // Branded scene takes over the frame when enabled (host over a background).
     if (this.sceneEnabled) { this.drawScene(ctx); this.drawGraphics(ctx); return; }
-
-    // Refresh audio levels / active-speaker (throttled internally to ~7x/sec).
-    this.updateLevels();
 
     ctx.fillStyle = "#0A0908"; ctx.fillRect(0, 0, W, H);
     // Each tile carries its video, display name, and a stable key ("host" or the
@@ -804,6 +881,9 @@ class StudioEngine {
     ctx.textBaseline = "middle";
     this.drawRundown(ctx);
     this.drawTicker(ctx);
+    this.drawSupporters(ctx);
+    this.drawClock(ctx);
+    this.drawOverlay(ctx);
     if (this.pinned) {
       const { x, y } = this.pinPos, w = PIN_W, h = PIN_H;
       // Pill-shaped lower-third (rounded capsule) with an amber outline.
@@ -985,6 +1065,8 @@ class StudioEngine {
     this.tipAlert = { name, amount, message };
     if (this.tipTimer) clearTimeout(this.tipTimer);
     this.tipTimer = setTimeout(() => { this.tipAlert = null; this.emit(); }, 9000);
+    // Keep it in the recent-supporters list (real tips only) for the ticker.
+    if (name && amount > 0) this.recentTips = [{ name, amount }, ...this.recentTips].slice(0, 20);
     this.emit();
   }
   clearGraphics() { this.banner = null; this.pinned = null; this.emit(); }
@@ -1078,7 +1160,7 @@ class StudioEngine {
     img.src = dataUrl;
     return img;
   }
-  setScene(cfg: Partial<{ enabled: boolean; mode: "none" | "chroma" | "ml"; chroma: string; background: string; frame: string; logo: string; tickerOn: boolean; tickerLabel: string; ticker: string }>) {
+  setScene(cfg: Partial<{ enabled: boolean; mode: "none" | "chroma" | "ml"; chroma: string; background: string; frame: string; logo: string; tickerOn: boolean; tickerLabel: string; ticker: string; camBox: { x: number; y: number; w: number; h: number }; supportersOn: boolean; panelOn: boolean; panelTitle: string; panelImage: string; clockOn: boolean; overlayImage: string; overlayBox: { x: number; y: number; w: number } }>) {
     if (typeof cfg.enabled === "boolean") this.sceneEnabled = cfg.enabled;
     if (cfg.mode) this.sceneMode = cfg.mode;
     if (cfg.chroma) this.chromaColor = cfg.chroma;
@@ -1088,7 +1170,40 @@ class StudioEngine {
     if (typeof cfg.tickerOn === "boolean") this.tickerOn = cfg.tickerOn;
     if (cfg.tickerLabel !== undefined) this.tickerLabel = cfg.tickerLabel;
     if (cfg.ticker !== undefined) this.setTickerText(cfg.ticker);
+    if (cfg.camBox) this.setCamBox(cfg.camBox, false);
+    if (typeof cfg.supportersOn === "boolean") this.supportersOn = cfg.supportersOn;
+    if (typeof cfg.panelOn === "boolean") this.panelOn = cfg.panelOn;
+    if (cfg.panelTitle !== undefined) this.panelTitle = cfg.panelTitle;
+    if (cfg.panelImage !== undefined) this.panelImg = this.loadImg(cfg.panelImage);
+    if (cfg.overlayImage !== undefined) this.overlayImg = this.loadImg(cfg.overlayImage);
+    if (cfg.overlayBox) this.setOverlayBox(cfg.overlayBox, false);
+    if (typeof cfg.clockOn === "boolean") this.setClock(cfg.clockOn, false);
     this.emit();
+  }
+  // Free image overlay box (fractions). Clamps position on-screen + a min size.
+  setOverlayBox(box: Partial<{ x: number; y: number; w: number }>, emit = true) {
+    const b = { ...this.overlayBox, ...box };
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    this.overlayBox = { x: clamp(b.x, 0, 1), y: clamp(b.y, 0, 1), w: clamp(b.w, 0.05, 1) };
+    if (emit) this.emit();
+  }
+  setSupportersOn(v: boolean) { this.supportersOn = v; this.emit(); }
+  setPanel(on: boolean, title?: string) { this.panelOn = on; if (title !== undefined) this.panelTitle = title; this.emit(); }
+  setClock(on: boolean, emit = true) {
+    this.clockOn = on;
+    if (on && !this.clockStart) this.clockStart = typeof performance !== "undefined" ? performance.now() : 0;
+    if (emit) this.emit();
+  }
+  resetClock() { this.clockStart = typeof performance !== "undefined" ? performance.now() : 0; this.emit(); }
+  // Set the camera window box (fractions). Clamps size to a sane minimum and
+  // keeps the box fully on-screen. Partial updates merge with the current box.
+  setCamBox(box: Partial<{ x: number; y: number; w: number; h: number }>, emit = true) {
+    const b = { ...this.camBox, ...box };
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+    const w = clamp(b.w, 0.1, 1);
+    const h = clamp(b.h, 0.1, 1);
+    this.camBox = { w, h, x: clamp(b.x, 0, 1 - w), y: clamp(b.y, 0, 1 - h) };
+    if (emit) this.emit();
   }
   setSceneEnabled(v: boolean) { this.sceneEnabled = v; this.emit(); }
   setSceneMode(m: "none" | "chroma" | "ml") { this.sceneMode = m; this.emit(); }
@@ -1220,22 +1335,147 @@ class StudioEngine {
     this.tickerText = items.join("      •      ");
   }
 
+  // The host camera rectangle (pixels) inside the branded scene, from camBox.
+  private camRect(): { x: number; y: number; w: number; h: number } {
+    const b = this.camBox;
+    return { x: b.x * W, y: b.y * H, w: b.w * W, h: b.h * H };
+  }
+  private camIsWindowed(): boolean {
+    const b = this.camBox;
+    return b.x > 0.001 || b.y > 0.001 || b.w < 0.999 || b.h < 0.999;
+  }
+
   private drawScene(ctx: CanvasRenderingContext2D) {
-    if (this.sceneBg?.complete && this.sceneBg.naturalWidth) coverDraw(ctx, this.sceneBg, this.sceneBg.naturalWidth, this.sceneBg.naturalHeight, 0, 0, W, H);
-    else { ctx.fillStyle = "#0A0908"; ctx.fillRect(0, 0, W, H); }
+    // Background priority: a playing media video (moving background) > the
+    // uploaded background image > a flat dark fill. The host draws over it.
+    if (this.mediaPlaying && this.mediaHasVideo && this.mediaEl && this.mediaEl.videoWidth) {
+      drawCover(ctx, this.mediaEl, 0, 0, W, H);
+    } else if (this.sceneBg?.complete && this.sceneBg.naturalWidth) {
+      coverDraw(ctx, this.sceneBg, this.sceneBg.naturalWidth, this.sceneBg.naturalHeight, 0, 0, W, H);
+    } else { ctx.fillStyle = "#0A0908"; ctx.fillRect(0, 0, W, H); }
 
     const host = this.hostVideo;
     if (host && host.videoWidth) {
-      if (this.sceneMode === "chroma") this.drawChromaHost(ctx, host);
-      else if (this.sceneMode === "ml") this.drawMlHost(ctx, host);
+      const r = this.camRect();
+      const windowed = this.camIsWindowed();
+      if (this.sceneMode === "chroma") this.drawChromaHost(ctx, host, r.x, r.y, r.w, r.h);
+      else if (this.sceneMode === "ml") this.drawMlHost(ctx, host, r.x, r.y, r.w, r.h);
+      else if (this.hostZoom !== 1) drawZoom(ctx, host, r.x, r.y, r.w, r.h, this.hostZoom, windowed);
+      else if (windowed) drawCoverRounded(ctx, host, r.x, r.y, r.w, r.h);
       else drawCover(ctx, host, 0, 0, W, H);
     }
 
+    // Branded placeholder panel in the gap beside a windowed camera (drawn under
+    // any uploaded frame so real art can still overlay it).
+    if (this.panelOn && this.camIsWindowed()) this.drawPanel(ctx);
+
     if (this.sceneFrame?.complete && this.sceneFrame.naturalWidth) ctx.drawImage(this.sceneFrame, 0, 0, W, H);
-    if (this.sceneLogo?.complete && this.sceneLogo.naturalWidth) {
+    // The centered scene logo would sit over a windowed camera, and the panel
+    // already shows the logo - so only draw it full-frame when no panel is up.
+    if (!this.panelOn && this.sceneLogo?.complete && this.sceneLogo.naturalWidth) {
       const lw = 170, lh = lw * (this.sceneLogo.naturalHeight / this.sceneLogo.naturalWidth || 0.4);
       ctx.drawImage(this.sceneLogo, (W - lw) / 2, 22, lw, lh);
     }
+  }
+
+  // A branded side panel that fills the empty gap next to a side-windowed camera.
+  // Placeholder until a Frame PNG is uploaded: brand gradient + accent edge, the
+  // logo near the top, and the show title.
+  private drawPanel(ctx: CanvasRenderingContext2D) {
+    const b = this.camBox;
+    let gx = 0, gw = 0;
+    if (b.x >= 0.25) { gx = 0; gw = b.x * W; }                        // camera on the right -> panel fills left
+    else if (b.x + b.w <= 0.75) { gx = (b.x + b.w) * W; gw = (1 - (b.x + b.w)) * W; } // camera on the left -> panel right
+    else return;                                                     // no clean side gap (full/corner) - skip
+    if (gw < W * 0.12) return;
+    const cx = gx + gw / 2;
+    ctx.save();
+    const g = ctx.createLinearGradient(gx, 0, gx + gw, 0);
+    g.addColorStop(0, "#141416"); g.addColorStop(1, "#0B0A0C");
+    ctx.fillStyle = g; ctx.fillRect(gx, 0, gw, H);
+    ctx.fillStyle = this.brandAccent; ctx.fillRect(gx === 0 ? gx + gw - 5 : gx, 0, 5, H); // accent edge toward the camera
+
+    let topY = 54;
+    // Prefer a dedicated panel image; fall back to the scene logo, then brand logo.
+    const custom = this.panelImg?.complete && this.panelImg.naturalWidth ? this.panelImg : null;
+    const logo = custom || (this.sceneLogo?.complete && this.sceneLogo.naturalWidth ? this.sceneLogo : (this.brandLogo?.complete && this.brandLogo.naturalWidth ? this.brandLogo : null));
+    if (logo) {
+      const cap = custom ? 0.82 : 0.6, maxW = custom ? 300 : 230;
+      const lw = Math.min(gw * cap, maxW), lh = lw * (logo.naturalHeight / logo.naturalWidth || 0.5);
+      ctx.drawImage(logo, cx - lw / 2, topY, lw, lh); topY += lh + 26;
+    }
+    const title = (this.panelTitle || "").trim().toUpperCase();
+    if (title) {
+      ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#F3EFE7";
+      let fs = 58, lines: string[] = [];
+      for (; fs >= 24; fs -= 4) {
+        ctx.font = `${fs}px Anton, sans-serif`;
+        lines = this.wrapLines(ctx, title, gw - 44, 4);
+        const widest = Math.max(...lines.map((l) => ctx.measureText(l).width));
+        if (widest <= gw - 44 && lines.length <= 4) break;
+      }
+      ctx.font = `${fs}px Anton, sans-serif`;
+      const lineH = fs * 1.08, blockH = lineH * lines.length;
+      let ty = Math.max(topY + fs, H / 2 - blockH / 2 + fs);
+      lines.forEach((l) => { ctx.fillText(l, cx, ty); ty += lineH; });
+      ctx.fillStyle = this.brandAccent; ctx.fillRect(cx - 34, ty - lineH + 12, 68, 4); // accent underline
+    }
+    ctx.restore();
+  }
+
+  // Bottom marquee of recent tips. Stacks above the news ticker if both are on.
+  private drawSupporters(ctx: CanvasRenderingContext2D) {
+    if (!this.supportersOn) return;
+    const h = 44;
+    const y = H - h - ((this.tickerOn && this.tickerText) ? 46 : 0);
+    ctx.save();
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(10,9,8,.92)"; ctx.fillRect(0, y, W, h);
+    ctx.fillStyle = this.brandAccent; ctx.fillRect(0, y, W, 2);
+    ctx.font = "700 20px Anton, sans-serif";
+    const label = "SUPPORTERS";
+    const lw = ctx.measureText(label).width + 36;
+    ctx.fillStyle = this.brandAccent; ctx.fillRect(0, y, lw, h);
+    ctx.fillStyle = "#151107"; ctx.fillText(label, 18, y + h / 2 + 1);
+
+    const text = this.recentTips.length
+      ? this.recentTips.map((t) => `${t.name}  $${t.amount.toFixed(2)}`).join("        •        ")
+      : "Tip the show and your name scrolls here";
+    ctx.beginPath(); ctx.rect(lw, y, W - lw, h); ctx.clip();
+    ctx.font = "600 21px Inter, sans-serif"; ctx.fillStyle = "#F3EFE7";
+    const tw = ctx.measureText(text).width, gap = 90, period = tw + gap;
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    const offset = period > 0 ? ((now * 60) / 1000) % period : 0;
+    const startX = lw + 22 - offset, copies = Math.ceil((W - lw) / period) + 2;
+    for (let i = -1; i < copies; i++) ctx.fillText(text, startX + i * period, y + h / 2 + 1);
+    ctx.restore();
+  }
+
+  // Free image overlay: drawn at its box (position + width), aspect preserved.
+  private drawOverlay(ctx: CanvasRenderingContext2D) {
+    const img = this.overlayImg;
+    if (!img?.complete || !img.naturalWidth) return;
+    const b = this.overlayBox;
+    const dw = b.w * W, dh = dw * (img.naturalHeight / img.naturalWidth);
+    ctx.drawImage(img, b.x * W, b.y * H, dw, dh);
+  }
+
+  // Small elapsed count-up clock, top-left.
+  private drawClock(ctx: CanvasRenderingContext2D) {
+    if (!this.clockOn) return;
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    const elapsed = this.clockStart ? Math.max(0, Math.floor((now - this.clockStart) / 1000)) : 0;
+    const hh = Math.floor(elapsed / 3600), mm = Math.floor((elapsed % 3600) / 60), ss = elapsed % 60;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const txt = hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${pad(mm)}:${pad(ss)}`;
+    ctx.save();
+    ctx.font = "400 30px Anton, sans-serif";
+    const w = Math.max(96, ctx.measureText(txt).width + 36), h = 44, x = 24, y = 24;
+    roundRectPath(ctx, x, y, w, h, 10); ctx.fillStyle = "rgba(10,9,8,.85)"; ctx.fill();
+    ctx.fillStyle = this.brandAccent; ctx.fillRect(x, y, 4, h);
+    ctx.fillStyle = "#F3EFE7"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+    ctx.fillText(txt, x + 18, y + h / 2 + 1);
+    ctx.restore();
   }
 
   // ---- Intro / "starting soon" bumper ----
@@ -1250,7 +1490,12 @@ class StudioEngine {
     if (cfg.headline !== undefined) this.bumperHeadline = cfg.headline;
     if (cfg.subtext !== undefined) this.bumperSubtext = cfg.subtext;
     if (cfg.background !== undefined) this.bumperBg = this.loadImg(cfg.background);
-    if (cfg.videoUrl !== undefined) this.bumperVideoUrl = cfg.videoUrl;
+    // Changing or clearing the intro video dismisses any stale "couldn't load"
+    // error - a new URL gets a fresh chance (and re-errors only if it also fails).
+    if (cfg.videoUrl !== undefined && cfg.videoUrl !== this.bumperVideoUrl) {
+      this.bumperVideoUrl = cfg.videoUrl;
+      if (this.error.startsWith("Intro video")) this.error = "";
+    }
     if (cfg.startsAt !== undefined) this.bumperStartsAt = Number(cfg.startsAt) || 0;
     this.syncBumperVideo();
     this.emit();
@@ -1273,8 +1518,12 @@ class StudioEngine {
       if (!this.bumperVideo) {
         const v = document.createElement("video");
         v.crossOrigin = "anonymous"; // required so drawing it doesn't taint the canvas
-        v.loop = true; v.muted = false; v.autoplay = true;
+        v.loop = true; v.muted = false; v.autoplay = true; v.preload = "auto";
         (v as any).playsInline = true;
+        // A failed load (almost always a non-CORS URL) otherwise shows nothing but
+        // the "starting soon" card with no explanation - surface the real reason.
+        v.onloadeddata = () => { if (this.error.startsWith("Intro video")) this.error = ""; this.emit(); };
+        v.onerror = () => { this.error = "Intro video couldn't load - the link must be a public, CORS-enabled MP4. Upload the file here and we handle that for you."; this.emit(); };
         v.src = this.bumperVideoUrl;
         this.bumperVideo = v;
         // Route its audio into the program mix (created once per element).
@@ -1295,7 +1544,8 @@ class StudioEngine {
 
   private teardownBumperVideo() {
     if (this.bumperAudioSrc) { try { this.bumperAudioSrc.disconnect(); } catch {} this.bumperAudioSrc = null; }
-    if (this.bumperVideo) { try { this.bumperVideo.pause(); } catch {} this.bumperVideo.src = ""; this.bumperVideo = null; }
+    if (this.bumperVideo) { try { this.bumperVideo.pause(); } catch {} this.bumperVideo.onerror = null; this.bumperVideo.onloadeddata = null; this.bumperVideo.src = ""; this.bumperVideo = null; }
+    if (this.error.startsWith("Intro video")) this.error = "";
   }
 
   // Wrap text to fit a max width, shrinking the font until it fits in maxLines.
@@ -1430,18 +1680,20 @@ class StudioEngine {
 
   // AI virtual background: segment the person out (no green screen) and draw
   // them over the scene background - like Zoom/Meet.
-  private drawMlHost(ctx: CanvasRenderingContext2D, v: HTMLVideoElement) {
-    if (!this.segReady) { this.ensureSegmenter(); drawCover(ctx, v, 0, 0, W, H); return; }
+  private drawMlHost(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, dx = 0, dy = 0, dw = W, dh = H) {
+    if (!this.segReady) { this.ensureSegmenter(); drawCover(ctx, v, dx, dy, dw, dh); return; }
     const IW = 640, IH = 360;
     if (!this.inputCanvas) { this.inputCanvas = document.createElement("canvas"); this.inputCanvas.width = IW; this.inputCanvas.height = IH; }
     const ictx = this.inputCanvas.getContext("2d", { willReadFrequently: true });
-    if (!ictx) { drawCover(ctx, v, 0, 0, W, H); return; }
-    coverDraw(ictx, v, v.videoWidth, v.videoHeight, 0, 0, IW, IH);
+    if (!ictx) { drawCover(ctx, v, dx, dy, dw, dh); return; }
+    // Honor the camera-crop slider: segmentation then runs on the zoomed frame,
+    // so the person mask stays aligned with what's composited.
+    coverDraw(ictx, v, v.videoWidth, v.videoHeight, 0, 0, IW, IH, this.hostZoom);
 
     let result: any;
-    try { result = this.segmenter.segmentForVideo(this.inputCanvas, performance.now()); } catch { drawCover(ctx, v, 0, 0, W, H); return; }
+    try { result = this.segmenter.segmentForVideo(this.inputCanvas, performance.now()); } catch { drawCover(ctx, v, dx, dy, dw, dh); return; }
     const mask = result?.confidenceMasks?.[0];
-    if (!mask) { try { result?.close?.(); } catch {} drawCover(ctx, v, 0, 0, W, H); return; }
+    if (!mask) { try { result?.close?.(); } catch {} drawCover(ctx, v, dx, dy, dw, dh); return; }
 
     const floats = mask.getAsFloat32Array();
     const mw = mask.width, mh = mask.height;
@@ -1458,16 +1710,16 @@ class StudioEngine {
     ictx.globalCompositeOperation = "destination-in";
     ictx.drawImage(this.maskCanvas, 0, 0, mw, mh, 0, 0, IW, IH);
     ictx.globalCompositeOperation = "source-over";
-    ctx.drawImage(this.inputCanvas, 0, 0, IW, IH, 0, 0, W, H);
+    ctx.drawImage(this.inputCanvas, 0, 0, IW, IH, dx, dy, dw, dh);
   }
 
   // Green-screen key: knock out the chroma color so the background shows through.
-  private drawChromaHost(ctx: CanvasRenderingContext2D, v: HTMLVideoElement) {
+  private drawChromaHost(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, dx = 0, dy = 0, dw = W, dh = H) {
     const pw = 640, ph = 360;
     if (!this.keyCanvas) { this.keyCanvas = document.createElement("canvas"); this.keyCanvas.width = pw; this.keyCanvas.height = ph; }
     const k = this.keyCanvas.getContext("2d", { willReadFrequently: true });
-    if (!k) { drawCover(ctx, v, 0, 0, W, H); return; }
-    coverDraw(k, v, v.videoWidth, v.videoHeight, 0, 0, pw, ph);
+    if (!k) { drawCover(ctx, v, dx, dy, dw, dh); return; }
+    coverDraw(k, v, v.videoWidth, v.videoHeight, 0, 0, pw, ph, this.hostZoom);
     const img = k.getImageData(0, 0, pw, ph);
     const d = img.data;
     const [r0, g0, b0] = hexRgb(this.chromaColor);
@@ -1477,7 +1729,7 @@ class StudioEngine {
       if (dist < 180 && g > r + 18 && g > b + 18) d[i + 3] = 0;
     }
     k.putImageData(img, 0, 0);
-    ctx.drawImage(this.keyCanvas, 0, 0, pw, ph, 0, 0, W, H);
+    ctx.drawImage(this.keyCanvas, 0, 0, pw, ph, dx, dy, dw, dh);
   }
 
   // ---- Screen / tab / window share (host) ----

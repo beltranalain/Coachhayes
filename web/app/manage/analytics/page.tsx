@@ -1,21 +1,20 @@
 import { getAllStats, getUploads, youtubeConfigured } from "@/lib/youtube";
 import { getSiteConfig } from "@/lib/siteConfig";
 import { formatCount } from "@/lib/format";
+import Shell from "@/components/hayes/admin/Shell";
 
-export default async function AdminAnalytics() {
-  const { channels } = await getSiteConfig();
+export default async function ManageAnalytics() {
+  const { branding, channels } = await getSiteConfig();
   const stats = await getAllStats(channels.map((c) => c.channelId));
   const recent = channels[0] ? await getUploads(channels[0].uploadsPlaylist, 8) : [];
 
   return (
-    <>
-      <div className="admin-topbar">
-        <div>
-          <h1>Analytics</h1>
-          <div className="sub">Pulled live from YouTube. No sample data.</div>
-        </div>
-      </div>
-
+    <Shell
+      title="Analytics"
+      sub="Pulled live from YouTube. No sample data."
+      brandName={branding.siteName}
+      logo={branding.logo}
+    >
       {!youtubeConfigured && (
         <div className="notice" style={{ marginBottom: 22 }}>
           <strong>Connect YouTube</strong> to see subscribers, views, and recent uploads here.
@@ -49,6 +48,6 @@ export default async function AdminAnalytics() {
           </p>
         )}
       </div>
-    </>
+    </Shell>
   );
 }

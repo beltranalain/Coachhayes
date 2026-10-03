@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Shell from "@/components/hayes/admin/Shell";
 import { getIdToken } from "@/lib/firebase";
 
 type Row = { key: string; name: string; detail: string; cost: number | null; free: boolean };
@@ -12,7 +13,8 @@ function money(n: number | null) {
   return "$" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function AdminCosts() {
+export default function ManageCosts() {
+  const [brand, setBrand] = useState({ name: "Coach Hayes Football", logo: "" });
   const [data, setData] = useState<Usage | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [budget, setBudget] = useState("");
@@ -26,14 +28,18 @@ export default function AdminCosts() {
   useEffect(() => {
     fetch("/api/site-config", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { if (d?.branding?.liveDelivery) setDelivery(d.branding.liveDelivery); })
+      .then((d) => {
+        if (d?.branding) setBrand({ name: d.branding.siteName || "Coach Hayes Football", logo: d.branding.logo || "" });
+        if (d?.branding?.liveDelivery) setDelivery(d.branding.liveDelivery);
+      })
       .catch(() => {});
   }, []);
 
   async function load() {
     try {
       const token = await getIdToken();
-      const res = await fetch("/api/admin/usage", { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store" });
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch("/api/admin/usage", { headers, cache: "no-store" });
       const d = await res.json();
       if (!res.ok) { setState("error"); return; }
       setData(d); setBudget(d.budget ? String(d.budget) : "");
@@ -58,8 +64,9 @@ export default function AdminCosts() {
   async function saveBudget() {
     setMsg("");
     const token = await getIdToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
     const res = await fetch("/api/admin/usage", {
-      method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      method: "POST", headers,
       body: JSON.stringify({ budget: Number(budget) || 0 }),
     });
     const d = await res.json();
@@ -70,8 +77,9 @@ export default function AdminCosts() {
   async function saveTypicalViewers() {
     setMsg("");
     const token = await getIdToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
     const res = await fetch("/api/admin/usage", {
-      method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      method: "POST", headers,
       body: JSON.stringify({ typicalViewers: Number(viewers) || 0 }),
     });
     const d = await res.json();
@@ -100,17 +108,7 @@ export default function AdminCosts() {
   const level = cap === 0 ? "none" : pct >= 100 ? "over" : pct >= 80 ? "warn" : "ok";
 
   return (
-    <>
-      <div className="admin-topbar">
-        <div>
-          <h1>Costs</h1>
-          <div className="sub">Estimated monthly spend across your services. Set a budget to get an alert.</div>
-        </div>
-        <div className="admin-actions">
-          <button className="btn btn-ghost btn-sm" type="button" onClick={load}>Refresh</button>
-        </div>
-      </div>
-
+    <Shell title="Costs" sub="Estimated monthly spend across your services. Set a budget to get an alert." brandName={brand.name} logo={brand.logo}>
       {state === "error" && <p className="form-error">Could not load usage.</p>}
 
       {state === "ready" && data && (
@@ -262,6 +260,6 @@ export default function AdminCosts() {
           </div>
         </>
       )}
-    </>
+    </Shell>
   );
 }

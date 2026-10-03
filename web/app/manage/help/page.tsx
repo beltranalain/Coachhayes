@@ -1,5 +1,11 @@
+"use client";
+
 // Admin SOP / operating guide. Static content - explains every Studio page:
-// purpose, how to use, do / don't. Visible to every role.
+// purpose, how to use, do / don't. Visible to every role. Ported into the new
+// "Control Room" admin shell (branding fetched for the Shell header).
+
+import { useEffect, useState } from "react";
+import Shell from "@/components/hayes/admin/Shell";
 
 type Section = {
   id: string;
@@ -195,15 +201,14 @@ const ROLE_ROWS: { role: string; sees: string }[] = [
 ];
 
 export default function AdminHelp() {
-  return (
-    <>
-      <div className="admin-topbar">
-        <div>
-          <h1>Help &amp; SOP</h1>
-          <div className="sub">How the Studio works - what each page is for, how to use it, and what to avoid.</div>
-        </div>
-      </div>
+  const [brand, setBrand] = useState({ name: "Coach Hayes Football", logo: "" });
 
+  useEffect(() => {
+    fetch("/api/site-config", { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.branding) setBrand({ name: d.branding.siteName || "Coach Hayes Football", logo: d.branding.logo || "" }); }).catch(() => {});
+  }, []);
+
+  return (
+    <Shell title="Help" sub="How the Studio works - what each page is for, how to use it, and what to avoid." brandName={brand.name} logo={brand.logo}>
       <div className="panel">
         <h3>First broadcast, step by step</h3>
         <ol className="sop-steps">
@@ -261,6 +266,6 @@ export default function AdminHelp() {
           <li><b>Old chat keeps showing:</b> it resets on Go Live, or use Clear chat in the Chat tab.</li>
         </ul>
       </div>
-    </>
+    </Shell>
   );
 }

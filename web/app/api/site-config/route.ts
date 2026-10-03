@@ -196,6 +196,7 @@ export async function POST(request: Request) {
           art: String(s.art ?? "a1").slice(0, 4),
           image: image.startsWith("data:image") && image.length < 200_000 ? image : "",
           visible: s.visible !== false,
+          video: typeof s.video === "string" ? s.video.slice(0, 300) : "",
         };
       });
     }

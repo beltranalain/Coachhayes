@@ -50,6 +50,7 @@ export type Series = {
   art: string;      // gradient art-well class: a1..a6 (fallback when no image)
   image?: string;   // custom thumbnail (data URL); overrides the gradient art
   visible?: boolean; // shown on the public site (defaults to true when unset)
+  video?: string;    // YouTube/Hudl link; embedded + playable in the show's community post
 };
 
 export const SERIES: Series[] = SHOWS as Series[];

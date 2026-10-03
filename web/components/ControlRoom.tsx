@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
-import { broadcast } from "@/lib/broadcast";
+import { broadcast, type TransitionStyle } from "@/lib/broadcast";
 import { getIdToken } from "@/lib/firebase";
 import SimulcastManager from "@/components/SimulcastManager";
 import LivePipModal from "@/components/LivePipModal";
@@ -9,7 +9,7 @@ import { PRIMARY_CHANNEL } from "@/lib/channels";
 import { connectTwitchChat } from "@/lib/twitchChat";
 
 const WS_BASE = process.env.NEXT_PUBLIC_CHAT_WS_URL || "";
-type Tab = "onair" | "chat" | "guests" | "sources" | "scene" | "intro" | "sounds" | "audio" | "rundown" | "media";
+type Tab = "onair" | "chat" | "guests" | "destinations" | "looks" | "sounds" | "audio" | "rundown" | "media";
 type ChatMessage = { id: string; name: string; text: string; uid?: string; tip?: number; source?: "site" | "youtube" | "twitch" | "facebook" };
 
 // Source badge: the site's own logo for site messages, platform logos for
@@ -21,7 +21,9 @@ function srcBadge(source?: string, logo?: string) {
   if (s === "facebook") return <span className="src-ic" title="Facebook"><svg width="16" height="16" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7v-3.5h3.1V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9v2.2h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z" /></svg></span>;
   return logo ? <img className="src-logo" src={logo} alt="Site" /> : <span className="src src-site">Site</span>;
 }
-type SceneCfg = { enabled: boolean; mode: "none" | "chroma" | "ml"; chroma: string; background: string; frame: string; logo: string; tickerOn: boolean; tickerLabel: string; ticker: string };
+type CamBox = { x: number; y: number; w: number; h: number };
+type OverlayBox = { x: number; y: number; w: number };
+type SceneCfg = { enabled: boolean; mode: "none" | "chroma" | "ml"; chroma: string; background: string; frame: string; logo: string; tickerOn: boolean; tickerLabel: string; ticker: string; camBox: CamBox; supportersOn: boolean; panelOn: boolean; panelTitle: string; panelImage: string; clockOn: boolean; overlayImage: string; overlayBox: OverlayBox };
 type BumperCfg = { enabled: boolean; mode: "card" | "video"; headline: string; subtext: string; background: string; videoUrl: string; startsAt: number };
 type SoundPad = { id: string; label: string; url: string };
 type ScheduleItem = { when: string; title: string; note: string; startsAt?: number };
@@ -88,6 +90,12 @@ function GuestPreview({ sessionId }: { sessionId: string }) {
 export default function ControlRoom() {
   const [, force] = useReducer((x) => x + 1, 0);
   const [tab, setTab] = useState<Tab>("onair");
+  // Studio redesign UI state: split-button device menus, overflow menu, mic meter
+  const [camMenu, setCamMenu] = useState(false);
+  const [micMenu, setMicMenu] = useState(false);
+  const [moreMenu, setMoreMenu] = useState(false);
+  const [micLvl, setMicLvl] = useState(0);
+  const [chatFilter, setChatFilter] = useState<"all" | "members" | "tips">("all");
   const [cams, setCams] = useState<MediaDeviceInfo[]>([]);
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
   const [chat, setChat] = useState<ChatMessage[]>([]);
@@ -97,7 +105,7 @@ export default function ControlRoom() {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [reveal, setReveal] = useState(false);
-  const [scene, setScene] = useState<SceneCfg>({ enabled: false, mode: "chroma", chroma: "#00b140", background: "", frame: "", logo: "", tickerOn: false, tickerLabel: "", ticker: "" });
+  const [scene, setScene] = useState<SceneCfg>({ enabled: false, mode: "chroma", chroma: "#00b140", background: "", frame: "", logo: "", tickerOn: false, tickerLabel: "", ticker: "", camBox: { x: 0, y: 0, w: 1, h: 1 }, supportersOn: false, panelOn: false, panelTitle: "", panelImage: "", clockOn: false, overlayImage: "", overlayBox: { x: 0.04, y: 0.08, w: 0.20 } });
   const [sceneMsg, setSceneMsg] = useState("");
   const [bumper, setBumper] = useState<BumperCfg>({ enabled: false, mode: "card", headline: "Starting soon", subtext: "", background: "", videoUrl: "", startsAt: 0 });
   const [bumperMsg, setBumperMsg] = useState("");
@@ -187,6 +195,9 @@ export default function ControlRoom() {
   const soundInput = useRef<HTMLInputElement | null>(null);
   const bumperBgInput = useRef<HTMLInputElement | null>(null);
   const bumperVideoInput = useRef<HTMLInputElement | null>(null);
+  const bumperLocalInput = useRef<HTMLInputElement | null>(null);
+  const panelImgInput = useRef<HTMLInputElement | null>(null);
+  const overlayImgInput = useRef<HTMLInputElement | null>(null);
   const rundownInput = useRef<HTMLInputElement | null>(null);
   const rundownFileIdx = useRef<number>(-1); // which topic row an upload targets
   const mediaInput = useRef<HTMLInputElement | null>(null);
@@ -202,7 +213,7 @@ export default function ControlRoom() {
         if (d?.branding?.youtubeChannelId) setYtChannelId(d.branding.youtubeChannelId);
         if (d?.branding?.twitchChannel !== undefined) setTwitchChannel(d.branding.twitchChannel || "");
         if (d?.branding?.hostName) { broadcast.setHostName(d.branding.hostName); setHostNameState(d.branding.hostName); }
-        if (d?.scene) { const sc = { tickerOn: false, tickerLabel: "", ticker: "", ...d.scene }; setScene(sc); broadcast.setScene(sc); }
+        if (d?.scene) { const sc = { tickerOn: false, tickerLabel: "", ticker: "", camBox: { x: 0, y: 0, w: 1, h: 1 }, supportersOn: false, panelOn: false, panelTitle: "", panelImage: "", clockOn: false, overlayImage: "", overlayBox: { x: 0.04, y: 0.08, w: 0.20 }, ...d.scene } as SceneCfg; setScene(sc); broadcast.setScene(sc); }
         if (d?.bumper) { const bm = { enabled: false, mode: "card", headline: "Starting soon", subtext: "", background: "", videoUrl: "", startsAt: 0, ...d.bumper } as BumperCfg; setBumper(bm); broadcast.setBumper(bm); }
         if (d?.rundown) { const rn = { enabled: false, title: "RUNDOWN", showTimer: true, activeIndex: 0, items: [], ...d.rundown } as RundownCfg; rn.items = (rn.items || []).map((it: any) => ({ title: it?.title ?? "", image: it?.image ?? "", seconds: Number(it?.seconds) || 0 })); setRundown(rn); broadcast.setRundown(rn); }
         if (Array.isArray(d?.schedule)) setSchedule(d.schedule);
@@ -265,15 +276,34 @@ export default function ControlRoom() {
   function updateScene(patch: Partial<SceneCfg>) {
     setScene((s) => { const next = { ...s, ...patch }; broadcast.setScene(next); return next; });
   }
-  async function pickSceneImg(e: React.ChangeEvent<HTMLInputElement>, kind: "background" | "frame" | "logo") {
+  // Move/resize the camera window. The engine clamps (min size + on-screen), so
+  // we mirror its clamped box back into state for the sliders/presets.
+  function updateCamBox(patch: Partial<CamBox>) {
+    broadcast.setCamBox(patch);
+    setScene((s) => ({ ...s, camBox: { ...broadcast.camBox } }));
+  }
+  const CAM_PRESETS: [string, CamBox][] = [
+    ["Full frame", { x: 0, y: 0, w: 1, h: 1 }],
+    ["Right side", { x: 0.40, y: 0, w: 0.60, h: 1 }],
+    ["Left side", { x: 0, y: 0, w: 0.60, h: 1 }],
+    ["Corner box", { x: 0.64, y: 0.64, w: 0.34, h: 0.34 }],
+  ];
+  async function pickSceneImg(e: React.ChangeEvent<HTMLInputElement>, kind: "background" | "frame" | "logo" | "panel" | "overlay") {
     const file = e.target.files?.[0]; e.target.value = "";
     if (!file) return;
     try {
       const url = kind === "background" ? await resizeScene(file, 1280, 720, true, false)
         : kind === "frame" ? await resizeScene(file, 1280, 720, true, true)
+        : kind === "panel" || kind === "overlay" ? await resizeScene(file, 800, 800, false, true)
         : await resizeScene(file, 400, 160, false, true);
-      updateScene({ [kind]: url } as Partial<SceneCfg>);
+      const field = kind === "panel" ? "panelImage" : kind === "overlay" ? "overlayImage" : kind;
+      updateScene({ [field]: url } as Partial<SceneCfg>);
     } catch { setSceneMsg("Could not read that image."); }
+  }
+  // Move/resize the free image overlay; mirror the engine's clamped box back.
+  function updateOverlayBox(patch: Partial<OverlayBox>) {
+    broadcast.setOverlayBox(patch);
+    setScene((s) => ({ ...s, overlayBox: { ...broadcast.overlayBox } }));
   }
   async function saveScene() {
     setSceneMsg("");
@@ -402,9 +432,16 @@ export default function ControlRoom() {
   }
   async function saveBumper() {
     setBumperMsg("");
+    // A local (blob:) intro video can't be persisted - it only exists in this
+    // tab and would come back as a dead link. Save everything else; don't store
+    // the temporary URL.
+    const isLocal = bumper.videoUrl.startsWith("blob:");
+    const data = isLocal ? { ...bumper, videoUrl: "" } : bumper;
     try {
-      const d = await persistBumper(bumper);
-      setBumperMsg(d.saved ? "Intro saved." : d.error || "Preview only - connect Firebase to save.");
+      const d = await persistBumper(data);
+      setBumperMsg(d.saved
+        ? (isLocal ? "Intro settings saved. The device-only video isn't stored - upload to Cloudflare to keep a video." : "Intro saved.")
+        : d.error || "Preview only - connect Firebase to save.");
     } catch { setBumperMsg("Could not save."); }
   }
 
@@ -423,7 +460,17 @@ export default function ControlRoom() {
       // 1. One-time direct-upload URL.
       const res = await fetch("/api/stream/upload", { method: "POST", headers: auth });
       const d = await res.json();
-      if (!res.ok || !d.uploadURL || !d.uid) { setIntroUp({ busy: false, msg: d.error || "Could not start the upload." }); return; }
+      if (!res.ok || !d.uploadURL || !d.uid) {
+        const raw = d.error || "Could not start the upload.";
+        // Cloudflare rejects uploads when the Stream account has no storage
+        // minutes. Make it unmistakably a billing setting, not an app bug, and
+        // point to the free "this device" option below.
+        const quota = /exceed|quota|capacity|storage/i.test(raw);
+        setIntroUp({ busy: false, msg: quota
+          ? "Cloudflare Stream has no storage minutes on this account, so uploads are blocked. This is a Cloudflare billing setting, not the app - add minutes in Cloudflare - Stream. To test for free right now, use \"Use a file from this device\" below."
+          : raw });
+        return;
+      }
       const uid = d.uid as string;
 
       // 2. Upload the file directly to Cloudflare with progress.
@@ -468,9 +515,34 @@ export default function ControlRoom() {
     }
   }
 
+  // Free alternative to the Cloudflare upload: use a file straight off this
+  // device. The clip is composited into the program canvas locally (and goes out
+  // over the broadcast that way), so it needs no hosting or Stream minutes. The
+  // trade-off: it lives only in this browser tab - a reload or another device
+  // won't have it, so it's ideal for testing. Upload to Cloudflare to keep it.
+  function pickIntroLocal(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (bumper.videoUrl.startsWith("blob:")) { try { URL.revokeObjectURL(bumper.videoUrl); } catch {} }
+    const url = URL.createObjectURL(file);
+    updateBumper({ videoUrl: url, mode: "video" });
+    setIntroUp({ busy: false, msg: "Using a file from this device - free, and it plays on this tab only. Upload to Cloudflare to keep it across reloads and other devices." });
+  }
+
   useEffect(() => broadcast.subscribe(force), []);
   useEffect(() => { if (!activeCam && cams[0]) setActiveCam(cams[0].deviceId); }, [cams, activeCam]);
   useEffect(() => () => { broadcast.stopReplayBuffer(); broadcast.stopVerticalRecording(); }, []); // free recorders when leaving the studio
+  // Poll the host mic level a few times/sec to animate the Studio mic meter.
+  useEffect(() => { const id = setInterval(() => setMicLvl(broadcast.hostInputLevel()), 180); return () => clearInterval(id); }, []);
+  // Resume the (suspended) AudioContext on the first user gesture so the mic
+  // meter is live during preview — browsers block audio until a gesture.
+  useEffect(() => {
+    const wake = () => { broadcast.resumeAudio(); };
+    window.addEventListener("pointerdown", wake, { once: true });
+    window.addEventListener("keydown", wake, { once: true });
+    return () => { window.removeEventListener("pointerdown", wake); window.removeEventListener("keydown", wake); };
+  }, []);
 
   // Keyboard shortcuts for live control (ignored while typing in a field).
   useEffect(() => {
@@ -695,87 +767,127 @@ export default function ControlRoom() {
         </div>
       </div>
 
-      <div className="two-col">
+      <div className="cr-studio">
+      <div className="cr-main">
         {/* ---- Program ---- */}
         <div className="panel">
           <h3>Program</h3>
           <div className="panel-sub">Exactly what goes out - camera, guests, and on-air graphics burned in.</div>
-          <div className="player-wrap" ref={stageRef} style={{ padding: 0, overflow: "hidden" }} />
-          <div className="panel-split" style={{ marginTop: 14 }}>
-            <div className="form-field">
-              <label>Camera</label>
-              <select value={activeCam} onChange={(e) => switchCam(e.target.value)}>
-                {cams.map((c) => <option key={c.deviceId} value={c.deviceId}>{c.label || "Camera"}</option>)}
-              </select>
-            </div>
-            <div className="form-field">
-              <label>Microphone</label>
-              <select onChange={(e) => broadcast.ensureCamera(undefined, e.target.value)}>
-                {mics.map((m) => <option key={m.deviceId} value={m.deviceId}>{m.label || "Microphone"}</option>)}
-              </select>
-            </div>
+          <div className="cr-stage">
+            <div className="player-wrap" ref={stageRef} style={{ padding: 0, overflow: "hidden" }} />
+            <span className="cr-watching"><span className="wd" />{onSite} watching</span>
           </div>
-          {cams.length > 1 && (
-            <div style={{ marginTop: 10 }}>
-              <span className="dest-meta" style={{ display: "block", marginBottom: 6 }}>Quick camera switch</span>
-              <div className="filters" style={{ margin: 0 }}>
-                {cams.map((c, i) => (
-                  <button key={c.deviceId} type="button" className={`filter-btn${activeCam === c.deviceId ? " active" : ""}`} onClick={() => switchCam(c.deviceId)}>{c.label ? c.label.slice(0, 22) : `Cam ${i + 1}`}</button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", rowGap: 10, marginTop: 16 }}>
+
+          {/* Primary action + split-button device toggles (Option B) */}
+          <div className="cr-actionbar">
             {!live ? (
-              <button className="btn btn-live" type="button" onClick={goLive} disabled={broadcast.connecting || ingest === null}>
-                {broadcast.connecting ? "Connecting..." : "Go Live"}
+              <button className="cr-golive" type="button" onClick={goLive} disabled={broadcast.connecting || ingest === null}>
+                <span className="gdot" />{broadcast.connecting ? "Connecting…" : "Go Live"}
               </button>
             ) : (
-              <button className="btn btn-ghost" type="button" onClick={endBroadcast}>Stop broadcast</button>
+              <button className="cr-golive stop" type="button" onClick={endBroadcast}>Stop broadcast</button>
             )}
-            {broadcast.screenSharing ? (
-              <div className="filters" style={{ margin: 0 }}>
-                <button className={`filter-btn${broadcast.screenLayout === "full" ? " active" : ""}`} type="button" onClick={() => broadcast.setScreenLayout("full")}>Full</button>
-                <button className={`filter-btn${broadcast.screenLayout === "pip" ? " active" : ""}`} type="button" onClick={() => broadcast.setScreenLayout("pip")}>PIP</button>
-                <button className={`filter-btn${broadcast.screenLayout === "split" ? " active" : ""}`} type="button" onClick={() => broadcast.setScreenLayout("split")}>Split</button>
+            <div className="cr-toggles">
+              <div className={`cr-tgl${broadcast.cameraOn ? " on" : ""}`}>
+                <button className="cr-tglmain" type="button" onClick={() => { broadcast.setCameraOn(!broadcast.cameraOn); force(); }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="6" width="12" height="12" rx="2" /><path d="M15 10l6-3v10l-6-3z" /></svg>
+                  <span>Camera</span><em>{broadcast.cameraOn ? "On" : "Off"}</em>
+                </button>
+                <button className="cr-tglcar" type="button" aria-label="Pick camera" onClick={() => { setCamMenu((v) => !v); setMicMenu(false); setMoreMenu(false); }}>▾</button>
+                {camMenu && (
+                  <div className="cr-menu" style={{ left: 0, right: "auto" }}>
+                    {cams.map((c, i) => (
+                      <button key={c.deviceId} type="button" className={`cr-mi${activeCam === c.deviceId ? " on" : ""}`} onClick={() => { switchCam(c.deviceId); setCamMenu(false); }}>{c.label || `Camera ${i + 1}`}</button>
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="filters" style={{ margin: 0 }}>
-                <button className={`filter-btn${broadcast.layout === "grid" ? " active" : ""}`} type="button" onClick={() => { broadcast.beginTransition(); broadcast.setLayout("grid"); force(); }}>Grid</button>
-                <button className={`filter-btn${broadcast.layout === "spotlight" ? " active" : ""}`} type="button" onClick={() => { broadcast.beginTransition(); broadcast.setLayout("spotlight"); force(); }}>Spotlight</button>
-                <button className={`filter-btn${broadcast.layout === "custom" ? " active" : ""}`} type="button" onClick={() => { broadcast.beginTransition(); broadcast.setLayout("custom"); force(); }}>Custom</button>
+              <div className={`cr-tgl${broadcast.micOn ? " on" : ""}`}>
+                <button className="cr-tglmain" type="button" onClick={() => { broadcast.setMicOn(!broadcast.micOn); force(); }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M6 11a6 6 0 0 0 12 0M12 17v4" /></svg>
+                  <span>Mic</span><em>{broadcast.micOn ? "On" : "Off"}</em>
+                </button>
+                <button className="cr-tglcar" type="button" aria-label="Pick microphone" onClick={() => { setMicMenu((v) => !v); setCamMenu(false); setMoreMenu(false); }}>▾</button>
+                {micMenu && (
+                  <div className="cr-menu" style={{ left: 0, right: "auto" }}>
+                    {mics.length === 0 && <span className="cr-mi" style={{ cursor: "default", opacity: .6 }}>No microphones found</span>}
+                    {mics.map((m, i) => (
+                      <button key={m.deviceId} type="button" className="cr-mi" onClick={() => { broadcast.ensureCamera(undefined, m.deviceId); setMicMenu(false); }}>{m.label || `Microphone ${i + 1}`}</button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-            <button className={`btn btn-sm ${broadcast.cameraOn ? "btn-ghost" : "btn-danger"}`} type="button" onClick={() => broadcast.setCameraOn(!broadcast.cameraOn)}>{broadcast.cameraOn ? "Camera on" : "Camera off"}</button>
-            <button className={`btn btn-sm ${broadcast.micOn ? "btn-ghost" : "btn-danger"}`} type="button" onClick={() => broadcast.setMicOn(!broadcast.micOn)}>{broadcast.micOn ? "Mic on" : "Mic off"}</button>
+              <button className={`cr-tgl single${broadcast.screenSharing ? " on" : ""}`} type="button" onClick={() => { broadcast.screenSharing ? broadcast.stopScreenShare() : broadcast.startScreenShare(); force(); }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8" /></svg>
+                <span>Screen</span><em>{broadcast.screenSharing ? "Sharing" : "Share"}</em>
+              </button>
+            </div>
+          </div>
+
+          {/* Live mic level meter (full audio lives in the Audio tab) */}
+          <div className="cr-micmeter">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M6 11a6 6 0 0 0 12 0M12 17v4" /></svg>
+            <div className="cr-meter"><span className="cr-mfill" style={{ width: `${broadcast.micOn ? Math.min(100, Math.round(micLvl * 320)) : 0}%` }} /></div>
+            <span className="dest-meta">Mic level</span>
+            <button type="button" className="cr-audlink" onClick={() => setTab("audio")}>Audio settings →</button>
+          </div>
+
+          {/* Layout / screen-share layout + overflow menu */}
+          <div className="cr-row2">
             {broadcast.screenSharing ? (
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => broadcast.stopScreenShare()}>Stop sharing</button>
+              <div className="cr-group"><span className="cr-glabel">Screen</span><div className="cr-seg">
+                <button className={broadcast.screenLayout === "full" ? "on" : ""} type="button" onClick={() => broadcast.setScreenLayout("full")}>Full</button>
+                <button className={broadcast.screenLayout === "pip" ? "on" : ""} type="button" onClick={() => broadcast.setScreenLayout("pip")}>PIP</button>
+                <button className={broadcast.screenLayout === "split" ? "on" : ""} type="button" onClick={() => broadcast.setScreenLayout("split")}>Split</button>
+              </div></div>
             ) : (
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => broadcast.startScreenShare()}>Share screen</button>
+              <div className="cr-group"><span className="cr-glabel">Layout</span><div className="cr-seg">
+                <button className={broadcast.layout === "grid" ? "on" : ""} type="button" onClick={() => { broadcast.beginTransition(); broadcast.setLayout("grid"); force(); }}>Grid</button>
+                <button className={broadcast.layout === "spotlight" ? "on" : ""} type="button" onClick={() => { broadcast.beginTransition(); broadcast.setLayout("spotlight"); force(); }}>Spotlight</button>
+                <button className={broadcast.layout === "custom" ? "on" : ""} type="button" onClick={() => { broadcast.beginTransition(); broadcast.setLayout("custom"); force(); }}>Custom</button>
+              </div></div>
             )}
-            {broadcast.recording ? (
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => broadcast.stopRecording()}><span className="rec-dot" />Stop recording</button>
-            ) : (
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => broadcast.startRecording()}>Record locally</button>
-            )}
-            <button className="btn btn-ghost btn-sm" type="button" onClick={() => setPip(true)}>Open live page</button>
+            <div className="cr-morewrap">
+              <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setMoreMenu((v) => !v); setCamMenu(false); setMicMenu(false); }}>More ▾</button>
+              {moreMenu && (
+                <div className="cr-menu" style={{ right: 0 }}>
+                  {broadcast.recording ? (
+                    <button type="button" className="cr-mi" onClick={() => { broadcast.stopRecording(); setMoreMenu(false); }}>Stop recording</button>
+                  ) : (
+                    <button type="button" className="cr-mi" onClick={() => { broadcast.startRecording(); setMoreMenu(false); }}>Record locally</button>
+                  )}
+                  <button type="button" className="cr-mi" onClick={() => { setPip(true); setMoreMenu(false); }}>Open live page</button>
+                  {broadcast.screenSharing ? (
+                    <button type="button" className="cr-mi" onClick={() => { broadcast.stopScreenShare(); setMoreMenu(false); }}>Stop screen share</button>
+                  ) : (
+                    <button type="button" className="cr-mi" onClick={() => { broadcast.startScreenShare(); setMoreMenu(false); }}>Share screen</button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* One-tap program "scenes" (also keys 1-4). Studio = branded scene. */}
           <div style={{ marginTop: 12 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
               <span className="dest-meta">Scenes <span style={{ opacity: .7 }}>(press 1-4)</span></span>
-              <div className="filters" style={{ margin: 0 }}>
-                <button type="button" className={`filter-btn${broadcast.transitionStyle === "cut" ? " active" : ""}`} onClick={() => { broadcast.setTransitionStyle("cut"); force(); }}>Cut</button>
-                <button type="button" className={`filter-btn${broadcast.transitionStyle === "fade" ? " active" : ""}`} onClick={() => { broadcast.setTransitionStyle("fade"); force(); }}>Fade</button>
-              </div>
+              <label className="cr-transition">
+                <span className="dest-meta">Transition</span>
+                <select value={broadcast.transitionStyle} onChange={(e) => { broadcast.setTransitionStyle(e.target.value as TransitionStyle); force(); }}>
+                  <option value="cut">Cut</option>
+                  <option value="fade">Fade</option>
+                  <option value="dip">Dip to black</option>
+                  <option value="slide">Slide</option>
+                  <option value="wipe">Wipe</option>
+                  <option value="zoom">Zoom</option>
+                </select>
+              </label>
             </div>
             <div className="filters" style={{ margin: 0 }}>
               {([["camera", "1 · Camera"], ["spotlight", "2 · Spotlight"], ["studio", "3 · Studio"], ["intro", "4 · Intro"]] as ["camera" | "spotlight" | "studio" | "intro", string][]).map(([k, label]) => (
                 <button key={k} type="button" className={`filter-btn${activeScene() === k ? " active" : ""}`} onClick={() => applyScene(k)}>{label}</button>
               ))}
             </div>
-            <p className="form-note" style={{ marginTop: 6 }}>Shortcuts: <strong>1-4</strong> scenes · <strong>M</strong> mute mic · <strong>C</strong> camera · <strong>B</strong> banner. (Ignored while typing.)</p>
             {broadcast.layout === "custom" && (
               <p className="form-note" style={{ marginTop: 6 }}><strong>Custom layout:</strong> drag any camera tile on the preview to move it; scroll over a tile to resize it.</p>
             )}
@@ -805,7 +917,6 @@ export default function ControlRoom() {
                 <span className="dest-meta" style={{ width: 46, textAlign: "right" }}>{Math.round(broadcast.hostZoom * 100)}%</span>
                 {broadcast.hostZoom !== 1 && <button className="btn btn-ghost btn-sm" type="button" onClick={() => { broadcast.setHostZoom(1); force(); }}>Reset</button>}
               </div>
-              <p className="form-note" style={{ marginTop: 6 }}>This webcam has no lens zoom, so this can only <strong>crop in</strong> (100%+) for a tighter shot - it can&apos;t widen the view. To fit more people, sit closer together, move the camera back, or use a wide-angle webcam.</p>
             </>
           )}
 
@@ -813,93 +924,25 @@ export default function ControlRoom() {
           {ingest === null && <div className="notice" style={{ marginTop: 14 }}><strong>Cloudflare Stream not connected.</strong> Preview works; Go Live turns on once the Stream keys are set.</div>}
           {broadcast.error && <p className="form-error" style={{ marginTop: 10 }}>{broadcast.error}</p>}
           {live && <p className="form-ok" style={{ marginTop: 10 }}>Live on your site and simulcasting to YouTube.</p>}
-          <div className="live-aud">
-            <span className="la-item"><b>{onSite}</b> on your site<small>watching your player</small></span>
-            <span className="la-item paid"><b>~${sessionCost.toFixed(2)}</b> this session<small>on-site delivery so far</small></span>
-            <span className="la-item free"><b>YouTube</b> free<small>simulcast viewers cost $0</small></span>
-          </div>
-
-          <div className="deliver-row">
-            <span className="deliver-label">Site viewers watch via</span>
-            <div className="filters" style={{ margin: 0 }}>
-              <button type="button" className={`filter-btn${liveDelivery === "own" ? " active" : ""}`} onClick={() => saveDelivery("own")}>Own player &middot; paid</button>
-              <button type="button" className={`filter-btn${liveDelivery === "youtube" ? " active" : ""}`} onClick={() => saveDelivery("youtube")}>YouTube embed &middot; free</button>
-            </div>
-          </div>
-          <p className="panel-sub" style={{ marginTop: 6 }}>
-            {liveDelivery === "youtube"
-              ? "Your live page shows YouTube's player - unlimited viewers cost $0. Best for large audiences (you keep the branded site; YouTube pays the bandwidth)."
-              : "Your live page uses your own low-latency player - you pay ~$0.001 per on-site viewer-minute. Best for smaller/loyal audiences + tips."}
-          </p>
-
-          {/* Quick "watch it live" links so the host can confirm the stream is
-              actually going out - one opens the branded site, one opens YouTube. */}
-          <div className="deliver-row" style={{ marginTop: 12 }}>
-            <span className="deliver-label">See the stream</span>
-            <div className="filters" style={{ margin: 0 }}>
-              <a className="filter-btn" href="/live" target="_blank" rel="noreferrer">Watch on website</a>
-              <a className="filter-btn" href={`https://www.youtube.com/channel/${ytChannelId}/live`} target="_blank" rel="noreferrer">Watch on YouTube</a>
-            </div>
-          </div>
+          {/* Stats row + delivery/see-stream moved to the Destinations tab to keep the main area clean. */}
+          <span style={{ display: "none" }}>{sessionCost}</span>
         </div>
 
         {/* ---- Show controls ---- */}
         <div>
           <div className="filters" style={{ marginBottom: 16 }}>
-            {([["onair", "On air"], ["chat", "Chat"], ["guests", "Guests"], ["audio", "Audio"], ["scene", "Scene"], ["rundown", "Rundown"], ["intro", "Intro"], ["sounds", "Sounds"], ["media", "Media"], ["sources", "Sources"]] as [Tab, string][]).map(([k, label]) => (
+            {([["onair", "On air"], ["chat", "Chat"], ["guests", "Guests"], ["audio", "Audio"], ["looks", "Looks"], ["rundown", "Rundown"], ["sounds", "Sounds"], ["media", "Media"], ["destinations", "Destinations"]] as [Tab, string][]).map(([k, label]) => (
               <button key={k} className={`filter-btn${tab === k ? " active" : ""}`} type="button" onClick={() => setTab(k)}>{label}</button>
             ))}
           </div>
 
-          {tab === "onair" && (
-            <div className="panel">
-              <h3>On-air graphics</h3>
-              <div className="panel-sub">These appear on the broadcast itself (burned into the video).</div>
-              <div className="form-field"><label>Banner title</label><input type="text" value={title} placeholder="Your Studio" onChange={(e) => setTitle(e.target.value)} /></div>
-              <div className="form-field"><label>Subtitle (optional)</label><input type="text" value={subtitle} placeholder="Segment 2" onChange={(e) => setSubtitle(e.target.value)} /></div>
-              <div className="form-field">
-                <label>Name-tag style</label>
-                <div className="filters" style={{ margin: 0 }}>
-                  {([["bar", "Bar"], ["rounded", "Rounded"], ["pill", "Pill"]] as ["bar" | "rounded" | "pill", string][]).map(([k, label]) => (
-                    <button key={k} type="button" className={`filter-btn${broadcast.bannerStyle === k ? " active" : ""}`} onClick={() => { broadcast.setBannerStyle(k); force(); }}>{label}</button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
-                <button className="btn btn-primary btn-sm" type="button" onClick={showBanner}>Show banner</button>
-                <button className="btn btn-ghost btn-sm" type="button" onClick={hideBanner}>Hide banner</button>
-                <button className="btn btn-ghost btn-sm" type="button" onClick={clearAll}>Clear all</button>
-              </div>
-              <p className="form-note" style={{ marginTop: -8, marginBottom: 16 }}>Drag the banner on the program preview to place it anywhere.</p>
-              <div className="panel-sub">Pin a message onto the broadcast, then drag it anywhere on the program preview.</div>
-              <div style={{ maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
-                {chat.length === 0 && <p className="muted" style={{ fontSize: "13px" }}>Chat appears here during a broadcast.</p>}
-                {chat.slice().reverse().map((m) => {
-                  const pinned = isPinned(m);
-                  return (
-                    <div className="dest-row" key={m.id} style={{ padding: "9px 0" }}>
-                      <div style={{ minWidth: 0 }}><div className="dest-name" style={{ color: "var(--amber)", display: "flex", alignItems: "center", gap: 6 }}>{srcBadge(m.source, siteLogo)}<span>{m.name}</span></div><div className="dest-meta" style={{ whiteSpace: "normal" }}>{m.text}</div></div>
-                      <button className={`btn btn-sm ${pinned ? "btn-primary" : "btn-ghost"}`} type="button" onClick={() => (pinned ? unpin() : pin(m))}>{pinned ? "Pinned" : "Pin"}</button>
-                    </div>
-                  );
-                })}
-              </div>
-              {broadcast.pinned && (
-                <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <span className="dest-meta">Pinned: <strong style={{ color: "var(--amber)" }}>{broadcast.pinned.name}</strong> - drag it on the preview to reposition.</span>
-                  <button className="btn btn-ghost btn-sm" type="button" onClick={unpin}>Unpin</button>
-                </div>
-              )}
-            </div>
-          )}
-
           {tab === "chat" && (
             <div className="panel">
               <div className="mod-row" style={{ alignItems: "center", marginBottom: 4 }}>
-                <h3 style={{ margin: 0 }}>Live chat</h3>
+                <h3 style={{ margin: 0 }}>Chat settings</h3>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={() => { if (confirm("Clear the live chat for everyone?")) { broadcast.clearChat(); setModMsg("Chat cleared."); } }}>Clear chat</button>
               </div>
-              <div className="panel-sub">Site + YouTube, merged. Timeout or remove a signed-in viewer from here.</div>
+              <div className="panel-sub">The live conversation is in the right rail. Moderation and YouTube pull-in are set here.</div>
               <div className="dest-row" style={{ marginTop: 6 }}>
                 <div><div className="dest-name">Reset chat when I go live</div><div className="dest-meta">Start each broadcast with a clean chat</div></div>
                 <label className="toggle"><input type="checkbox" checked={broadcast.autoClearChat} onChange={(e) => broadcast.setAutoClearChat(e.target.checked)} /><span className="track" /></label>
@@ -925,15 +968,7 @@ export default function ControlRoom() {
                   })()}
                 </label>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <input
-                    type="text"
-                    value={ytLiveDraft}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    maxLength={200}
-                    onChange={(e) => setYtLiveDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveYtLink(); } }}
-                    style={{ flex: 1, background: "var(--bg2)", border: "1px solid var(--line)", color: "var(--cream)", borderRadius: 8, padding: "9px 12px", font: "inherit", fontSize: 13 }}
-                  />
+                  <input type="text" value={ytLiveDraft} placeholder="https://www.youtube.com/watch?v=..." maxLength={200} onChange={(e) => setYtLiveDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveYtLink(); } }} style={{ flex: 1, background: "var(--bg2)", border: "1px solid var(--line)", color: "var(--cream)", borderRadius: 8, padding: "9px 12px", font: "inherit", fontSize: 13 }} />
                   <button className="btn btn-primary btn-sm" type="button" onClick={saveYtLink} disabled={ytLiveDraft.trim() === ytLiveUrl.trim()}>Save</button>
                 </div>
                 {ytLinkMsg && <p className="form-ok" style={{ margin: "6px 0 0", fontSize: 12.5 }}>{ytLinkMsg}</p>}
@@ -941,49 +976,35 @@ export default function ControlRoom() {
                   <b>Public</b> streams pull chat in automatically (a couple of minutes after going live). <b>Unlisted</b> streams aren&apos;t searchable - paste the live video link here and click <b>Save</b> to pull their chat instantly. <b>Private</b> streams can&apos;t be read by YouTube&apos;s API, so set the broadcast to Public or Unlisted to merge its chat.
                 </p>
               </div>
-              {modMsg && <p className="form-ok" style={{ fontSize: "12.5px", marginBottom: 10 }}>{modMsg}</p>}
-              <div style={{ maxHeight: 460, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-                {chat.length === 0 && <p className="muted" style={{ fontSize: "13px" }}>No messages yet.</p>}
-                {chat.map((m) => (
-                  <div className="mod-row" key={m.id}>
-                    <div className={`msg${m.tip ? " tipmsg" : ""}`} style={{ minWidth: 0 }}>
-                      {m.tip ? <><span className="tipamt">${m.tip.toFixed(2)}</span><b>{m.name}</b>{m.text ? <span> {m.text}</span> : null}</> : <>{srcBadge(m.source, siteLogo)}<b>{m.name}</b> {linkify(m.text)}</>}
-                    </div>
-                    {m.uid && (
-                      <div className="mod-actions">
-                        <button className="btn btn-ghost btn-xs" type="button" title="Timeout for a set time" onClick={() => setTimeoutFor(m)}>Timeout</button>
-                        <button className="btn btn-ghost btn-xs" type="button" title="Remove from chat" onClick={() => moderate("ban", m)}>Ban</button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+              {modMsg && <p className="form-ok" style={{ fontSize: "12.5px", marginTop: 10 }}>{modMsg}</p>}
+            </div>
+          )}
+
+          {tab === "onair" && (
+            <div className="panel">
+              <h3>On-air graphics</h3>
+              <div className="panel-sub">These appear on the broadcast itself (burned into the video).</div>
+              <div className="form-field"><label>Banner title</label><input type="text" value={title} placeholder="Your Studio" onChange={(e) => setTitle(e.target.value)} /></div>
+              <div className="form-field"><label>Subtitle (optional)</label><input type="text" value={subtitle} placeholder="Segment 2" onChange={(e) => setSubtitle(e.target.value)} /></div>
+              <div className="form-field">
+                <label>Name-tag style</label>
+                <div className="filters" style={{ margin: 0 }}>
+                  {([["bar", "Bar"], ["rounded", "Rounded"], ["pill", "Pill"]] as ["bar" | "rounded" | "pill", string][]).map(([k, label]) => (
+                    <button key={k} type="button" className={`filter-btn${broadcast.bannerStyle === k ? " active" : ""}`} onClick={() => { broadcast.setBannerStyle(k); force(); }}>{label}</button>
+                  ))}
+                </div>
               </div>
-
-              {/* Host posts into the chat (links become clickable for viewers). */}
-              <form onSubmit={(e) => { e.preventDefault(); sendChat(); }} style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <input type="text" value={chatDraft} onChange={(e) => setChatDraft(e.target.value)} placeholder="Message chat as host - paste links here" maxLength={500} style={{ flex: 1, background: "var(--bg2)", border: "1px solid var(--line)", color: "var(--cream)", borderRadius: 8, padding: "9px 12px", font: "inherit", fontSize: 13 }} />
-                <button className="btn btn-primary btn-sm" type="submit" disabled={!chatDraft.trim()}>Send</button>
-              </form>
-
-              {timeoutFor && (
-                <div className="modal-backdrop" onClick={() => setTimeoutFor(null)}>
-                  <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-                    <h3 style={{ marginTop: 0 }}>Timeout {timeoutFor.name}</h3>
-                    <div className="panel-sub">They can still watch, but can&apos;t chat until the timeout ends.</div>
-                    <div className="filters" style={{ marginTop: 14, marginBottom: 0 }}>
-                      {([["1 min", 60], ["5 min", 300], ["15 min", 900], ["1 hour", 3600], ["24 hours", 86400]] as [string, number][]).map(([label, secs]) => (
-                        <button key={secs} type="button" className="filter-btn" onClick={() => { moderate("timeout", timeoutFor, secs); setTimeoutFor(null); }}>{label}</button>
-                      ))}
-                    </div>
-                    <div className="form-field" style={{ marginTop: 14 }}>
-                      <label>Custom (minutes)</label>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <input type="number" min={1} max={1440} value={customMin} onChange={(e) => setCustomMin(e.target.value)} />
-                        <button className="btn btn-primary btn-sm" type="button" onClick={() => { const s = Math.max(1, Math.min(1440, Number(customMin) || 10)) * 60; moderate("timeout", timeoutFor, s); setTimeoutFor(null); }}>Apply</button>
-                      </div>
-                    </div>
-                    <button className="btn btn-ghost btn-sm" style={{ marginTop: 14 }} type="button" onClick={() => setTimeoutFor(null)}>Cancel</button>
-                  </div>
+              <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+                <button className="btn btn-primary btn-sm" type="button" onClick={showBanner}>Show banner</button>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={hideBanner}>Hide banner</button>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={clearAll}>Clear all</button>
+              </div>
+              <p className="form-note" style={{ marginTop: -8, marginBottom: 16 }}>Drag the banner on the program preview to place it anywhere.</p>
+              <div className="panel-sub">To pin a chat message onto the broadcast, use the <strong>Pin</strong> button on any message in the Live chat (right), then drag it on the program preview.</div>
+              {broadcast.pinned && (
+                <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span className="dest-meta">Pinned: <strong style={{ color: "var(--amber)" }}>{broadcast.pinned.name}</strong> - drag it on the preview to reposition.</span>
+                  <button className="btn btn-ghost btn-sm" type="button" onClick={unpin}>Unpin</button>
                 </div>
               )}
             </div>
@@ -1081,7 +1102,7 @@ export default function ControlRoom() {
             </div>
           )}
 
-          {tab === "scene" && (
+          {tab === "looks" && (
             <div className="panel">
               <h3>Branded scene</h3>
               <div className="panel-sub">Put the host over a background (green-screen), with a frame + logo - a TV-broadcast look. The Program preview updates live.</div>
@@ -1092,6 +1113,106 @@ export default function ControlRoom() {
               <div className="dest-row">
                 <div><div className="dest-name">Enable scene</div><div className="dest-meta">Overrides the normal camera view</div></div>
                 <label className="toggle"><input type="checkbox" checked={scene.enabled} onChange={(e) => updateScene({ enabled: e.target.checked })} /><span className="track" /></label>
+              </div>
+
+              <div className="form-field" style={{ marginTop: 12 }}>
+                <label>Camera placement</label>
+                <div className="filters" style={{ margin: 0 }}>
+                  {CAM_PRESETS.map(([label, box]) => {
+                    const active = Math.abs(scene.camBox.x - box.x) < 0.02 && Math.abs(scene.camBox.y - box.y) < 0.02 && Math.abs(scene.camBox.w - box.w) < 0.02 && Math.abs(scene.camBox.h - box.h) < 0.02;
+                    return <button key={label} type="button" className={`filter-btn${active ? " active" : ""}`} onClick={() => updateCamBox(box)}>{label}</button>;
+                  })}
+                </div>
+                <p className="form-note" style={{ marginTop: 6 }}>Pick a starting point, then fine-tune the exact position and size below. Leave room for a branded overlay (upload it as the Frame below), like a talk-show layout.</p>
+                {/* Free position + size. Values are % of the frame; the engine keeps the box on-screen. */}
+                <div className="cam-sliders">
+                  {([["x", "Left", 0, 100], ["y", "Top", 0, 100], ["w", "Width", 10, 100], ["h", "Height", 10, 100]] as [keyof CamBox, string, number, number][]).map(([k, label, min, max]) => (
+                    <div className="cam-slider" key={k}>
+                      <span className="dest-meta" style={{ width: 54 }}>{label}</span>
+                      <input type="range" min={min} max={max} step={1} value={Math.round(scene.camBox[k] * 100)} onChange={(e) => updateCamBox({ [k]: Number(e.target.value) / 100 } as Partial<CamBox>)} style={{ flex: 1 }} />
+                      <span className="dest-meta" style={{ width: 42, textAlign: "right" }}>{Math.round(scene.camBox[k] * 100)}%</span>
+                    </div>
+                  ))}
+                </div>
+                <button className="btn btn-ghost btn-sm" type="button" style={{ marginTop: 8 }} onClick={() => updateCamBox({ x: 0, y: 0, w: 1, h: 1 })}>Reset to full frame</button>
+              </div>
+
+              <div className="form-field" style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+                <label>Show layout extras</label>
+                <div className="dest-row">
+                  <div><div className="dest-name">Side panel</div><div className="dest-meta">Branded panel in the gap beside a side-windowed camera (placeholder until you upload a Frame)</div></div>
+                  <label className="toggle"><input type="checkbox" checked={scene.panelOn} onChange={(e) => { const on = e.target.checked; const full = scene.camBox.x < 0.01 && scene.camBox.y < 0.01 && scene.camBox.w > 0.99 && scene.camBox.h > 0.99; if (on && full) updateCamBox({ x: 0.40, y: 0, w: 0.60, h: 1 }); updateScene({ panelOn: on }); }} /><span className="track" /></label>
+                </div>
+                {scene.panelOn && (
+                  <>
+                    <input ref={panelImgInput} type="file" accept="image/*" hidden onChange={(e) => pickSceneImg(e, "panel")} />
+                    <div className="scene-up" style={{ marginTop: 8 }}>
+                      <div className="scene-prev logo" style={scene.panelImage ? { backgroundImage: `url(${scene.panelImage})` } : undefined}>{!scene.panelImage && "Panel image"}</div>
+                      <div className="scene-up-btns">
+                        <button className="btn btn-ghost btn-sm" type="button" onClick={() => panelImgInput.current?.click()}>{scene.panelImage ? "Change image" : "Upload image"}</button>
+                        {scene.panelImage && <button className="btn btn-ghost btn-sm" type="button" onClick={() => updateScene({ panelImage: "" })}>Clear</button>}
+                      </div>
+                    </div>
+                    <input type="text" value={scene.panelTitle} maxLength={48} placeholder="Show title (e.g. CANES TALK LIVE)" onChange={(e) => updateScene({ panelTitle: e.target.value })} style={{ marginTop: 8 }} />
+                    <p className="form-note" style={{ marginTop: 6 }}>The panel shows this image (any logo/graphic) above the title. No image = your site logo is used. Transparent PNGs look best.</p>
+                    {!(scene.camBox.x >= 0.25 || scene.camBox.x + scene.camBox.w <= 0.75) && (
+                      <p className="form-note" style={{ marginTop: 6, color: "var(--live)" }}>Camera is full-frame - there's no gap for the panel. Pick <strong>Right side</strong> or <strong>Left side</strong> above.</p>
+                    )}
+                  </>
+                )}
+
+                <div className="dest-row" style={{ marginTop: 6 }}>
+                  <div><div className="dest-name">Supporters ticker</div><div className="dest-meta">Scrolling list of recent tips along the bottom (real tips only)</div></div>
+                  <label className="toggle"><input type="checkbox" checked={scene.supportersOn} onChange={(e) => updateScene({ supportersOn: e.target.checked })} /><span className="track" /></label>
+                </div>
+
+                <div className="dest-row" style={{ marginTop: 6 }}>
+                  <div><div className="dest-name">Custom ticker</div><div className="dest-meta">Scroll your own text along the bottom - phone #, sponsors, promos</div></div>
+                  <label className="toggle"><input type="checkbox" checked={scene.tickerOn} onChange={(e) => updateScene({ tickerOn: e.target.checked })} /><span className="track" /></label>
+                </div>
+                {scene.tickerOn && (
+                  <>
+                    <div className="form-field" style={{ marginTop: 8 }}>
+                      <label>Label (optional)</label>
+                      <input type="text" value={scene.tickerLabel} maxLength={40} placeholder="e.g. COACH HAYES" onChange={(e) => updateScene({ tickerLabel: e.target.value })} />
+                    </div>
+                    <div className="form-field">
+                      <label>Messages (one per line)</label>
+                      <textarea rows={3} value={scene.ticker} maxLength={2000} placeholder={"Call in: 862-799-9956\nMerch 10% off - code TIMMY10\nFollow @coachhayes"} onChange={(e) => updateScene({ ticker: e.target.value })} />
+                    </div>
+                  </>
+                )}
+
+                <div className="dest-row" style={{ marginTop: 6 }}>
+                  <div><div className="dest-name">Show clock</div><div className="dest-meta">Elapsed count-up timer, top-left</div></div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {scene.clockOn && <button className="btn btn-ghost btn-sm" type="button" onClick={() => broadcast.resetClock()}>Reset</button>}
+                    <label className="toggle"><input type="checkbox" checked={scene.clockOn} onChange={(e) => updateScene({ clockOn: e.target.checked })} /><span className="track" /></label>
+                  </div>
+                </div>
+
+                {/* Free image overlay: add any graphic and place/size it anywhere. */}
+                <input ref={overlayImgInput} type="file" accept="image/*" hidden onChange={(e) => pickSceneImg(e, "overlay")} />
+                <div className="dest-row" style={{ marginTop: 6 }}>
+                  <div><div className="dest-name">Image overlay</div><div className="dest-meta">Drop any image on the screen, then place + size it freely (logo, sponsor, player)</div></div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button className="btn btn-ghost btn-sm" type="button" onClick={() => overlayImgInput.current?.click()}>{scene.overlayImage ? "Change" : "Add image"}</button>
+                    {scene.overlayImage && <button className="btn btn-ghost btn-sm" type="button" onClick={() => updateScene({ overlayImage: "" })}>Remove</button>}
+                  </div>
+                </div>
+                {scene.overlayImage && (
+                  <div className="cam-sliders" style={{ marginTop: 8 }}>
+                    {([["x", "Left", 0, 100], ["y", "Top", 0, 100], ["w", "Size", 5, 100]] as [keyof OverlayBox, string, number, number][]).map(([k, label, min, max]) => (
+                      <div className="cam-slider" key={k}>
+                        <span className="dest-meta" style={{ width: 54 }}>{label}</span>
+                        <input type="range" min={min} max={max} step={1} value={Math.round(scene.overlayBox[k] * 100)} onChange={(e) => updateOverlayBox({ [k]: Number(e.target.value) / 100 } as Partial<OverlayBox>)} style={{ flex: 1 }} />
+                        <span className="dest-meta" style={{ width: 42, textAlign: "right" }}>{Math.round(scene.overlayBox[k] * 100)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="form-note" style={{ marginTop: 8 }}>Supporters, custom ticker, clock and image overlay show in any scene; the side panel needs the camera windowed to a side. If both tickers are on, your custom text sits above the supporters list. Click <strong>Save scene</strong> to keep these.</p>
               </div>
 
               <div className="form-field" style={{ marginTop: 12 }}>
@@ -1139,23 +1260,6 @@ export default function ControlRoom() {
                   </div>
                 </div>
               </div>
-
-              <div className="dest-row" style={{ marginTop: 18 }}>
-                <div><div className="dest-name">Rotating ticker</div><div className="dest-meta">News-style scroll along the bottom (works in any mode)</div></div>
-                <label className="toggle"><input type="checkbox" checked={scene.tickerOn} onChange={(e) => updateScene({ tickerOn: e.target.checked })} /><span className="track" /></label>
-              </div>
-              {scene.tickerOn && (
-                <>
-                  <div className="form-field">
-                    <label>Label (optional)</label>
-                    <input type="text" value={scene.tickerLabel} maxLength={40} placeholder="e.g. CWTV" onChange={(e) => updateScene({ tickerLabel: e.target.value })} />
-                  </div>
-                  <div className="form-field">
-                    <label>Messages (one per line)</label>
-                    <textarea rows={3} value={scene.ticker} maxLength={2000} placeholder={"Welcome to the show\nFollow us @yourstudio\nNew episode every week"} onChange={(e) => updateScene({ ticker: e.target.value })} />
-                  </div>
-                </>
-              )}
 
               <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16 }}>
                 <button className="btn btn-primary btn-sm" type="button" onClick={saveScene}>Save scene</button>
@@ -1221,7 +1325,7 @@ export default function ControlRoom() {
             </div>
           )}
 
-          {tab === "intro" && (
+          {tab === "looks" && (
             <div className="panel">
               <h3>Intro / starting-soon screen</h3>
               <div className="panel-sub">A branded holding screen that goes out on the broadcast before your show starts, so early viewers see something professional instead of a cold open. The Program preview updates live.</div>
@@ -1259,6 +1363,7 @@ export default function ControlRoom() {
                 <div className="form-field">
                   <label>Intro video</label>
                   <input ref={bumperVideoInput} type="file" accept="video/*" hidden onChange={uploadIntroVideo} />
+                  <input ref={bumperLocalInput} type="file" accept="video/*" hidden onChange={pickIntroLocal} />
                   <div className="scene-uploads">
                     <div className="scene-up">
                       <div className="scene-prev">
@@ -1266,16 +1371,19 @@ export default function ControlRoom() {
                           ? <video src={bumper.videoUrl} muted loop playsInline autoPlay style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} />
                           : "No video"}
                       </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button className="btn btn-primary btn-sm" type="button" disabled={introUp.busy} onClick={() => bumperVideoInput.current?.click()}>
-                          {introUp.busy ? "Working..." : bumper.videoUrl ? "Replace video" : "Upload video"}
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button className="btn btn-primary btn-sm" type="button" disabled={introUp.busy} onClick={() => bumperLocalInput.current?.click()}>
+                          {bumper.videoUrl ? "Replace (this device)" : "Use a file from this device"}
                         </button>
-                        {bumper.videoUrl && !introUp.busy && <button className="btn btn-ghost btn-sm" type="button" onClick={() => updateBumper({ videoUrl: "" })}>Clear</button>}
+                        <button className="btn btn-ghost btn-sm" type="button" disabled={introUp.busy} onClick={() => bumperVideoInput.current?.click()}>
+                          {introUp.busy ? "Working..." : "Upload to Cloudflare (keeps it)"}
+                        </button>
+                        {bumper.videoUrl && !introUp.busy && <button className="btn btn-ghost btn-sm" type="button" onClick={() => { if (bumper.videoUrl.startsWith("blob:")) { try { URL.revokeObjectURL(bumper.videoUrl); } catch {} } updateBumper({ videoUrl: "" }); }}>Clear</button>}
                       </div>
                     </div>
                   </div>
-                  {introUp.msg && <p className={introUp.msg.toLowerCase().includes("fail") || introUp.msg.toLowerCase().includes("could not") || introUp.msg.toLowerCase().includes("timed out") ? "form-error" : "form-note"} style={{ marginTop: 8 }}>{introUp.msg}</p>}
-                  <p className="form-note" style={{ marginTop: 6 }}>Upload an MP4/MOV. It's sent to Cloudflare Stream and converted to a broadcast-safe looping clip. Processing takes about a minute for short clips. The starting-soon card shows while it buffers.</p>
+                  {introUp.msg && <p className={/fail|could ?n.?t|timed out|exceed|quota|capacity|storage|not connected|error|unable/i.test(introUp.msg) ? "form-error" : "form-note"} style={{ marginTop: 8 }}>{introUp.msg}</p>}
+                  <p className="form-note" style={{ marginTop: 6 }}><b>From this device</b> is free and instant - the clip is composited locally and goes out on your broadcast, but it only lives in this browser tab (a reload clears it). <b>Upload to Cloudflare</b> stores it so it survives reloads and works from any device - that uses Cloudflare Stream storage, which is a paid add-on (why uploads need minutes on the account).</p>
                   <details style={{ marginTop: 8 }}>
                     <summary className="form-note" style={{ cursor: "pointer" }}>Advanced: paste a video URL instead</summary>
                     <input type="text" value={bumper.videoUrl} maxLength={500} placeholder="https://.../video.mp4" style={{ marginTop: 8 }} onChange={(e) => updateBumper({ videoUrl: e.target.value })} />
@@ -1302,6 +1410,7 @@ export default function ControlRoom() {
               <input ref={mediaInput} type="file" accept="video/*,audio/*" hidden onChange={pickMedia} />
               <h3>Media</h3>
               <div className="panel-sub">Play a video or music file into your live broadcast. A video fills the screen while it plays; a music file plays over your current camera. Use the level slider to balance it against your mic.</div>
+              <div className="notice" style={{ marginTop: 8 }}><strong>Want your face over the video?</strong> Turn on a <strong>Branded scene</strong> (Looks tab) with <strong>Background removal</strong> (AI or green screen). The playing video then becomes your scene background and your camera composites on top of it.</div>
               {!broadcast.mediaPlaying ? (
                 <button className="btn btn-primary btn-sm" type="button" onClick={() => mediaInput.current?.click()}>Choose file to play</button>
               ) : (
@@ -1382,24 +1491,109 @@ export default function ControlRoom() {
             </div>
           )}
 
-          {tab === "sources" && (
+          {tab === "destinations" && (
             <>
               <div className="panel">
-                <h3>OBS - optional pro mode</h3>
-                <div className="panel-sub">Only if you want to stream from OBS instead of the browser. Paste into OBS -&gt; Settings -&gt; Stream (Custom).</div>
-                {ingest ? (
-                  <>
-                    <label className="form-note" style={{ marginBottom: 6, display: "block" }}>Server (RTMPS)</label>
-                    <div className="copybox" style={{ marginBottom: 14 }}><input type="text" readOnly value={ingest.rtmpsUrl} /><button className="btn btn-ghost btn-sm" type="button" onClick={() => navigator.clipboard?.writeText(ingest.rtmpsUrl)}>Copy</button></div>
-                    <label className="form-note" style={{ marginBottom: 6, display: "block" }}>Stream key</label>
-                    <div className="copybox"><input type={reveal ? "text" : "password"} readOnly value={ingest.streamKey} /><button className="btn btn-ghost btn-sm" type="button" onClick={() => setReveal((v) => !v)}>{reveal ? "Hide" : "Show"}</button><button className="btn btn-ghost btn-sm" type="button" onClick={() => navigator.clipboard?.writeText(ingest.streamKey)}>Copy</button></div>
-                  </>
-                ) : <p className="muted" style={{ fontSize: "13.5px" }}>Connect Cloudflare Stream to get your OBS keys.</p>}
+                <h3>How site viewers watch</h3>
+                <div className="panel-sub">Choose the player your live page uses. This is a cost/quality trade-off.</div>
+                <div className="filters" style={{ margin: "0 0 8px" }}>
+                  <button type="button" className={`filter-btn${liveDelivery === "own" ? " active" : ""}`} onClick={() => saveDelivery("own")}>Own player &middot; paid</button>
+                  <button type="button" className={`filter-btn${liveDelivery === "youtube" ? " active" : ""}`} onClick={() => saveDelivery("youtube")}>YouTube embed &middot; free</button>
+                </div>
+                <p className="form-note" style={{ margin: 0 }}>
+                  {liveDelivery === "youtube"
+                    ? "Your live page shows YouTube's player - unlimited viewers cost $0. Best for large audiences (you keep the branded site; YouTube pays the bandwidth)."
+                    : "Your live page uses your own low-latency player - you pay ~$0.001 per on-site viewer-minute. Best for smaller/loyal audiences + tips."}
+                </p>
+                <div className="deliver-row" style={{ marginTop: 14 }}>
+                  <span className="deliver-label">See the stream</span>
+                  <div className="filters" style={{ margin: 0 }}>
+                    <a className="filter-btn" href="/live" target="_blank" rel="noreferrer">Watch on website</a>
+                    <a className="filter-btn" href={`https://www.youtube.com/channel/${ytChannelId}/live`} target="_blank" rel="noreferrer">Watch on YouTube</a>
+                  </div>
+                </div>
               </div>
               <SimulcastManager />
+              <div className="panel">
+              <h3>OBS - optional pro mode</h3>
+              <div className="panel-sub">Only if you want to stream from OBS instead of the browser. Paste into OBS -&gt; Settings -&gt; Stream (Custom).</div>
+              {ingest ? (
+                <>
+                  <label className="form-note" style={{ marginBottom: 6, display: "block" }}>Server (RTMPS)</label>
+                  <div className="copybox" style={{ marginBottom: 14 }}><input type="text" readOnly value={ingest.rtmpsUrl} /><button className="btn btn-ghost btn-sm" type="button" onClick={() => navigator.clipboard?.writeText(ingest.rtmpsUrl)}>Copy</button></div>
+                  <label className="form-note" style={{ marginBottom: 6, display: "block" }}>Stream key</label>
+                  <div className="copybox"><input type={reveal ? "text" : "password"} readOnly value={ingest.streamKey} /><button className="btn btn-ghost btn-sm" type="button" onClick={() => setReveal((v) => !v)}>{reveal ? "Hide" : "Show"}</button><button className="btn btn-ghost btn-sm" type="button" onClick={() => navigator.clipboard?.writeText(ingest.streamKey)}>Copy</button></div>
+                </>
+              ) : <p className="muted" style={{ fontSize: "13.5px" }}>Connect Cloudflare Stream to get your OBS keys.</p>}
+              </div>
             </>
           )}
         </div>
+      </div>
+      <aside className="cr-chat">
+            <div className="panel">
+              <h3 style={{ margin: 0 }}>Live chat</h3>
+              <div className="panel-sub" style={{ marginBottom: 10 }}>Site + YouTube, merged.</div>
+              <div className="cr-chatfilters">
+                {([["all", "All"], ["members", "Members"], ["tips", "Tips"]] as ["all" | "members" | "tips", string][]).map(([k, label]) => (
+                  <button key={k} type="button" className={`cr-cf${chatFilter === k ? " on" : ""}`} onClick={() => setChatFilter(k)}>{label}</button>
+                ))}
+              </div>
+              {modMsg && <p className="form-ok" style={{ fontSize: "12.5px", marginBottom: 8 }}>{modMsg}</p>}
+              <div className="cr-msgs">
+                {chat.length === 0 && <p className="muted" style={{ fontSize: "13px" }}>No messages yet.</p>}
+                {chat.filter((m) => chatFilter === "all" || (chatFilter === "members" && !!m.uid) || (chatFilter === "tips" && !!m.tip)).map((m) => {
+                  const pinned = isPinned(m);
+                  return (
+                    <div className="mod-row cr-msg" key={m.id}>
+                      <div className={`msg${m.tip ? " tipmsg" : ""}`} style={{ minWidth: 0 }}>
+                        {m.tip ? <><span className="tipamt">${m.tip.toFixed(2)}</span><b>{m.name}</b>{m.text ? <span> {m.text}</span> : null}</> : <>{srcBadge(m.source, siteLogo)}<b>{m.name}</b> {linkify(m.text)}</>}
+                      </div>
+                      <div className="mod-actions">
+                        {m.text && (
+                          <button className={`cr-pin${pinned ? " on" : ""}`} type="button" title={pinned ? "Unpin from broadcast" : "Pin to broadcast"} onClick={() => (pinned ? unpin() : pin(m))}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M9 4h6l-1 6 3 3H7l3-3-1-6zM12 16v4" /></svg>{pinned ? "Pinned" : "Pin"}
+                          </button>
+                        )}
+                        {m.uid && <>
+                          <button className="btn btn-ghost btn-xs" type="button" title="Timeout for a set time" onClick={() => setTimeoutFor(m)}>Timeout</button>
+                          <button className="btn btn-ghost btn-xs" type="button" title="Remove from chat" onClick={() => moderate("ban", m)}>Ban</button>
+                        </>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Host posts into the chat (links become clickable for viewers). */}
+              <form onSubmit={(e) => { e.preventDefault(); sendChat(); }} style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <input type="text" value={chatDraft} onChange={(e) => setChatDraft(e.target.value)} placeholder="Chat with the show - paste links here" maxLength={500} style={{ flex: 1, background: "var(--bg2)", border: "1px solid var(--line)", color: "var(--cream)", borderRadius: 8, padding: "9px 12px", font: "inherit", fontSize: 13 }} />
+                <button className="btn btn-primary btn-sm" type="submit" disabled={!chatDraft.trim()}>Send</button>
+              </form>
+
+              {timeoutFor && (
+                <div className="modal-backdrop" onClick={() => setTimeoutFor(null)}>
+                  <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                    <h3 style={{ marginTop: 0 }}>Timeout {timeoutFor.name}</h3>
+                    <div className="panel-sub">They can still watch, but can&apos;t chat until the timeout ends.</div>
+                    <div className="filters" style={{ marginTop: 14, marginBottom: 0 }}>
+                      {([["1 min", 60], ["5 min", 300], ["15 min", 900], ["1 hour", 3600], ["24 hours", 86400]] as [string, number][]).map(([label, secs]) => (
+                        <button key={secs} type="button" className="filter-btn" onClick={() => { moderate("timeout", timeoutFor, secs); setTimeoutFor(null); }}>{label}</button>
+                      ))}
+                    </div>
+                    <div className="form-field" style={{ marginTop: 14 }}>
+                      <label>Custom (minutes)</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input type="number" min={1} max={1440} value={customMin} onChange={(e) => setCustomMin(e.target.value)} />
+                        <button className="btn btn-primary btn-sm" type="button" onClick={() => { const s = Math.max(1, Math.min(1440, Number(customMin) || 10)) * 60; moderate("timeout", timeoutFor, s); setTimeoutFor(null); }}>Apply</button>
+                      </div>
+                    </div>
+                    <button className="btn btn-ghost btn-sm" style={{ marginTop: 14 }} type="button" onClick={() => setTimeoutFor(null)}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+      </aside>
       </div>
     </>
   );

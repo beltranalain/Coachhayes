@@ -46,6 +46,8 @@ aside{background:var(--card);border-right:1px solid var(--hair);padding:18px 13p
 .brand .mk{width:28px;height:28px;border-radius:8px;background:var(--ink);color:var(--app);display:grid;place-items:center;
   font-family:var(--fdisp);font-weight:600;font-size:12px}
 [data-theme="dark"] .brand .mk{background:var(--acc);color:var(--accInk)}
+.brand img.mk{object-fit:cover;background:#fff;padding:0}
+[data-theme="dark"] .brand img.mk{background:var(--card)}
 .brand b{font-family:var(--fdisp);font-weight:600;font-size:14.5px;letter-spacing:-.03em;line-height:1.15}
 .brand b em{display:block;font-style:normal;font-size:11px;font-weight:400;color:var(--dim);letter-spacing:0}
 .navgrp{margin-bottom:16px}

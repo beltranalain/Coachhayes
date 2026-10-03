@@ -10,9 +10,9 @@ import ProfileView from "@/components/hayes/ProfileView";
 import PlayerPostCard, { type PlayerPost } from "@/components/hayes/PlayerPostCard";
 
 type Poll = { options: string[]; votedBy: Record<string, number> };
-type Post = { id: string; uid: string; author: string; picture?: string | null; text: string; ts: number; likes: number; likedBy: string[]; commentCount: number; room: string; savedBy: string[]; image?: string | null; clip?: string | null; poll?: Poll | null; kind?: string | null; player?: PlayerPost | null };
+type Post = { id: string; uid: string; author: string; picture?: string | null; text: string; ts: number; likes: number; likedBy: string[]; commentCount: number; room: string; savedBy: string[]; image?: string | null; clip?: string | null; poll?: Poll | null; kind?: string | null; player?: PlayerPost | null; show?: string | null };
 type Comment = { id: string; author: string; picture?: string | null; text: string; ts: number };
-type Notif = { id: string; type: "like" | "comment"; fromName: string; excerpt: string; postId: string; ts: number; read: boolean };
+type Notif = { id: string; type: string; fromName: string; excerpt: string; postId: string; ts: number; read: boolean };
 type Tab = "general" | "film" | "notifications" | "saved" | "profile";
 
 function timeAgo(ts: number) {
@@ -52,6 +52,7 @@ type Show = { key: string; title: string; href: string; art: string; image?: str
 export default function CommunityFeed({ content: c, shows = [], playerSrc, liveInitial, logo }: { content: any; shows?: Show[]; playerSrc?: string; liveInitial: boolean; logo?: string }) {
   const [user, setUser] = useState<User | null>(null);
   const [tab, setTab] = useState<Tab>("general");
+  const [activeShow, setActiveShow] = useState<string | null>(null); // strip filter: show posts about one series
   const [posts, setPosts] = useState<Post[]>([]);
   const [locked, setLocked] = useState(false);
   const [lockSignedIn, setLockSignedIn] = useState(false);
@@ -138,6 +139,7 @@ export default function CommunityFeed({ content: c, shows = [], playerSrc, liveI
     setBusy(true); setErr("");
     try {
       const body: any = { text, room: tab === "film" ? "film" : "general" };
+      if (activeShow) body.show = activeShow;
       if (image) body.image = image;
       if (clip) body.clip = clip;
       if (pollOpts && pollOpts.filter((o) => o.trim()).length >= 2) body.poll = { options: pollOpts.filter((o) => o.trim()) };
@@ -183,6 +185,12 @@ export default function CommunityFeed({ content: c, shows = [], playerSrc, liveI
   const signedIn = Boolean(user);
   const myName = user?.displayName?.split(" ")[0] || user?.email?.split("@")[0] || "You";
   const showComposer = (tab === "general" || tab === "film") && !locked;
+  // Posts shown after the strip's show-filter is applied (client-side). Inside a
+  // show channel, the show's own post (its header + video) is pinned to the top,
+  // then the discussion below it, newest first.
+  const shown = activeShow
+    ? posts.filter((p) => p.show === activeShow).sort((a, b) => ((b.kind === "show" ? 1 : 0) - (a.kind === "show" ? 1 : 0)) || b.ts - a.ts)
+    : posts;
 
   return (
     <div className="feedwrap">
@@ -216,24 +224,33 @@ export default function CommunityFeed({ content: c, shows = [], playerSrc, liveI
         {tab === "profile" && <ProfileView user={user} content={c} />}
 
         {(tab === "general" || tab === "film") && (
-          <div className="livestrip">
-            <Link href="/live" className={`lv1${live ? " on" : ""}`}>
-              <span className="ring"><span className="th" style={{ background: "var(--deep)" }} /></span>
-              <em>{live ? "Live now" : "Live"}</em>
-            </Link>
-            {shows.map((s) => (
-              <Link key={s.key} href={s.href || "/live"} className="lv1">
-                <span className="ring"><span className={`th${!s.image ? " " + (s.art || "a1") : ""}`} style={s.image ? { backgroundImage: `url(${s.image})` } : undefined} /></span>
-                <em>{s.title}</em>
+          <>
+            <div className="livestrip">
+              <Link href="/live" className={`lv1${live ? " on" : ""}`}>
+                <span className="ring"><span className="th" style={{ background: "var(--deep)" }} /></span>
+                <em>{live ? "Live now" : "Live"}</em>
               </Link>
-            ))}
-          </div>
+              {shows.map((s) => (
+                <button key={s.key} type="button" className={`lv1 lv1btn${activeShow === s.key ? " sel" : ""}`} onClick={() => setActiveShow(activeShow === s.key ? null : s.key)} title={`Show posts about ${s.title}`}>
+                  <span className="ring"><span className={`th${!s.image ? " " + (s.art || "a1") : ""}`} style={s.image ? { backgroundImage: `url(${s.image})` } : undefined} /></span>
+                  <em>{s.title}</em>
+                </button>
+              ))}
+            </div>
+            {activeShow && (
+              <div className="showfilter">
+                <span>Showing posts about <b>{shows.find((s) => s.key === activeShow)?.title || "this show"}</b></span>
+                <button type="button" className="link" onClick={() => setActiveShow(null)}>Show all</button>
+              </div>
+            )}
+          </>
         )}
 
         {tab !== "profile" && showComposer && (
           <div className="composer">
             <span className="comment-av" style={{ width: 40, height: 40, fontSize: 15 }}>{signedIn ? (myAvatar ? <img src={myAvatar} alt="" /> : initial(myName)) : ""}</span>
             <div className="cbody">
+              {activeShow && <div className="composer-show">Posting about <b>{shows.find((s) => s.key === activeShow)?.title || "this show"}</b></div>}
               <textarea placeholder={signedIn ? `Say something${tab === "film" ? " in the Film Room" : ""}…` : "Sign in to say something about the game"} value={text} onChange={(e) => setText(e.target.value)} disabled={!signedIn} rows={2} style={{ width: "100%", resize: "vertical", background: "transparent", border: "none", outline: "none", color: "var(--ink)", font: "inherit", fontSize: 15 }} />
 
               {(image || clip || pollOpts) && (
@@ -273,7 +290,7 @@ export default function CommunityFeed({ content: c, shows = [], playerSrc, liveI
               {notifs.map((n) => (
                 <div className={`notif${n.read ? "" : " unread"}`} key={n.id}>
                   <span className="post-av" style={{ width: 32, height: 32, fontSize: 13 }}>{initial(n.fromName)}</span>
-                  <div style={{ fontSize: 14 }}><b>{n.fromName}</b> {n.type === "like" ? "liked" : "commented on"} your post{n.excerpt ? <> — <span style={{ color: "var(--sub)" }}>“{n.excerpt}”</span></> : ""}<div className="post-time">{timeAgo(n.ts)}</div></div>
+                  <div style={{ fontSize: 14 }}><b>{n.fromName}</b> {n.type === "like" ? "liked your post" : n.type === "comment" ? "commented on your post" : "posted"}{n.excerpt ? <> — <span style={{ color: "var(--sub)" }}>“{n.excerpt}”</span></> : ""}<div className="post-time">{timeAgo(n.ts)}</div></div>
                 </div>
               ))}
             </div>
@@ -290,15 +307,15 @@ export default function CommunityFeed({ content: c, shows = [], playerSrc, liveI
           </div>
         ) : loading ? (
           <div className="card" style={{ textAlign: "center", padding: "40px 30px", color: "var(--sub)" }}>Loading…</div>
-        ) : posts.length === 0 ? (
+        ) : shown.length === 0 ? (
           <div className="card" style={{ textAlign: "center", padding: "48px 30px" }}>
-            <h3 style={{ marginBottom: 8 }}>{tab === "saved" ? "Nothing saved yet" : tab === "film" ? "The Film Room is open" : "The Locker Room is open"}</h3>
-            <p style={{ color: "var(--sub)", maxWidth: "44ch", margin: "0 auto" }}>{tab === "saved" ? "Tap the bookmark on any post to save it here." : "Be the first to post. Talk football with people who actually watch the tape."}</p>
+            <h3 style={{ marginBottom: 8 }}>{activeShow ? `No posts about ${shows.find((s) => s.key === activeShow)?.title || "this show"} yet` : tab === "saved" ? "Nothing saved yet" : tab === "film" ? "The Film Room is open" : "The Locker Room is open"}</h3>
+            <p style={{ color: "var(--sub)", maxWidth: "44ch", margin: "0 auto" }}>{activeShow ? "Be the first — select the show above and post about it." : tab === "saved" ? "Tap the bookmark on any post to save it here." : "Be the first to post. Talk football with people who actually watch the tape."}</p>
             {!signedIn && tab !== "saved" && <Link className="pill" href="/account" style={{ marginTop: 18 }}>Sign in to post</Link>}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {posts.map((p) => {
+            {shown.map((p) => {
               const liked = user ? p.likedBy.includes(user.uid) : false;
               const saved = user ? p.savedBy.includes(user.uid) : false;
               const vid = ytId(p.clip);
@@ -306,7 +323,14 @@ export default function CommunityFeed({ content: c, shows = [], playerSrc, liveI
                 <div className="post" key={p.id}>
                   <div className="post-head">
                     <span className="post-av">{p.picture ? <img src={p.picture} alt="" /> : initial(p.author)}</span>
-                    <div><b>{p.author}</b><span className="post-time">{timeAgo(p.ts)}</span></div>
+                    <div>
+                      <b>{p.author}</b>
+                      <span className="post-time">
+                        {timeAgo(p.ts)}
+                        {p.show && p.kind !== "show" && (() => { const t = shows.find((s) => s.key === p.show)?.title; return t ? <> · about <button type="button" className="post-showtag" onClick={() => setActiveShow(p.show!)}>{t}</button></> : null; })()}
+                        {p.show && p.kind === "show" && <> · Show</>}
+                      </span>
+                    </div>
                   </div>
                   {p.kind === "player" && p.player ? (
                     <PlayerPostCard p={p.player} />

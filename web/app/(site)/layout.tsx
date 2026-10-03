@@ -1,4 +1,5 @@
 import "../hayes-ds.css";
+import { cookies } from "next/headers";
 import ThemeRoot from "@/components/hayes/ThemeRoot";
 import SiteNav from "@/components/hayes/SiteNav";
 import SiteFooter from "@/components/hayes/SiteFooter";
@@ -13,6 +14,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const [{ branding }, content] = await Promise.all([getSiteConfig(), getHayesContent()]);
   const live = await getLiveInfo(branding.youtubeChannelId || PRIMARY_CHANNEL.channelId);
   const year = new Date().getFullYear();
+  // Read the saved theme on the server so the first paint matches it (no flash).
+  const initialTheme = (await cookies()).get("hz-theme")?.value === "dark" ? "dark" : "light";
   return (
     <>
       {/* The approved design's typefaces: Inter Tight / Inter (light theme) and
@@ -24,7 +27,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet"
       />
-      <ThemeRoot>
+      <ThemeRoot initial={initialTheme}>
         <SiteNav brandName={branding.siteName} live={live.live} logo={branding.logo} />
         {children}
         <SiteFooter brandName={branding.siteName} content={content.footer} year={year} />

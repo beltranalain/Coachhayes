@@ -29,6 +29,84 @@
 .hzadmin .two-col{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
 @media(max-width:900px){.hzadmin .two-col,.hzadmin .panel-split{grid-template-columns:1fr}}
 
+/* Studio redesign: main column (program + controls + panel tabs) + chat-only rail */
+.hzadmin .cr-studio{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;margin-bottom:16px;align-items:start}
+.hzadmin .cr-main{min-width:0}
+.hzadmin .cr-chat{position:sticky;top:88px}
+/* Match the public Live page chat card (.lchat): structured sections + dividers, edge-to-edge */
+.hzadmin .cr-chat .panel{display:flex;flex-direction:column;height:calc(100vh - 150px);margin-bottom:0;border-radius:18px;padding:0;overflow:hidden}
+.hzadmin .cr-chat .panel>h3{margin:0;padding:15px 18px 2px}
+.hzadmin .cr-chat .panel>.panel-sub{margin:0 !important;padding:0 18px 12px}
+.hzadmin .cr-chatfilters{display:flex;gap:7px;margin:0;padding:0 18px 12px;border-bottom:1px solid var(--hair2)}
+.hzadmin .cr-cf{background:var(--soft);border:1px solid var(--hair);border-radius:999px;padding:5px 14px;font-size:12.5px;font-weight:600;color:var(--sub);cursor:pointer}
+.hzadmin .cr-cf.on{background:#fff;color:#111;border-color:#fff}
+.hzadmin .cr-msgs{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:14px 18px}
+.hzadmin .cr-chat form{margin:0 !important;padding:12px 18px;border-top:1px solid var(--hair2)}
+@media(max-width:1000px){.hzadmin .cr-studio{grid-template-columns:1fr}.hzadmin .cr-chat{position:static}.hzadmin .cr-chat .panel{height:auto;max-height:620px}}
+
+/* Program preview + viewer chip */
+.hzadmin .cr-stage{position:relative}
+.hzadmin .cr-watching{position:absolute;right:12px;top:12px;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#fff;background:rgba(0,0,0,.55);padding:5px 11px;border-radius:999px;z-index:4}
+.hzadmin .cr-watching .wd{width:7px;height:7px;border-radius:50%;background:#34C759}
+
+/* Primary action + split-button device toggles */
+.hzadmin .cr-actionbar{display:flex;align-items:stretch;gap:12px;margin-top:16px}
+.hzadmin .cr-golive{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--live);color:#fff;border:none;border-radius:14px;padding:0 26px;min-width:150px;font-size:16px;font-weight:700;cursor:pointer}
+.hzadmin .cr-golive:disabled{opacity:.55;cursor:default}
+.hzadmin .cr-golive.stop{background:var(--soft);color:var(--ink);border:1px solid var(--hair)}
+.hzadmin .cr-golive .gdot{width:9px;height:9px;border-radius:50%;background:#fff;animation:crpulse 1.8s infinite}
+@keyframes crpulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.hzadmin .cr-toggles{display:flex;gap:10px;flex:1}
+.hzadmin .cr-tgl{flex:1;display:flex;align-items:stretch;background:var(--soft);border:1px solid var(--hair);border-radius:14px;overflow:visible;position:relative;color:var(--sub)}
+.hzadmin .cr-tgl.single{flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:10px 6px;cursor:pointer}
+.hzadmin .cr-tglmain{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:10px 6px;background:none;border:none;color:inherit;cursor:pointer}
+.hzadmin .cr-tglcar{display:grid;place-items:center;width:30px;border:none;border-left:1px solid var(--hair);background:none;color:var(--sub);cursor:pointer;font-size:12px}
+.hzadmin .cr-tgl svg{width:20px;height:20px}
+.hzadmin .cr-tgl span{font-size:12px;font-weight:600;color:var(--ink)}
+.hzadmin .cr-tgl em{font-style:normal;font-size:10.5px;color:var(--sub)}
+.hzadmin .cr-tgl.on{border-color:color-mix(in srgb,#34C759 55%,transparent);background:color-mix(in srgb,#34C759 13%,transparent);color:#34C759}
+.hzadmin .cr-tgl.on em{color:#34C759}
+.hzadmin .cr-tgl.on .cr-tglcar{border-left-color:color-mix(in srgb,#34C759 40%,transparent)}
+
+/* dropdown menus (device pickers + overflow) */
+.hzadmin .cr-menu{position:absolute;top:calc(100% + 6px);background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:6px;min-width:190px;box-shadow:0 14px 40px rgba(0,0,0,.5);z-index:20;display:flex;flex-direction:column}
+.hzadmin .cr-mi{text-align:left;background:none;border:none;color:var(--ink);padding:9px 12px;border-radius:8px;font-size:13.5px;cursor:pointer}
+.hzadmin .cr-mi:hover{background:var(--soft)}
+.hzadmin .cr-mi.on{color:var(--acc);font-weight:600}
+
+/* mic level meter */
+.hzadmin .cr-micmeter{display:flex;align-items:center;gap:10px;margin-top:12px}
+.hzadmin .cr-micmeter svg{width:16px;height:16px;color:var(--sub);flex-shrink:0}
+.hzadmin .cr-meter{height:7px;border-radius:999px;background:var(--soft);border:1px solid var(--hair);overflow:hidden;width:200px}
+.hzadmin .cr-mfill{display:block;height:100%;background:linear-gradient(90deg,#34C759,#d6c24a 78%,var(--live));border-radius:999px;transition:width .12s linear}
+.hzadmin .cr-audlink{margin-left:auto;background:none;border:none;color:var(--acc);font-size:12.5px;font-weight:600;cursor:pointer}
+
+/* layout segmented + overflow */
+.hzadmin .cr-row2{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-top:14px}
+.hzadmin .cr-group{display:flex;flex-direction:column;gap:7px}
+.hzadmin .cr-glabel{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--sub);font-weight:600}
+.hzadmin .cr-seg{display:inline-flex;background:var(--soft);border:1px solid var(--hair);border-radius:11px;padding:3px}
+.hzadmin .cr-seg button{border:none;background:none;color:var(--sub);padding:7px 15px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.hzadmin .cr-seg button.on{background:var(--acc);color:var(--accInk)}
+.hzadmin .cr-morewrap{margin-left:auto;position:relative}
+
+/* transition picker next to the Scenes row */
+.hzadmin .cr-transition{display:inline-flex;align-items:center;gap:8px}
+.hzadmin .cr-transition select{background:var(--soft);border:1px solid var(--hair);color:var(--ink);border-radius:10px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer}
+
+/* free camera-window position/size sliders */
+.hzadmin .cam-sliders{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.hzadmin .cam-slider{display:flex;align-items:center;gap:10px}
+
+/* pin-to-broadcast button on chat messages */
+.hzadmin .cr-msg .mod-actions{opacity:0;transition:opacity .12s}
+.hzadmin .cr-msg:hover .mod-actions{opacity:1}
+.hzadmin .cr-pin{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border:1px solid var(--hair);border-radius:8px;padding:4px 9px;font-size:11px;font-weight:600;color:var(--sub);cursor:pointer}
+.hzadmin .cr-pin svg{width:12px;height:12px}
+.hzadmin .cr-pin:hover{color:var(--acc);border-color:var(--acc)}
+.hzadmin .cr-pin.on{background:var(--acc);border-color:var(--acc);color:var(--accInk);opacity:1}
+.hzadmin .cr-msg:has(.cr-pin.on) .mod-actions{opacity:1}
+
 /* KPI / stat cards */
 .hzadmin .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px}
 .hzadmin .stat-card{background:var(--card);border:1px solid var(--hair);border-radius:16px;padding:18px 20px}
@@ -50,7 +128,7 @@
 
 /* Forms */
 .hzadmin .form-field{margin-bottom:16px}
-.hzadmin .form-field label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:600}
+.hzadmin .form-field label:not(.toggle){display:block;font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:600}
 .hzadmin .form-field input,.hzadmin .form-field textarea,.hzadmin .form-field select,
 .hzadmin input[type=text],.hzadmin input[type=email],.hzadmin input[type=password],
 .hzadmin input[type=number],.hzadmin input[type=url],.hzadmin input[type=datetime-local],.hzadmin input[type=date]{
@@ -79,10 +157,14 @@
 .hzadmin .health-dot{width:9px;height:9px;border-radius:50%;background:var(--green)}
 
 /* Toggle switch */
-.hzadmin .toggle{position:relative;width:42px;height:24px;border-radius:980px;background:var(--hair);border:1px solid var(--hair);cursor:pointer;flex-shrink:0;transition:background .15s}
-.hzadmin .toggle.on,.hzadmin .toggle[aria-checked=true],.hzadmin .toggle[data-on=true]{background:var(--acc)}
-.hzadmin .toggle::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
-.hzadmin .toggle.on::after,.hzadmin .toggle[aria-checked=true]::after,.hzadmin .toggle[data-on=true]::after{transform:translateX(18px)}
+/* Checkbox switch: <label class="toggle"><input type="checkbox"><span class="track"></label>
+   Hide the native checkbox; the .track span is the pill + knob. */
+.hzadmin .toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer;flex-shrink:0}
+.hzadmin .toggle input{position:absolute;opacity:0;width:0;height:0;margin:0;pointer-events:none}
+.hzadmin .toggle .track{position:relative;width:42px;height:24px;max-width:none;flex:none;border-radius:980px;background:var(--hair);border:1px solid var(--hair);transition:background .15s}
+.hzadmin .toggle .track::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.hzadmin .toggle input:checked + .track{background:var(--acc);border-color:var(--acc)}
+.hzadmin .toggle input:checked + .track::after{transform:translateX(18px)}
 
 /* Text helpers */
 .hzadmin .muted{color:var(--sub)}

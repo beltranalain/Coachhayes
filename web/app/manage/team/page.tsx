@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Shell from "@/components/hayes/admin/Shell";
 import { getIdToken } from "@/lib/firebase";
 import { useAdminRole } from "@/lib/adminRole";
 import { ROLES, type Role } from "@/lib/admin";
@@ -21,8 +22,9 @@ const ROLE_HELP: { role: Role; text: string }[] = [
   { role: "moderator", text: "Go Live plus chat / user moderation (Users) only." },
 ];
 
-export default function AdminTeam() {
+export default function ManageTeam() {
   const { isOwner } = useAdminRole();
+  const [brand, setBrand] = useState({ name: "Coach Hayes Football", logo: "" });
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [note, setNote] = useState<string>("");
@@ -32,12 +34,13 @@ export default function AdminTeam() {
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<Role>("moderator");
 
+  const authH = async (): Promise<Record<string, string>> => { const t = await getIdToken(); return t ? { Authorization: `Bearer ${t}` } : {}; };
+
   async function load() {
     setLoading(true);
     try {
-      const token = await getIdToken();
       const res = await fetch("/api/admin/team", {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: await authH(),
         cache: "no-store",
       });
       const d = await res.json();
@@ -51,6 +54,10 @@ export default function AdminTeam() {
   }
 
   useEffect(() => {
+    fetch("/api/site-config", { cache: "no-store" }).then((r) => r.json()).then((d) => { if (d?.branding) setBrand({ name: d.branding.siteName || "Coach Hayes Football", logo: d.branding.logo || "" }); }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (isOwner) load();
     else setLoading(false);
   }, [isOwner]);
@@ -60,12 +67,11 @@ export default function AdminTeam() {
     setNote("");
     setErr("");
     try {
-      const token = await getIdToken();
       const res = await fetch("/api/admin/team", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(await authH()),
         },
         body: JSON.stringify({ action, email, role }),
       });
@@ -96,34 +102,16 @@ export default function AdminTeam() {
 
   if (!isOwner) {
     return (
-      <>
-        <div className="admin-topbar">
-          <div>
-            <h1>Team</h1>
-            <div className="sub">Staff and roles.</div>
-          </div>
-        </div>
+      <Shell title="Team" sub="Staff access & roles" brandName={brand.name} logo={brand.logo}>
         <div className="notice">
           <strong>Owners only.</strong> Only an owner can manage the team.
         </div>
-      </>
+      </Shell>
     );
   }
 
   return (
-    <>
-      <div className="admin-topbar">
-        <div>
-          <h1>Team</h1>
-          <div className="sub">Add staff and control what each person can see.</div>
-        </div>
-        <div className="admin-actions">
-          <button className="btn btn-ghost btn-sm" type="button" onClick={load} disabled={loading || busy}>
-            {loading ? "Loading..." : "Refresh"}
-          </button>
-        </div>
-      </div>
-
+    <Shell title="Team" sub="Staff access & roles" brandName={brand.name} logo={brand.logo}>
       {note && <div className="notice" style={{ marginBottom: 16 }}>{note}</div>}
       {err && <div className="notice" style={{ marginBottom: 16 }}><strong>Error.</strong> {err}</div>}
 
@@ -219,6 +207,6 @@ export default function AdminTeam() {
           </div>
         </div>
       </div>
-    </>
+    </Shell>
   );
 }

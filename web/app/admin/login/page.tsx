@@ -30,7 +30,7 @@ export default function AdminLogin() {
       const p = new URLSearchParams(window.location.search).get("next");
       return p && p.startsWith("/") ? p : "/manage/go-live";
     } catch {
-      return "/admin";
+      return "/manage/go-live";
     }
   };
 

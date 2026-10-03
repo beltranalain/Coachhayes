@@ -4,6 +4,7 @@ import { verifyUser } from "@/lib/requireUser";
 import { isRoom, roomGated, roomMinTier, tierMeets } from "@/lib/communityRooms";
 import { getMembership, effectiveTier } from "@/lib/membership";
 import { roleForEmail } from "@/lib/team";
+import { broadcastNotification } from "@/lib/notify";
 import { authorMap, withLiveAuthor } from "@/lib/communityAuthors";
 
 // Can this member enter a gated room? Team members always can; otherwise their
@@ -27,6 +28,7 @@ function shape(id: string, x: any) {
     image: x.image || null, clip: x.clip || null,
     poll: x.poll ? { options: x.poll.options || [], votedBy: x.poll.votedBy || {} } : null,
     kind: x.kind || null, player: x.player || null,
+    show: x.show || null,
   };
 }
 
@@ -99,7 +101,16 @@ export async function POST(request: Request) {
   let author = u.name; let picture = u.picture;
   try { const pf = (await db.collection("profiles").doc(u.uid).get()).data(); if (pf?.name) author = pf.name; if (pf?.avatar) picture = pf.avatar; } catch {}
   const now = Date.now();
-  const doc: any = { uid: u.uid, author, picture, text, ts: now, likes: 0, likedBy: [], commentCount: 0, room, savedBy: [], image, clip, poll };
+  // Optional show tag (a series key) so the community strip can filter the feed.
+  const show = typeof b.show === "string" && b.show.trim() ? b.show.trim().slice(0, 60) : null;
+  const doc: any = { uid: u.uid, author, picture, text, ts: now, likes: 0, likedBy: [], commentCount: 0, room, savedBy: [], image, clip, poll, show };
   const ref = await db.collection("posts").add(doc);
+  // A post by an admin (owner/manager) announces to everyone.
+  try {
+    const role = await roleForEmail(u.email);
+    if (role === "owner" || role === "manager") {
+      await broadcastNotification(author, "post", ref.id, text || "New post");
+    }
+  } catch { /* non-fatal */ }
   return NextResponse.json({ ok: true, post: { id: ref.id, ...doc } });
 }

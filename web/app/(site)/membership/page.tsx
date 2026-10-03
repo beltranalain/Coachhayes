@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getHayesContent } from "@/lib/siteConfig";
+import { stripeConfigured, MEMBERSHIP_PRICES } from "@/lib/stripe";
+import MembershipJoin from "@/components/MembershipJoin";
 
 export const metadata: Metadata = {
   title: "Membership",
@@ -36,9 +38,9 @@ export default async function MembershipPage() {
             {tier.key === "free" ? (
               <Link className="link" href="/account">{tier.cta}</Link>
             ) : (
-              // Paid tiers: create/sign in now; Stripe checkout arrives in the
-              // membership phase (the account page explains the upgrade).
-              <Link className={`pill${tier.highlight ? "" : " dark"}`} href="/account">{tier.cta}</Link>
+              // Paid tiers: on-site Stripe Payment Element checkout (no redirect).
+              // `enabled` only when Stripe + this tier's price are configured.
+              <MembershipJoin tier={tier.key} tierName={tier.name} price={`${tier.price}${tier.priceSuffix ? " " + tier.priceSuffix : ""}`} cta={tier.cta} highlight={tier.highlight} enabled={stripeConfigured && !!MEMBERSHIP_PRICES[tier.key]} />
             )}
           </div>
         ))}
