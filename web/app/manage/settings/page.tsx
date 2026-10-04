@@ -20,15 +20,27 @@ export default function SettingsAdmin() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [health, setHealth] = useState<{ key: string; name: string; status: string; detail: string }[] | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const tok = async (): Promise<Record<string, string>> => { const t = await getIdToken(); return t ? { Authorization: `Bearer ${t}` } : {}; };
   const set = (patch: Partial<Branding>) => setB((s) => ({ ...s, ...patch }));
+
+  async function runHealth() {
+    setChecking(true);
+    try {
+      const r = await fetch("/api/admin/health", { headers: await tok(), cache: "no-store" });
+      const d = await r.json();
+      setHealth(Array.isArray(d.services) ? d.services : []);
+    } catch { setHealth([]); } finally { setChecking(false); }
+  }
 
   useEffect(() => {
     fetch("/api/site-config", { cache: "no-store" }).then((r) => r.json()).then((d) => {
       if (d?.branding) setB({ ...BLANK, ...d.branding });
       setLoading(false);
     }).catch(() => setLoading(false));
+    runHealth();
   }, []);
 
   function onLogo(file: File) {
@@ -101,16 +113,23 @@ export default function SettingsAdmin() {
 
         <div className="stack">
           <div className="card">
-            <h3>Connections</h3>
-            <p className="cs">Everything runs on your own accounts. These are configured via environment keys on the server.</p>
-            <div className="rows">
-              <Conn name="Cloudflare Stream" meta="Live input + playback" />
-              <Conn name="Simulcast relay" meta="MediaMTX — set RELAY_URL to enable" />
-              <Conn name="YouTube" meta={b.youtubeChannelId ? `Channel ${b.youtubeChannelId}` : "Set the channel ID above"} />
-              <Conn name="Stripe" meta="Your account · merchant of record" />
-              <Conn name="Anthropic (AI scout)" meta="Set ANTHROPIC_API_KEY to enable" />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div><h3>Connections</h3><p className="cs" style={{ margin: 0 }}>Live status of everything your site connects to. Green means it&apos;s working; grey means it&apos;s not turned on yet.</p></div>
+              <button className="btn sm" style={{ marginLeft: "auto" }} onClick={runHealth} disabled={checking}>{checking ? "Checking…" : "Recheck"}</button>
             </div>
-            <p className="cs" style={{ marginTop: 12 }}>Connection status is managed with server environment keys — ask your developer to set or rotate them.</p>
+            <div className="rows" style={{ marginTop: 12 }}>
+              {health === null ? (
+                <div className="r"><span className="nm"><b>Checking connections…</b></span><span className="st checking"><i /></span></div>
+              ) : (
+                health.map((s) => <Conn key={s.key} name={s.name} meta={s.detail} status={s.status} />)
+              )}
+            </div>
+            <div className="connlegend">
+              <span><i style={{ background: "var(--green)" }} /> Connected</span>
+              <span><i style={{ background: "var(--amber)" }} /> Needs setup</span>
+              <span><i style={{ background: "var(--live)" }} /> Error</span>
+              <span><i style={{ background: "var(--dim)" }} /> Not set</span>
+            </div>
           </div>
 
           <div className="card">
@@ -134,10 +153,12 @@ export default function SettingsAdmin() {
   );
 }
 
-function Conn({ name, meta }: { name: string; meta: string }) {
+function Conn({ name, meta, status }: { name: string; meta: string; status: string }) {
+  const label = status === "ok" ? "Connected" : status === "warn" ? "Needs setup" : status === "fail" ? "Error" : "Not set";
   return (
     <div className="r">
       <span className="nm"><b>{name}</b><span>{meta}</span></span>
+      <span className={`st ${status}`}><i />{label}</span>
     </div>
   );
 }

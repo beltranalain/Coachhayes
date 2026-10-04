@@ -53,7 +53,7 @@ const GROUPS: Group[] = [
     items: [
       { key: "members", label: "Members", href: "/manage/members", roles: ["owner", "manager", "moderator"], icon: I(<><circle cx="10" cy="7" r="3.2" /><path d="M4 17c0-3.3 2.7-5 6-5s6 1.7 6 5" /></>) },
       { key: "team", label: "Team", href: "/manage/team", roles: ["owner"], icon: I(<><circle cx="7" cy="7" r="2.4" /><circle cx="13.5" cy="8" r="2" /><path d="M3 16c0-2.4 1.8-3.8 4-3.8s4 1.4 4 3.8M12 16c0-1.9.9-3 2.8-3.1" /></>) },
-      { key: "tips", label: "Tips", href: "/manage/tips", roles: ["owner", "manager"], icon: I(<path d="M10 3v14M6.5 6.5h5a2.5 2.5 0 0 1 0 5h-3a2.5 2.5 0 0 0 0 5h5" />) },
+      { key: "tips", label: "Tips", href: "/manage/tips", roles: ["owner", "manager"], icon: I(<path d="M10 3v14M13.5 6.5H9a2.5 2.5 0 0 0 0 5h2a2.5 2.5 0 0 1 0 5H6.5" />) },
       { key: "email", label: "Email list", href: "/manage/email", roles: ["owner", "manager"], icon: I(<><rect x="3" y="5" width="14" height="10" rx="2" /><path d="M3 6l7 5 7-5" /></>) },
     ],
   },

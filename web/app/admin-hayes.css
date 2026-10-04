@@ -129,6 +129,17 @@ main{padding:0 0 70px;min-width:0}
 .r .st i{width:7px;height:7px;border-radius:50%;background:var(--dim)}
 .r.on .st{color:var(--green)}
 .r.on .st i{background:var(--green)}
+/* live connection status dots (green / yellow / red / grey) with a pulse ring */
+.r .st.ok{color:var(--green)} .r .st.ok i{background:var(--green);--c:57,217,138;animation:connpulse 2.2s infinite}
+.r .st.warn{color:var(--amber)} .r .st.warn i{background:var(--amber);--c:245,165,36;animation:connpulse 2.2s infinite}
+.r .st.fail{color:var(--live)} .r .st.fail i{background:var(--live);--c:232,64,42;animation:connpulse 2.2s infinite}
+.r .st.off i{background:var(--dim)}
+.r .st.checking i{background:var(--amber);animation:connblink 1.1s infinite}
+@keyframes connpulse{0%{box-shadow:0 0 0 0 rgba(var(--c),.55)}70%{box-shadow:0 0 0 7px rgba(var(--c),0)}100%{box-shadow:0 0 0 0 rgba(var(--c),0)}}
+@keyframes connblink{0%,100%{opacity:1}50%{opacity:.3}}
+.connlegend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--sub)}
+.connlegend span{display:inline-flex;align-items:center;gap:6px}
+.connlegend i{width:7px;height:7px;border-radius:50%;display:inline-block}
 .r .act{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
 .ava{width:32px;height:32px;border-radius:50%;background:var(--soft);display:grid;place-items:center;
   font-size:11.5px;font-weight:600;color:var(--sub);flex-shrink:0}

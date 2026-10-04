@@ -33,6 +33,21 @@ export async function POST(request: Request) {
   if (isPI || isCS) {
     const obj = event.data.object;
     const md = obj.metadata || {};
+
+    // Shop purchase -> record the order (same one-time-payment endpoint as tips).
+    if (isPI && md.kind === "shop") {
+      try {
+        const db = getAdminDb();
+        await db?.collection("shopOrders").add({
+          title: String(md.title || ""), size: String(md.size || ""), qty: Number(md.qty) || 1,
+          amountCents: Number(md.amount) || (obj.amount ?? 0), email: String(md.email || ""),
+          name: String(md.name || ""), address: String(md.address || ""), productId: String(md.productId || ""),
+          status: "paid", ts: Date.now(), paymentId: obj.id,
+        });
+      } catch { /* ignore */ }
+      return NextResponse.json({ received: true });
+    }
+
     // Only process our tips (ignore any unrelated payments on the account).
     if (isPI && md.kind !== "tip") return NextResponse.json({ received: true });
 
