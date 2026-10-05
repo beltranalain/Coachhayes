@@ -60,7 +60,12 @@ export async function POST(request: Request) {
 // else intact. Keeps the Firestore doc comfortably under the 1MB limit.
 function sanitize(v: unknown): unknown {
   if (typeof v === "string") {
-    if (v.startsWith("data:") && (!v.startsWith("data:image") || v.length > 300_000)) return "";
+    // Inline data URLs: keep valid images in FULL (up to the size cap); drop
+    // non-images or oversized ones. Do NOT truncate — a cut data URL won't render.
+    if (v.startsWith("data:")) {
+      return v.startsWith("data:image") && v.length <= 300_000 ? v : "";
+    }
+    // Regular text fields stay capped.
     return v.slice(0, 4000);
   }
   if (Array.isArray(v)) return v.slice(0, 40).map(sanitize);
