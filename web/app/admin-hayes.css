@@ -293,3 +293,32 @@ td .muted{color:var(--sub);font-size:12px}
 /* Legacy globals.css .brand is position:absolute (old centered wordmark) —
    force the admin sidebar brand back into normal flow so it doesn't overlap nav. */
 .hzadmin aside .brand{position:static;transform:none;left:auto;top:auto}
+
+/* --- Blog admin (editor + posts table) --- */
+.hzadmin .blogedit-grid{display:grid;grid-template-columns:1fr 290px;gap:18px;align-items:start}
+@media (max-width:980px){.hzadmin .blogedit-grid{grid-template-columns:1fr}}
+.hzadmin .blogtabs{display:inline-flex;gap:4px;background:var(--soft);border:1px solid var(--hair);border-radius:10px;padding:4px;margin-bottom:14px}
+.hzadmin .blogtabs button{padding:6px 16px;border:none;background:none;border-radius:7px;font-size:13.5px;font-weight:600;color:var(--dim);cursor:pointer}
+.hzadmin .blogtabs button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.hzadmin .bl-label{display:block;font-size:12.5px;font-weight:600;color:var(--sub);margin-bottom:6px}
+.hzadmin .bl-cap{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:0 0 10px}
+.hzadmin .bl-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:7px 8px;border-bottom:1px solid var(--hair);background:var(--card)}
+.hzadmin .bl-toolbar button{padding:5px 9px;border:none;background:none;border-radius:6px;font-size:13px;color:var(--sub);cursor:pointer}
+.hzadmin .bl-toolbar button:hover{background:var(--soft);color:var(--ink)}
+.hzadmin .bl-div{width:1px;height:16px;background:var(--hair);margin:0 5px}
+.hzadmin .bl-body{min-height:420px;padding:16px;font-size:15.5px;line-height:1.7;color:var(--ink);outline:none}
+.hzadmin .bl-body:empty::before{content:attr(data-ph);color:var(--dim);pointer-events:none}
+.hzadmin .bl-body h2{font-size:22px;margin:18px 0 10px}
+.hzadmin .bl-body h3{font-size:18px;margin:16px 0 8px}
+.hzadmin .bl-body p{margin:0 0 14px}
+.hzadmin .bl-body a{color:var(--acc);text-decoration:underline}
+.hzadmin .bl-body ul,.hzadmin .bl-body ol{margin:0 0 14px;padding-left:22px}
+.hzadmin .bl-body img{max-width:100%;border-radius:10px;margin:10px 0}
+.hzadmin .blogrow{display:grid;grid-template-columns:1fr 100px 66px 104px 92px;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--hair)}
+.hzadmin .blogrow-head{border-top:none;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);font-weight:700;padding-bottom:6px}
+.hzadmin .blogrow-title{font-weight:600;color:var(--ink);text-decoration:none}
+.hzadmin .blogrow-title:hover{color:var(--acc)}
+@media (max-width:640px){
+  .hzadmin .blogrow{grid-template-columns:1fr auto}
+  .hzadmin .blogrow span:nth-child(3),.hzadmin .blogrow span:nth-child(4){display:none}
+}

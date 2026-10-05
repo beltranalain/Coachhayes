@@ -38,6 +38,7 @@ const GROUPS: Group[] = [
       { key: "rankings", label: "Rankings", href: "/admin/rankings", roles: ["owner", "manager"], icon: I(<><circle cx="10" cy="10" r="7" /><path d="M10 6v8M7 9l3-3 3 3" /></>) },
       { key: "players", label: "Players", href: "/admin/players", roles: ["owner", "manager"], icon: I(<><circle cx="9" cy="9" r="6" /><path d="M13.5 13.5 18 18" /></>) },
       { key: "content", label: "Website content", href: "/admin/content", roles: ["owner", "manager"], icon: I(<><rect x="4" y="3" width="12" height="14" rx="2" /><path d="M7 7h6M7 10h6M7 13h4" /></>) },
+      { key: "blog", label: "Blog", href: "/admin/blog", roles: ["owner", "manager"], icon: I(<><path d="M4 3h8l4 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><path d="M11.5 3v4h4M7 11h6M7 14h4" /></>) },
     ],
   },
   {

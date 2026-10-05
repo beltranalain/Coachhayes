@@ -26,6 +26,7 @@ export async function GET(request: Request) {
   const relay = process.env.RELAY_URL || "";
   const yt = process.env.YOUTUBE_API_KEY || "";
   const anthropic = process.env.ANTHROPIC_API_KEY || "";
+  const groq = process.env.GROQ_API_KEY || "";
   const resendKey = process.env.RESEND_API_KEY || "";
   const resendFrom = process.env.RESEND_FROM || "";
   const chatWs = process.env.NEXT_PUBLIC_CHAT_WS_URL || "";
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
   const relayS: S = relay ? "ok" : "off";
   const youtubeS: S = yt ? "ok" : "off";
   const anthropicS: S = anthropic ? "ok" : "off";
+  const groqS: S = groq ? "ok" : "off";
 
   // Stripe connected but membership not fully wired -> yellow.
   let stripeS: S = stripe;
@@ -66,8 +68,9 @@ export async function GET(request: Request) {
     { key: "stripe", name: "Stripe", status: stripeS, detail: stripeDetail },
     { key: "resend", name: "Resend", status: resendS, detail: resendDetail },
     { key: "anthropic", name: "Anthropic (Claude AI)", status: anthropicS, detail: anthropic ? "AI player breakdowns" : "Off — connect for AI player scouting" },
+    { key: "groq", name: "Groq (AI blog writer)", status: groqS, detail: groq ? "Writes blog post drafts" : "Off — connect to write blog posts with AI" },
     { key: "chat", name: "Chat worker (Cloudflare)", status: chat, detail: chat === "ok" ? "Real-time chat and tip alerts" : "Not connected" },
   ];
   // Back-compat flat map + the new services array.
-  return NextResponse.json({ services, firebase, stream, stripe, resend, chat, youtube: youtubeS });
+  return NextResponse.json({ services, firebase, stream, stripe, resend, chat, youtube: youtubeS, groq: groqS });
 }

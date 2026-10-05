@@ -2,11 +2,19 @@ import { PRIMARY_CHANNEL } from "@/lib/channels";
 import { getLiveInfo } from "@/lib/youtube";
 import { getSiteConfig, getHayesContent } from "@/lib/siteConfig";
 import { getPublishedPlayers, CHIP_META } from "@/lib/rankings";
+import { getPublishedPosts, readingMinutes } from "@/lib/blog";
 import Home from "@/components/hayes/Home";
 
 export default async function HomePage() {
-  const [{ schedule, branding }, content, players] = await Promise.all([getSiteConfig(), getHayesContent(), getPublishedPlayers()]);
+  const [{ schedule, branding }, content, players, posts] = await Promise.all([getSiteConfig(), getHayesContent(), getPublishedPlayers(), getPublishedPosts(3)]);
   const live = await getLiveInfo(branding.youtubeChannelId || PRIMARY_CHANNEL.channelId);
+
+  // Latest blog posts for the home-page strip.
+  const latestPosts = posts.map((p) => ({
+    slug: p.slug, title: p.title, excerpt: p.excerpt, coverImage: p.coverImage,
+    category: p.categories[0] || "", readMins: readingMinutes(p.content),
+    date: p.publishedAt ? new Date(p.publishedAt).toLocaleDateString("en-US", { dateStyle: "medium" }) : "",
+  }));
 
   // Top of the board preview — the top few published players, in rank order.
   const topRankings = players.slice(0, 5).map((p) => ({
@@ -34,6 +42,7 @@ export default async function HomePage() {
       playerSrc={playerSrc}
       schedule={week}
       rankings={{ total: players.length, top: topRankings }}
+      posts={latestPosts}
     />
   );
 }

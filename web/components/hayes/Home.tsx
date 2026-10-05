@@ -15,6 +15,8 @@ type RankRow = {
   videoUrl?: string;
 };
 
+type PostCard = { slug: string; title: string; excerpt: string; coverImage: string; category: string; readMins: number; date: string };
+
 // Pull the 11-char YouTube id out of a watch/embed/share/live URL.
 function ytId(url?: string): string | null {
   if (!url) return null;
@@ -32,6 +34,7 @@ export default function Home({
   playerSrc,
   schedule,
   rankings,
+  posts,
 }: {
   tagline: string;
   logo?: string;
@@ -40,6 +43,7 @@ export default function Home({
   playerSrc?: string;
   schedule: ScheduleRow[];
   rankings: { total: number; top: RankRow[] };
+  posts: PostCard[];
 }) {
   const week = schedule.slice(0, 5);
   // Reflect the Studio going live automatically (polls Cloudflare status).
@@ -223,6 +227,34 @@ export default function Home({
           </div>
         </div>
       </section>
+
+      {/* ============ LATEST FROM THE BLOG ============ */}
+      {posts.length > 0 && (
+        <section className="sec">
+          <div className="wide">
+            <div className="hd center">
+              <h2>Latest from the blog</h2>
+              <p>Film breakdowns, recruiting notes, and the stories behind the game.</p>
+            </div>
+            <div className="bloggrid">
+              {posts.map((p) => (
+                <Link key={p.slug} href={`/blog/${p.slug}`} className="blogcard">
+                  <div className={`blogcard-art${p.coverImage ? " has-img" : ""}`} style={p.coverImage ? { backgroundImage: `url(${p.coverImage})` } : undefined} />
+                  <div className="blogcard-body">
+                    {p.category && <span className="blogtag">{p.category}</span>}
+                    <h3>{p.title}</h3>
+                    {p.excerpt && <p>{p.excerpt}</p>}
+                    <span className="blogmeta">{p.date}{p.date ? " · " : ""}{p.readMins} min read</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="center" style={{ marginTop: 22 }}>
+              <Link className="pill" href="/blog">Read the blog ›</Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {playing && (
         <div className="rkvidmodal" onClick={(e) => { if (e.target === e.currentTarget) setPlaying(null); }}>
