@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import GoogleIcon from "@/components/hayes/GoogleIcon";
+import YouTubeMemberLink from "@/components/hayes/YouTubeMemberLink";
 import { firebaseConfigured, getFirebaseAuth, getIdToken } from "@/lib/firebase";
 import {
   GoogleAuthProvider,
@@ -44,13 +45,21 @@ export default function AccountPage() {
     getRedirectResult(auth).catch(() => {});
     const unsub = onAuthStateChanged(auth, async (u) => {
       setViewer(u); setReady(true);
-      if (u) {
-        try { const t = await getIdToken(); const r = await fetch("/api/membership/me", { headers: t ? { Authorization: `Bearer ${t}` } : {}, cache: "no-store" }); const d = await r.json(); setTier(d.effective || null); setIsTeam(!!d.isTeam); }
-        catch {}
-      } else { setTier(null); setIsTeam(false); }
+      if (u) await refreshTier();
+      else { setTier(null); setIsTeam(false); }
     });
     return () => unsub();
   }, []);
+
+  // Re-read the member's effective tier (after a YouTube link, upgrade, etc.).
+  async function refreshTier() {
+    try {
+      const t = await getIdToken();
+      const r = await fetch("/api/membership/me", { headers: t ? { Authorization: `Bearer ${t}` } : {}, cache: "no-store" });
+      const d = await r.json();
+      setTier(d.effective || null); setIsTeam(!!d.isTeam);
+    } catch { /* ignore */ }
+  }
 
   const TIER_LABEL: Record<string, string> = { coordinator: "The Coordinator", timmy: "Po’ Lil Timmy" };
 
@@ -165,6 +174,7 @@ export default function AccountPage() {
               Paid tiers (Po’ Lil Timmy · The Coordinator) unlock members’ rooms like the Film Room. Stripe checkout turns on in the membership phase.
             </p>
           )}
+          {!isTeam && tier !== "coordinator" && <YouTubeMemberLink onLinked={refreshTier} />}
         </div>
       ) : (
         // ---- Signed out: create account / sign in ----

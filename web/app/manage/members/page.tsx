@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Shell from "@/components/hayes/admin/Shell";
+import YouTubeMembersPanel from "@/components/hayes/admin/YouTubeMembersPanel";
 import { getIdToken } from "@/lib/firebase";
 
 // Members — read-only view of the REAL configured membership tiers from
@@ -102,6 +103,8 @@ export default function MembersAdmin() {
         </div>
         {gMsg && <p style={{ color: gMsg.ok ? "var(--green)" : "var(--live)", fontSize: 13, marginTop: 10 }}>{gMsg.text}</p>}
       </div>
+
+      <YouTubeMembersPanel />
 
       <div className="card">
         <h3>Members</h3>

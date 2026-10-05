@@ -27,6 +27,8 @@ export async function GET(request: Request) {
   const yt = process.env.YOUTUBE_API_KEY || "";
   const anthropic = process.env.ANTHROPIC_API_KEY || "";
   const groq = process.env.GROQ_API_KEY || "";
+  const ytClientId = process.env.YOUTUBE_OAUTH_CLIENT_ID || process.env.NEXT_PUBLIC_YOUTUBE_OAUTH_CLIENT_ID || "";
+  const ytSecret = process.env.YOUTUBE_OAUTH_CLIENT_SECRET || "";
   const resendKey = process.env.RESEND_API_KEY || "";
   const resendFrom = process.env.RESEND_FROM || "";
   const chatWs = process.env.NEXT_PUBLIC_CHAT_WS_URL || "";
@@ -44,6 +46,18 @@ export async function GET(request: Request) {
   const youtubeS: S = yt ? "ok" : "off";
   const anthropicS: S = anthropic ? "ok" : "off";
   const groqS: S = groq ? "ok" : "off";
+
+  // YouTube memberships: off (no keys) / warn (keys but owner hasn't connected) / ok (connected).
+  let ytMembersS: S = "off";
+  let ytMembersDetail = "Off — connect to give YouTube members access here";
+  if (ytClientId && ytSecret) {
+    try {
+      const db = getAdminDb();
+      const doc = db ? await db.collection("integrations").doc("youtube").get() : null;
+      if (doc?.data()?.refreshToken) { ytMembersS = "ok"; ytMembersDetail = "Connected — YouTube members can unlock access here"; }
+      else { ytMembersS = "warn"; ytMembersDetail = "Keys added — click Connect in Members to finish"; }
+    } catch { ytMembersS = "warn"; ytMembersDetail = "Keys added — click Connect in Members to finish"; }
+  }
 
   // Stripe connected but membership not fully wired -> yellow.
   let stripeS: S = stripe;
@@ -69,8 +83,9 @@ export async function GET(request: Request) {
     { key: "resend", name: "Resend", status: resendS, detail: resendDetail },
     { key: "anthropic", name: "Anthropic (Claude AI)", status: anthropicS, detail: anthropic ? "AI player breakdowns" : "Off — connect for AI player scouting" },
     { key: "groq", name: "Groq (AI blog writer)", status: groqS, detail: groq ? "Writes blog post drafts" : "Off — connect to write blog posts with AI" },
+    { key: "ytmembers", name: "YouTube memberships", status: ytMembersS, detail: ytMembersDetail },
     { key: "chat", name: "Chat worker (Cloudflare)", status: chat, detail: chat === "ok" ? "Real-time chat and tip alerts" : "Not connected" },
   ];
   // Back-compat flat map + the new services array.
-  return NextResponse.json({ services, firebase, stream, stripe, resend, chat, youtube: youtubeS, groq: groqS });
+  return NextResponse.json({ services, firebase, stream, stripe, resend, chat, youtube: youtubeS, groq: groqS, ytmembers: ytMembersS });
 }

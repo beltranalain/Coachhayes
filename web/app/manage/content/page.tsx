@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Shell from "@/components/hayes/admin/Shell";
 import { getIdToken } from "@/lib/firebase";
 import type { HayesContent, Stat, Tile } from "@/lib/hayesContent";
@@ -123,6 +123,58 @@ const inputStyle: React.CSSProperties = {
   width: "100%", padding: "10px 12px", borderRadius: 9, border: "1px solid var(--hair)",
   background: "var(--soft)", color: "var(--ink)", fontSize: 14,
 };
+
+// Resize an uploaded image to a small data URL. Feature-tile images are stored
+// inline in the content doc, so keep them well under Firestore's 1MB limit
+// (several tiles share one document).
+function fileToImg(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 960; let { width: w, height: h } = img;
+        if (w > max || h > max) { const s = max / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+        const c = document.createElement("canvas"); c.width = w; c.height = h;
+        c.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        let q = 0.82, out = c.toDataURL("image/jpeg", q);
+        while (out.length > 150_000 && q > 0.35) { q -= 0.1; out = c.toDataURL("image/jpeg", q); }
+        resolve(out);
+      };
+      img.onerror = reject; img.src = String(r.result);
+    };
+    r.onerror = reject; r.readAsDataURL(file);
+  });
+}
+
+// Image control with an Upload button + live preview, falling back to a URL paste.
+function ImageField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  async function pick(f: File) {
+    if (!f.type.startsWith("image/")) { setErr("That file isn't an image."); return; }
+    try { setBusy(true); setErr(""); onChange(await fileToImg(f)); } catch { setErr("Could not read that image."); } finally { setBusy(false); }
+  }
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <span style={{ display: "block", fontSize: 12, color: "var(--sub)", marginBottom: 6, fontWeight: 600 }}>{label}</span>
+      {value ? (
+        <div style={{ position: "relative", marginBottom: 8 }}>
+          <div style={{ height: 96, borderRadius: 10, border: "1px solid var(--hair)", backgroundImage: `url(${value})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+          <button type="button" onClick={() => onChange("")} style={{ position: "absolute", top: 8, right: 8, width: 26, height: 26, borderRadius: "50%", border: "none", background: "rgba(0,0,0,.6)", color: "#fff", cursor: "pointer" }}>✕</button>
+        </div>
+      ) : null}
+      <input ref={ref} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) pick(f); }} />
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button type="button" className="btn sm" onClick={() => ref.current?.click()} disabled={busy}>{busy ? "Uploading…" : value ? "Change image" : "Upload image"}</button>
+        <span style={{ fontSize: 11.5, color: "var(--dim)" }}>overrides the color gradient</span>
+      </div>
+      <input value={value.startsWith("data:") ? "" : value} onChange={(e) => onChange(e.target.value)} placeholder="…or paste an image URL" style={{ ...inputStyle, marginTop: 8, fontSize: 13 }} />
+      {err && <p style={{ fontSize: 12, color: "var(--live)", marginTop: 6 }}>{err}</p>}
+    </div>
+  );
+}
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="card" style={{ padding: 20 }}>
@@ -169,10 +221,8 @@ function HomeEditor({ content: h, patch }: { content: HayesContent["home"]; patc
               <Field label="Title" value={t.title} onChange={(v) => setTile(i, { title: v })} />
             </div>
             <Field label="Blurb" value={t.blurb} onChange={(v) => setTile(i, { blurb: v })} area />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Field label="Links to" value={t.href} onChange={(v) => setTile(i, { href: v })} />
-              <Field label="Image URL (optional — overrides gradient)" value={t.image ?? ""} onChange={(v) => setTile(i, { image: v })} />
-            </div>
+            <Field label="Links to" value={t.href} onChange={(v) => setTile(i, { href: v })} />
+            <ImageField label="Tile image (optional)" value={t.image ?? ""} onChange={(v) => setTile(i, { image: v })} />
           </div>
         ))}
       </Card>
