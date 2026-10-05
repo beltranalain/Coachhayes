@@ -1,10 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import type { HomeContent } from "@/lib/hayesContent";
 import { useLiveStatus } from "@/components/hayes/useLiveStatus";
+import CategoryChips from "@/components/hayes/CategoryChips";
+import type { Chip, Categories } from "@/lib/chips";
 
 type ScheduleRow = { when: string; title: string; note?: string };
+
+type RankRow = {
+  slug: string; name: string; position: string; school: string; classYear: string;
+  chip: string; chipLabel: string; categories?: Categories; commit?: string; commitLogo?: string;
+  videoUrl?: string;
+};
+
+// Pull the 11-char YouTube id out of a watch/embed/share/live URL.
+function ytId(url?: string): string | null {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
 
 // Home renders entirely from data: `tagline` (branding), `content`
 // (admin-editable), live status, and the schedule. No hardcoded copy/numbers.
@@ -15,6 +31,7 @@ export default function Home({
   live,
   playerSrc,
   schedule,
+  rankings,
 }: {
   tagline: string;
   logo?: string;
@@ -22,10 +39,13 @@ export default function Home({
   live: { live: boolean; viewers?: number };
   playerSrc?: string;
   schedule: ScheduleRow[];
+  rankings: { total: number; top: RankRow[] };
 }) {
   const week = schedule.slice(0, 5);
   // Reflect the Studio going live automatically (polls Cloudflare status).
   const isLive = useLiveStatus(live.live);
+  // Film highlight playing in the rankings-preview modal.
+  const [playing, setPlaying] = useState<{ id: string; name: string } | null>(null);
   return (
     <>
       {/* ============ HERO ============ */}
@@ -85,6 +105,66 @@ export default function Home({
         </div>
       </header>
 
+      {/* ============ TOP OF THE BOARD (rankings preview) ============ */}
+      <section className="sec">
+        <div className="wide">
+          <div className="hd center">
+            <h2>Top of the board</h2>
+            <p>Every recruit graded on film — Blue, Gold, Silver, Bronze. Here&apos;s who&apos;s leading.</p>
+          </div>
+
+          {rankings.top.length > 0 ? (
+            <>
+              <div className="rkprev">
+                {rankings.top.map((p, i) => {
+                  const vid = ytId(p.videoUrl);
+                  return (
+                    <div className="rkprev-row" key={p.slug}>
+                      <span className="rkprev-num">{i + 1}</span>
+                      <span className="rkprev-who">
+                        <Link className="rkprev-name" href={`/rankings/${p.slug}`}>{p.name}</Link>
+                        <em>{[p.school, p.position, p.classYear].filter(Boolean).join(" · ")}</em>
+                      </span>
+                      {vid ? (
+                        <button
+                          type="button"
+                          className="rkprev-film"
+                          aria-label={`Play ${p.name} highlights`}
+                          onClick={() => setPlaying({ id: vid, name: p.name })}
+                        >
+                          <img src={`https://i.ytimg.com/vi/${vid}/mqdefault.jpg`} alt="" loading="lazy" />
+                          <span className="rkprev-play"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg></span>
+                        </button>
+                      ) : (
+                        <span className="rkprev-film rkprev-film-none">No film</span>
+                      )}
+                      <span className="rkprev-badges">
+                        <CategoryChips categories={p.categories} overall={p.chip as Chip} size={26} />
+                      </span>
+                      <b className="rkprev-label">{p.chipLabel}</b>
+                      {p.commitLogo ? (
+                        <img className="rkprev-logo" src={p.commitLogo} alt={p.commit || ""} title={p.commit ? `Committed to ${p.commit}` : ""} />
+                      ) : (
+                        <span className="rkprev-logo rkprev-logo-none">—</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="center" style={{ marginTop: 22 }}>
+                <Link className="pill" href="/rankings">See all {rankings.total} rankings ›</Link>
+              </div>
+            </>
+          ) : (
+            <div className="rkprev rkprev-empty">
+              <h3>The board is opening soon</h3>
+              <p>Coach is grading the first class now. Submit your film to be considered — every submission gets a yes or a no.</p>
+              <Link className="pill" href="/rankings/submit">Submit your film</Link>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* ============ FEATURE TILES ============ */}
       <section className="sec">
         <div className="wide">
@@ -143,6 +223,18 @@ export default function Home({
           </div>
         </div>
       </section>
+
+      {playing && (
+        <div className="rkvidmodal" onClick={(e) => { if (e.target === e.currentTarget) setPlaying(null); }}>
+          <div className="rkvidbox">
+            <button className="rkvidclose" onClick={() => setPlaying(null)} aria-label="Close">✕</button>
+            <div className="rkvidframe">
+              <iframe src={`https://www.youtube.com/embed/${playing.id}?autoplay=1`} title={`${playing.name} highlights`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            </div>
+            <p className="rkvidname">{playing.name}</p>
+          </div>
+        </div>
+      )}
     </>
   );
 }

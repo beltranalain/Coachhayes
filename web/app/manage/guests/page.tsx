@@ -36,7 +36,7 @@ export default function GuestsAdmin() {
             <div className="note" style={{ margin: "6px 0 0" }}>
               No guests in the room yet. Share the invite link and open the <b>Studio</b> — everyone who joins shows up live there, where you bring them on stage, send them backstage, mute, or remove.
             </div>
-            <Link href="/manage/studio" className="btn acc" style={{ marginTop: 14, display: "inline-flex" }}>Open the studio</Link>
+            <Link href="/admin/studio" className="btn acc" style={{ marginTop: 14, display: "inline-flex" }}>Open the studio</Link>
             {!wsConfigured && (
               <div className="note" style={{ marginTop: 14, borderLeftColor: "var(--amber)" }}>
                 <b>Green-room backend not connected.</b> Set <code>NEXT_PUBLIC_CHAT_WS_URL</code> (the relay) so guests can join from the link.

@@ -838,6 +838,47 @@ a.pstat:hover{border-color:var(--acc)}
   .rkchips{display:none}
 }
 
+/* --- Home "Top of the board" rankings preview --- */
+.rkprev{background:var(--card);border:1px solid var(--hair);border-radius:18px;overflow:hidden;max-width:860px;margin:0 auto}
+/* FIXED-width columns (each row is its own grid, so widths must be fixed to
+   line up across rows): rank | name (flex) | film | chips | label | commit */
+.rkprev-row{display:grid;grid-template-columns:46px minmax(0,1fr) 104px 150px 80px 30px;align-items:center;gap:18px;
+  padding:14px 22px;border-top:1px solid var(--hair2)}
+.rkprev-row:first-child{border-top:0}
+.rkprev-row:hover{background:var(--alt)}
+.rkprev-num{font-family:var(--fdisp);font-weight:600;font-size:23px;color:var(--acc);letter-spacing:-.04em;text-align:center}
+.rkprev-who{min-width:0}
+.rkprev-name{display:block;font-size:15px;font-weight:600;color:var(--ink);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rkprev-name:hover{color:var(--acc)}
+.rkprev-who em{font-style:normal;font-size:12.5px;color:var(--sub)}
+.rkprev-film{position:relative;width:104px;height:58px;border-radius:9px;overflow:hidden;display:block;padding:0;
+  background:var(--alt);border:1px solid var(--hair);cursor:pointer}
+.rkprev-film img{width:100%;height:100%;object-fit:cover;display:block}
+.rkprev-film .rkprev-play{position:absolute;inset:0;display:grid;place-items:center;color:#fff;background:rgba(0,0,0,.26);transition:background .15s}
+.rkprev-film:hover .rkprev-play{background:rgba(0,0,0,.08)}
+.rkprev-film-none{width:104px;height:58px;border-radius:9px;display:grid;place-items:center;font-size:11px;
+  text-align:center;color:var(--sub);background:var(--alt);border:1px dashed var(--hair);cursor:default}
+.rkprev-badges{display:flex;align-items:center;justify-content:flex-start}
+.rkprev-label{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap}
+.rkprev-logo{width:28px;height:28px;object-fit:contain}
+.rkprev-logo-none{display:grid;place-items:center;color:var(--sub);font-size:14px}
+.rkprev-empty{text-align:center;padding:40px 30px}
+.rkprev-empty h3{margin-bottom:8px}
+.rkprev-empty p{color:var(--sub);max-width:46ch;margin:0 auto 18px}
+@media (max-width:760px){
+  .rkprev-label{display:none}
+  .rkprev-row{grid-template-columns:46px minmax(0,1fr) 104px 150px 30px;gap:14px;padding:13px 16px}
+}
+@media (max-width:560px){
+  .rkprev-logo{display:none}
+  .rkprev-row{grid-template-columns:40px minmax(0,1fr) 92px 150px}
+  .rkprev-film,.rkprev-film-none{width:92px;height:52px}
+}
+@media (max-width:430px){
+  .rkprev-badges{display:none}
+  .rkprev-row{grid-template-columns:40px minmax(0,1fr) 92px}
+}
+
 .rkvid.playing{position:relative}
 .ytout{position:absolute;right:12px;bottom:12px;z-index:4;background:rgba(0,0,0,.72);color:#fff;
   border-radius:8px;padding:5px 11px;font-size:11.5px;font-weight:600}

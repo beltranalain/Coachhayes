@@ -47,7 +47,7 @@ export default function SiteHeader({ brand = { name: BRAND.name } }: { brand?: {
         <div className="navright">
           <Link href="/library" aria-label="Search"><SearchIcon /></Link>
           <Link href="/live" aria-label="What's live"><BellIcon /></Link>
-          <Link href="/manage" className="navsignin">Sign in</Link>
+          <Link href="/admin" className="navsignin">Sign in</Link>
         </div>
 
         <button className="nav-toggle" aria-label="Toggle navigation" onClick={() => setOpen((v) => !v)}>

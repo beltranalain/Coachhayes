@@ -77,7 +77,7 @@ export default function GoLivePage() {
         <div className="card">
           <h3>Broadcast</h3>
           <p className="cs">Pick the show first. It decides which channel the broadcast is created on and which destinations turn on.</p>
-          <Link href="/manage/studio" className="btn" style={{ display: "flex", width: "100%", padding: 15, borderRadius: 14, marginBottom: 14, background: "var(--acc)", color: "var(--accInk)", fontFamily: "var(--fdisp)", letterSpacing: "-.02em", fontSize: 16, flexDirection: "column", gap: 3, textAlign: "center" }}>
+          <Link href="/admin/studio" className="btn" style={{ display: "flex", width: "100%", padding: 15, borderRadius: 14, marginBottom: 14, background: "var(--acc)", color: "var(--accInk)", fontFamily: "var(--fdisp)", letterSpacing: "-.02em", fontSize: 16, flexDirection: "column", gap: 3, textAlign: "center" }}>
             Open the studio<span style={{ fontFamily: "var(--fbody)", fontSize: 12.5, fontWeight: 400, opacity: 0.9 }}>Turn on your camera + mic, bring in guests, and go live from the browser.</span>
           </Link>
           <p className="cs" style={{ marginTop: 0 }}>Already streaming from OBS or the studio? Use the destination controls below to fan out to YouTube/Facebook.</p>
@@ -123,7 +123,7 @@ export default function GoLivePage() {
             <div className="rows">
               <div className="r"><span className="ava">{brand.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("")}</span><span className="nm"><b>Host</b><span>You · camera and mic</span></span><span className="act"><span className="pill ok">Ready</span></span></div>
             </div>
-            <p style={{ marginTop: 14 }}><Link className="link" href="/manage/guests">Open the green room ›</Link></p>
+            <p style={{ marginTop: 14 }}><Link className="link" href="/admin/guests">Open the green room ›</Link></p>
           </div>
         </div>
       </div>

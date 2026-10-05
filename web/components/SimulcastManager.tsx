@@ -99,9 +99,9 @@ export default function SimulcastManager() {
   // Platform-specific reminder for the "chat in" side (set in Settings).
   function chatNote() {
     if (platform === "YouTube")
-      return <>To also merge <strong>YouTube chat</strong> into your show, add your <strong>Channel ID</strong> in <a href="/manage/settings">Settings &rarr; YouTube channel</a>. (The stream key sends video out; the Channel ID reads chat back in - they&apos;re different.) The broadcast must be <strong>Public</strong> (auto) or <strong>Unlisted</strong> (paste its link in the Chat tab) - not Private.</>;
+      return <>To also merge <strong>YouTube chat</strong> into your show, add your <strong>Channel ID</strong> in <a href="/admin/settings">Settings &rarr; YouTube channel</a>. (The stream key sends video out; the Channel ID reads chat back in - they&apos;re different.) The broadcast must be <strong>Public</strong> (auto) or <strong>Unlisted</strong> (paste its link in the Chat tab) - not Private.</>;
     if (platform === "Twitch")
-      return <>To also merge <strong>Twitch chat</strong>, add your <strong>Twitch username</strong> in <a href="/manage/settings">Settings &rarr; Merged live chat</a>.</>;
+      return <>To also merge <strong>Twitch chat</strong>, add your <strong>Twitch username</strong> in <a href="/admin/settings">Settings &rarr; Merged live chat</a>.</>;
     if (platform === "Facebook")
       return <>Facebook video will simulcast with this key. Merged <strong>Facebook chat</strong> is coming soon.</>;
     return null;
@@ -118,7 +118,7 @@ export default function SimulcastManager() {
         <strong>Two things to set up per platform:</strong>
         <div style={{ marginTop: 6, fontSize: "13px", lineHeight: 1.5 }}>
           1. <strong>Video out</strong> - paste each platform&apos;s <strong>stream key</strong> below.<br />
-          2. <strong>Chat in</strong> (optional) - to merge that platform&apos;s chat into your show, set your <strong>YouTube Channel ID</strong> and <strong>Twitch username</strong> in <a href="/manage/settings">Settings</a>. The stream key alone can&apos;t read chat.
+          2. <strong>Chat in</strong> (optional) - to merge that platform&apos;s chat into your show, set your <strong>YouTube Channel ID</strong> and <strong>Twitch username</strong> in <a href="/admin/settings">Settings</a>. The stream key alone can&apos;t read chat.
         </div>
       </div>
 

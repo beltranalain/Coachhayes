@@ -20,6 +20,9 @@ dist/
 **/.env.local
 **/.env.*.local
 **/*.env.local
+# Exported env dumps (e.g. Vercel import files) — may hold live keys
+**/*.env.txt
+import*.env.txt
 
 # ── Logs ──────────────────────────────────────────────────────
 *.log

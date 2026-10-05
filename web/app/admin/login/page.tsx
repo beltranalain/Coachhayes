@@ -28,9 +28,9 @@ export default function AdminLogin() {
   const nextUrl = () => {
     try {
       const p = new URLSearchParams(window.location.search).get("next");
-      return p && p.startsWith("/") ? p : "/manage/go-live";
+      return p && p.startsWith("/") ? p : "/admin/go-live";
     } catch {
-      return "/manage/go-live";
+      return "/admin/go-live";
     }
   };
 

@@ -79,7 +79,7 @@ export default async function ManageOverview() {
           <span className={`live-pill${live.live ? " is-live" : ""}`}>
             <span className="dot" /><span>{live.live ? "Live now" : "Offline"}</span>
           </span>
-          <Link className="btn btn-primary btn-sm" href="/manage/go-live">Go Live</Link>
+          <Link className="btn btn-primary btn-sm" href="/admin/go-live">Go Live</Link>
         </>
       }
     >

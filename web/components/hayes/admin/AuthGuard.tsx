@@ -23,7 +23,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!auth) { setState("ok"); return; }
     const unsub = onAuthStateChanged(auth, async (u: User | null) => {
       if (!u) {
-        router.replace("/admin/login?next=/manage/go-live");
+        router.replace("/admin/login?next=/admin/go-live");
         return;
       }
       try {

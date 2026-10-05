@@ -8,7 +8,7 @@ import { getIdToken } from "@/lib/firebase";
 // Players — a REAL, at-a-glance summary of the roster. All numbers and rows below
 // are computed from live data (/api/admin/players + /api/admin/submissions); there
 // is no sample data here. Full grading (AI scout, chip editing, publishing, the
-// board) lives in Rankings (/manage/rankings) — this page just links there.
+// board) lives in Rankings (/admin/rankings) — this page just links there.
 type Player = { id: string; name: string; position?: string; school?: string; classYear?: string; chip?: string; published?: boolean; slug?: string };
 type Sub = { id: string; playerName?: string; position?: string; classYear?: string; videoUrl?: string; status?: string };
 
@@ -44,7 +44,7 @@ export default function PlayersAdmin() {
 
   return (
     <Shell title="Players" sub={`${players.length} graded · ${pending.length} awaiting review`} brandName={brand.name} logo={brand.logo}>
-      <div className="note" style={{ marginBottom: 14 }}>Players is your quick summary. The full editor — AI scout, chip grading, publishing, and reordering — lives in <Link className="link" href="/manage/rankings">Rankings</Link>.</div>
+      <div className="note" style={{ marginBottom: 14 }}>Players is your quick summary. The full editor — AI scout, chip grading, publishing, and reordering — lives in <Link className="link" href="/admin/rankings">Rankings</Link>.</div>
 
       <div className="row4">
         <div className="card kpi"><b>{players.length}</b><span>Players graded</span><div className="d">On the board</div></div>
@@ -65,7 +65,7 @@ export default function PlayersAdmin() {
             {pending.map((s) => (
               <div className="r" key={s.id}>
                 <span className="nm"><b>{s.playerName || "Unnamed player"}</b><span>{[s.position, s.classYear].filter(Boolean).join(" · ") || "—"}{s.videoUrl ? <> · <a className="link" href={s.videoUrl} target="_blank" rel="noreferrer">film ›</a></> : null}</span></span>
-                <span className="act"><Link className="btn sm acc" href="/manage/rankings">Grade in Rankings</Link></span>
+                <span className="act"><Link className="btn sm acc" href="/admin/rankings">Grade in Rankings</Link></span>
               </div>
             ))}
           </div>
@@ -78,7 +78,7 @@ export default function PlayersAdmin() {
         {loading ? (
           <div className="note" style={{ margin: 0 }}>Loading…</div>
         ) : players.length === 0 ? (
-          <div className="note" style={{ margin: 0 }}>No players graded yet. Add one from <Link className="link" href="/manage/rankings">Rankings</Link>.</div>
+          <div className="note" style={{ margin: 0 }}>No players graded yet. Add one from <Link className="link" href="/admin/rankings">Rankings</Link>.</div>
         ) : (
           <div className="rows">
             {board.map((p, i) => (
@@ -92,7 +92,7 @@ export default function PlayersAdmin() {
             ))}
           </div>
         )}
-        <p style={{ marginTop: 14 }}><Link className="btn acc" href="/manage/rankings">Open the full board</Link></p>
+        <p style={{ marginTop: 14 }}><Link className="btn acc" href="/admin/rankings">Open the full board</Link></p>
       </div>
     </Shell>
   );
