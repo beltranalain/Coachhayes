@@ -32,7 +32,11 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description:
       "Your Studio - an independent studio making five shows. Live talk, long-form, from the road, and a documentary series. Watch here and on YouTube at the same time.",
-    ...(branding.favicon ? { icons: { icon: branding.favicon } } : {}),
+    // Use the uploaded favicon if set, otherwise fall back to the site logo so
+    // the browser tab always shows the brand mark.
+    ...((branding.favicon || branding.logo)
+      ? { icons: { icon: branding.favicon || branding.logo, apple: branding.favicon || branding.logo } }
+      : {}),
   };
 }
 

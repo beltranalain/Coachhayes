@@ -98,6 +98,11 @@ export default function BlogEditor({ postId }: { postId?: string }) {
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+
+  // Snapshot the current body + open the live-look preview.
+  const openPreview = () => { setPreviewHtml(editorRef.current?.innerHTML ?? contentHtml); setPreview(true); };
 
   const mark = () => setDirty(true);
 
@@ -225,6 +230,8 @@ export default function BlogEditor({ postId }: { postId?: string }) {
   const { score, items: seoItems } = calcSeo(title, contentHtml, excerpt, metaTitle, metaDesc, keywords);
   const circ = 2 * Math.PI * 26;
   const words = contentHtml.replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length;
+  const previewMins = Math.max(1, Math.round(previewHtml.replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length / 200));
+  const previewDate = new Date().toLocaleDateString("en-US", { dateStyle: "medium" });
 
   if (loading) return <div className="note" style={{ margin: 0 }}>Loading…</div>;
 
@@ -237,6 +244,7 @@ export default function BlogEditor({ postId }: { postId?: string }) {
         <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           {dirty && <span style={{ fontSize: 12.5, color: "#E0A400" }}>Unsaved changes</span>}
           {postId && <button className="btn sm" onClick={del} disabled={deleting} style={{ color: "var(--live)" }}>{confirmDel ? "Confirm delete" : "Delete"}</button>}
+          <button className="btn sm" onClick={openPreview}>Preview</button>
           <button className="btn sm" onClick={save} disabled={saving} style={{ background: "var(--acc)", color: "var(--accInk)" }}>{saving ? "Saving…" : postId ? "Save" : "Create post"}</button>
         </div>
       </div>
@@ -435,6 +443,54 @@ export default function BlogEditor({ postId }: { postId?: string }) {
           </div>
         </div>
       </div>
+
+      {preview && (
+        <div className="blogprev-overlay" onClick={(e) => { if (e.target === e.currentTarget) setPreview(false); }}>
+          <div className="blogprev-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="blogprev-bar">
+              <span>Preview — how this looks on the website</span>
+              <button onClick={() => setPreview(false)} aria-label="Close preview">✕</button>
+            </div>
+            <article className="blogprev-page">
+              {coverImage && <div className="blogprev-cover" style={{ backgroundImage: `url(${coverImage})` }} />}
+              {[...selectedCats][0] && <span className="blogprev-tag">{[...selectedCats][0]}</span>}
+              <h1>{title || "Untitled post"}</h1>
+              <p className="blogprev-meta">Coach Hayes Football · {previewDate} · {previewMins} min read</p>
+              {previewHtml.trim()
+                ? <div className="blogprev-body" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                : <p className="blogprev-empty">Nothing to preview yet — generate or write the body first.</p>}
+              {selectedTags.length > 0 && (
+                <div className="blogprev-tags">{selectedTags.map((t) => <span key={t} className="blogprev-tag soft">{t}</span>)}</div>
+              )}
+            </article>
+          </div>
+          <style>{`
+            .blogprev-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:26px 16px;overflow:auto}
+            .blogprev-sheet{width:100%;max-width:880px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45)}
+            .blogprev-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#0E0C0B;color:#E7E2DA;font-size:12.5px;position:sticky;top:0;z-index:2}
+            .blogprev-bar button{background:none;border:none;color:#E7E2DA;font-size:16px;cursor:pointer;line-height:1}
+            .blogprev-page{max-width:720px;margin:0 auto;padding:36px 40px 52px;color:#1D1D1F;font-family:'Inter Tight',Inter,-apple-system,system-ui,sans-serif}
+            .blogprev-cover{aspect-ratio:16/9;border-radius:14px;background-size:cover;background-position:center;margin-bottom:22px;border:1px solid rgba(0,0,0,.08)}
+            .blogprev-tag{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#0B6BFF;border:1px solid rgba(0,0,0,.1);background:#F5F5F7;padding:3px 9px;border-radius:999px}
+            .blogprev-tag.soft{color:#6E6E73}
+            .blogprev-page h1{font-size:34px;line-height:1.1;letter-spacing:-.02em;margin:12px 0 10px;color:#1D1D1F;font-weight:700}
+            .blogprev-meta{font-size:13px;color:#6E6E73;margin:0 0 24px}
+            .blogprev-body{font-size:17px;line-height:1.75;color:#333}
+            .blogprev-body h1{font-size:26px;margin:28px 0 12px;color:#1D1D1F}
+            .blogprev-body h2{font-size:24px;margin:28px 0 12px;color:#1D1D1F;letter-spacing:-.01em}
+            .blogprev-body h3{font-size:19px;margin:22px 0 10px;color:#1D1D1F}
+            .blogprev-body p{margin:0 0 18px;color:#3a3a3e}
+            .blogprev-body ul,.blogprev-body ol{margin:0 0 18px;padding-left:22px;color:#3a3a3e}
+            .blogprev-body li{margin:0 0 8px}
+            .blogprev-body a{color:#0B6BFF;text-decoration:underline}
+            .blogprev-body strong{color:#1D1D1F;font-weight:700}
+            .blogprev-body em{color:#1D1D1F}
+            .blogprev-body img{max-width:100%;border-radius:12px;margin:14px 0}
+            .blogprev-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+            .blogprev-empty{color:#8a857d;font-size:15px}
+          `}</style>
+        </div>
+      )}
     </div>
   );
 }

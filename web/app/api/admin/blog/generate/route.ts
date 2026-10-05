@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/requireAdmin";
 import { adminConfigured } from "@/lib/firebaseAdmin";
 import { generateWithGroq, groqConfigured } from "@/lib/groq";
 import { getSiteConfig } from "@/lib/siteConfig";
+import { getCfbGrounding } from "@/lib/sportsData";
+import { getPublishedPlayers, CHIP_META } from "@/lib/rankings";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,10 +33,36 @@ export async function POST(request: Request) {
   let site = "Coach Hayes Football";
   try { const { branding } = await getSiteConfig(); if (branding?.siteName) site = branding.siteName; } catch {}
 
+  // Ground the post in REAL current data so the AI doesn't invent players/stats:
+  // live ESPN college-football facts + this site's own graded recruiting board.
+  let grounding = "";
+  try { grounding = await getCfbGrounding(title); } catch {}
+  try {
+    const players = await getPublishedPlayers();
+    if (players.length) {
+      const board = players.slice(0, 15)
+        .map((p) => `${p.name} (${[p.position, p.school, p.classYear].filter(Boolean).join(", ")}) — ${CHIP_META[p.chip]?.label || p.chip}${p.commit ? `, committed to ${p.commit}` : ""}`)
+        .join("; ");
+      grounding += `${grounding ? "\n\n" : ""}${site}'s own graded recruits (the Coach Hayes rankings board — real, use these when writing about recruiting): ${board}.`;
+    }
+  } catch {}
+
+  const today = new Date().toLocaleDateString("en-US", { dateStyle: "full" });
+  const dataBlock = grounding.trim()
+    ? `VERIFIED CURRENT DATA (this is accurate and up to date as of ${today} — every specific fact you state MUST come from here; do not reference any other season or year):\n${grounding.trim()}\n\n`
+    : "";
+
   const prompt = `You are a content writer for "${site}", a football media platform covering high school and college football: live shows, a film-graded recruiting rankings board (the "four-chip" system — Blue, Gold, Silver, Bronze), a fantasy league, a fan community, and merch.
 
-Write a comprehensive, engaging blog post based on this title: "${title}"
+${dataBlock}Write a comprehensive, engaging blog post based on this title: "${title}"
 
+ACCURACY RULES (critical — this is a real publication):
+- Use ONLY the VERIFIED CURRENT DATA above for any specific fact: team records, rankings, scores, dates, player names, and stats. That data is current and correct.
+- When writing about key players, use ONLY the statistical leaders named in the data — those are the players who actually lead each team. Do NOT feature any player who is not named in the data (no backups, no made-up names).
+- You MAY cite the exact statistics provided (they are real and current). Do NOT invent, round differently, or guess any other numbers, ratings, jersey details, or quotes.
+- If you don't have a specific number for a point, write about it qualitatively ("a disruptive pass rusher") instead of inventing a figure.
+- If the title names a team or player not in the data, keep the piece analytical and general — do not fabricate specifics to fill gaps.
+${dataBlock ? "" : "- No live data was available this time, so avoid specific current records, scores, or named players entirely; write an evergreen, analytical piece.\n"}
 Requirements:
 - Content: 700-1100 words in HTML format using <h2>, <h3>, <p>, <ul>/<li>, <strong>, and <em> tags only. Do NOT include <h1> or repeat the title in the content.
 - Excerpt: 2-3 compelling sentences summarizing the post (plain text, no HTML)
@@ -59,7 +87,7 @@ Respond ONLY with valid JSON (no markdown code blocks):
 }`;
 
   try {
-    const responseText = await generateWithGroq(prompt, { temperature: 0.7, maxTokens: 4000, jsonMode: true });
+    const responseText = await generateWithGroq(prompt, { temperature: 0.4, maxTokens: 4000, jsonMode: true });
     const cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     if (!cleaned) throw new Error("The AI returned an empty response — please try again.");
 
