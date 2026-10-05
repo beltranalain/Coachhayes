@@ -293,7 +293,7 @@ class StudioEngine {
     if (camId) this.camId = camId; if (micId) this.micId = micId;
     try {
       const next = await navigator.mediaDevices.getUserMedia({
-        video: this.camId ? { deviceId: { exact: this.camId } } : true,
+        video: this.camConstraints(),
         audio: this.micConstraints(),
       });
       if (this.pc && this.live) {
@@ -343,7 +343,7 @@ class StudioEngine {
       return;
     }
     try {
-      const cam = await navigator.mediaDevices.getUserMedia({ video: this.camId ? { deviceId: { exact: this.camId } } : true });
+      const cam = await navigator.mediaDevices.getUserMedia({ video: this.camConstraints() });
       const track = cam.getVideoTracks()[0];
       if (track && this.hostStream) {
         this.hostStream.addTrack(track);
@@ -391,6 +391,20 @@ class StudioEngine {
     if (this.micId) c.deviceId = { exact: this.micId };
     if (this.micEnhance) { c.noiseSuppression = true; c.echoCancellation = true; c.autoGainControl = true; }
     return this.micId || this.micEnhance ? c : true;
+  }
+
+  // Ask the camera for HD (1080p ideal, 720p min) at 30fps. Without this the
+  // browser hands back the webcam's default (often 640x480), which looks soft
+  // once it's drawn onto the 720p program canvas. "ideal" degrades gracefully
+  // on cameras that can't hit 1080p.
+  private camConstraints(): MediaTrackConstraints {
+    const c: MediaTrackConstraints = {
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      frameRate: { ideal: 30 },
+    };
+    if (this.camId) c.deviceId = { exact: this.camId };
+    return c;
   }
 
   // Wire the host mic into the mix, optionally through a gentle "studio voice"
