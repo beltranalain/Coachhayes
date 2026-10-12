@@ -16,8 +16,24 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const year = new Date().getFullYear();
   // Read the saved theme on the server so the first paint matches it (no flash).
   const initialTheme = (await cookies()).get("hz-theme")?.value === "dark" ? "dark" : "light";
+
+  // Sitewide structured data (P4-3): Organization + WebSite + the Coach as a
+  // credentialed Person, cross-referenced by @id. Renders on every public page.
+  const site = branding.siteName || "Coach Hayes Football";
+  const base = `https://${(branding.domain || "coachhayesfootball.com").replace(/^https?:\/\//, "")}`;
+  const sameAs = branding.youtubeChannelId ? [`https://www.youtube.com/channel/${branding.youtubeChannelId}`] : [];
+  const siteGraph = {
+    "@context": "https://schema.org",
+    "@graph": [
+      { "@type": "Organization", "@id": `${base}#org`, name: site, url: base, ...(sameAs.length ? { sameAs } : {}) },
+      { "@type": "WebSite", "@id": `${base}#website`, name: site, url: base, publisher: { "@id": `${base}#org` } },
+      { "@type": "Person", "@id": `${base}#coach`, name: "Coach Kyle Hayes", jobTitle: "Football recruiting analyst and film evaluator", knowsAbout: ["High school football recruiting", "Football film evaluation", "College football", "Player development"], worksFor: { "@id": `${base}#org` }, url: base },
+    ],
+  };
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteGraph) }} />
       {/* The approved design's typefaces: Inter Tight / Inter (light theme) and
           Plus Jakarta Sans (dark theme). Must be loaded or --fdisp/--fbody fall
           back to the browser serif. */}

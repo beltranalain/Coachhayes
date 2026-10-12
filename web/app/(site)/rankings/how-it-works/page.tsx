@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CHIP_ORDER, CHIP_META } from "@/lib/rankings";
+import { CHIP_ORDER, CHIP_META, CHIP_GRADE_QUESTION, CHIP_GRADE_DEFINITION } from "@/lib/rankings";
 import { getSiteConfig } from "@/lib/siteConfig";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -31,6 +31,7 @@ export default async function HowItWorksPage() {
     "@context": "https://schema.org",
     "@type": "FAQPage",
     mainEntity: [
+      { "@type": "Question", name: CHIP_GRADE_QUESTION, acceptedAnswer: { "@type": "Answer", text: CHIP_GRADE_DEFINITION } },
       { "@type": "Question", name: "How are football recruits ranked?", acceptedAnswer: { "@type": "Answer", text: "Every recruit is graded on film and assigned one of four chips — Blue (elite), Gold, Silver, or Bronze. Players sort by chip, then by evaluation. No stars, no camp buzz, no offer counting." } },
       { "@type": "Question", name: "What do the four chips mean?", acceptedAnswer: { "@type": "Answer", text: CHIP_ORDER.map((c) => `${CHIP_META[c].label}: ${CHIP_META[c].blurb}`).join(" ") } },
       { "@type": "Question", name: "Can a player's chip change?", acceptedAnswer: { "@type": "Answer", text: "Yes. The grade reflects the film. As a player develops and sends new tape, the chip can move up." } },
@@ -51,6 +52,11 @@ export default async function HowItWorksPage() {
         One coach, one standard, one grade per player. Here's exactly how {site} evaluates high
         school football recruits — so you know what a chip means before you chase one.
       </p>
+
+      <div className="card" style={{ marginTop: 24 }}>
+        <h2 style={{ marginTop: 0, fontSize: 21, letterSpacing: "-.02em" }}>{CHIP_GRADE_QUESTION}</h2>
+        <p style={{ color: "var(--sub)", margin: 0, lineHeight: 1.7, fontSize: 16 }}>{CHIP_GRADE_DEFINITION}</p>
+      </div>
 
       <div className="chiplegend" style={{ marginTop: 26 }}>
         {CHIP_ORDER.map((c) => (

@@ -1,4 +1,4 @@
-import { getPublishedPlayers, CHIP_META } from "@/lib/rankings";
+import { getPublishedPlayers, CHIP_META, CHIP_GRADE_QUESTION, CHIP_GRADE_DEFINITION } from "@/lib/rankings";
 import { getSiteConfig } from "@/lib/siteConfig";
 
 export const dynamic = "force-dynamic";
@@ -23,11 +23,17 @@ export async function GET() {
   lines.push("");
   lines.push("## Recruiting Rankings");
   lines.push("");
-  lines.push("Every recruit is graded on film by Coach Hayes and assigned one of four chips, then ranked:");
-  lines.push("- **Blue chip** — elite, high-major, program-changing talent");
-  lines.push("- **Gold chip** — power-conference starter upside");
-  lines.push("- **Silver chip** — solid D1 contributor / mid-major standout");
-  lines.push("- **Bronze chip** — developmental prospect on the radar");
+  lines.push(`### ${CHIP_GRADE_QUESTION}`);
+  lines.push("");
+  lines.push(CHIP_GRADE_DEFINITION);
+  lines.push("");
+  lines.push("The five attributes each earn a chip; those five scores average into the overall chip:");
+  lines.push("- **Blue chip** (4 pts) — elite, high-major, program-changing talent");
+  lines.push("- **Gold chip** (3 pts) — power-conference starter upside");
+  lines.push("- **Silver chip** (2 pts) — solid D1 contributor / mid-major standout");
+  lines.push("- **Bronze chip** (1 pt) — developmental prospect on the radar");
+  lines.push("");
+  lines.push("The five graded attributes: Power, Speed, Motor, Technique, Football IQ.");
   lines.push("");
   lines.push(`- [Full rankings board](${base}/rankings)`);
   lines.push(`- [How the grade works](${base}/rankings/how-it-works)`);
@@ -38,7 +44,9 @@ export async function GET() {
     lines.push(`### Class of ${year}`);
     lines.push("");
     for (const p of topByYear[year].slice(0, 50)) {
-      lines.push(`- [${p.name}](${base}/rankings/${p.slug}) — ${p.position}, ${p.school}${p.state ? `, ${p.state}` : ""} · ${CHIP_META[p.chip].label}`);
+      // Only include fields that exist — no empty "WR,  · Gold chip" gaps.
+      const meta = [p.position, p.school, p.state].filter(Boolean).join(", ");
+      lines.push(`- [${p.name}](${base}/rankings/${p.slug})${meta ? ` — ${meta}` : ""} · ${CHIP_META[p.chip].label}`);
     }
     lines.push("");
   }

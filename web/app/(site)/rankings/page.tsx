@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getPublishedPlayers, getRankingFacets, CHIP_META, CHIP_ORDER } from "@/lib/rankings";
+import { getPublishedPlayers, getRankingFacets, CHIP_META, CHIP_ORDER, CHIP_GRADE_QUESTION, CHIP_GRADE_DEFINITION } from "@/lib/rankings";
 import { getSiteConfig } from "@/lib/siteConfig";
 import RankingsBoard from "@/components/hayes/RankingsBoard";
 
@@ -54,6 +54,7 @@ export default async function RankingsPage() {
     "@context": "https://schema.org",
     "@type": "FAQPage",
     mainEntity: [
+      { "@type": "Question", name: CHIP_GRADE_QUESTION, acceptedAnswer: { "@type": "Answer", text: CHIP_GRADE_DEFINITION } },
       { "@type": "Question", name: "How are players ranked?", acceptedAnswer: { "@type": "Answer", text: "Every recruit is graded on film by Coach Hayes and assigned one of four chips — Blue (elite), Gold, Silver, or Bronze — then ranked. No stars, no camp buzz, no offer counting." } },
       { "@type": "Question", name: "What is a blue-chip prospect?", acceptedAnswer: { "@type": "Answer", text: "A Blue chip is the top grade: high-major, program-changing talent evaluated on film." } },
       { "@type": "Question", name: "How do I get my film reviewed?", acceptedAnswer: { "@type": "Answer", text: "Submit a highlight link and a short profile on the Rankings page. Every submission gets a yes or a no." } },
@@ -93,6 +94,11 @@ export default async function RankingsPage() {
             <div><b>{CHIP_META[c].label}</b><span>{CHIP_META[c].blurb}</span></div>
           </div>
         ))}
+      </div>
+
+      <div className="card" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, fontSize: 20, letterSpacing: "-.02em" }}>{CHIP_GRADE_QUESTION}</h2>
+        <p style={{ color: "var(--sub)", margin: 0, lineHeight: 1.65 }}>{CHIP_GRADE_DEFINITION}</p>
       </div>
 
       {players.length > 0 ? (

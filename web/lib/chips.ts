@@ -34,6 +34,18 @@ export const CATEGORIES: { key: CategoryKey; label: string; abbr: string }[] = [
 export type Categories = Partial<Record<CategoryKey, Chip>>;
 export type CategoryNotes = Partial<Record<CategoryKey, string>>;
 
+// Canonical public definition of the chip grade. Published verbatim and
+// IDENTICALLY on /rankings/how-it-works, the rankings board, the rankings
+// FAQPage schema, and llms.txt — the one query the site owns outright, so it
+// must read the same everywhere. Single source → no drift.
+export const CHIP_GRADE_QUESTION = "What is the Coach Hayes chip grade?";
+export const CHIP_GRADE_DEFINITION =
+  "The Coach Hayes chip grade is a film-first evaluation of a high school football player. " +
+  "Coach Kyle Hayes grades five attributes from game tape — Power, Speed, Motor, Technique and Football IQ — " +
+  "and assigns each one a chip worth four points for Blue, three for Gold, two for Silver and one for Bronze. " +
+  "The five attribute scores are averaged into an overall score out of four, and that average sets the player's " +
+  "overall chip. Grades come only from what the film shows, not from stars, scholarship offers or camp results.";
+
 const isChip = (v: unknown): v is Chip => v === "bronze" || v === "silver" || v === "gold" || v === "blue";
 
 // Keep only valid category → chip entries.
