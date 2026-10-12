@@ -847,6 +847,14 @@ export default function ControlRoom() {
                 <button className={broadcast.layout === "custom" ? "on" : ""} type="button" onClick={() => { broadcast.beginTransition(); broadcast.setLayout("custom"); force(); }}>Custom</button>
               </div></div>
             )}
+            <div className="cr-group">
+              <span className="cr-glabel">Quality</span>
+              <div className="cr-seg">
+                <button className={broadcast.quality === "720" ? "on" : ""} type="button" title="Stable, lighter on your computer" onClick={() => { broadcast.setQuality("720"); force(); }}>720p</button>
+                <button className={broadcast.quality === "1080" ? "on" : ""} type="button" title="Sharper — needs a strong computer and good upload speed" onClick={() => { broadcast.setQuality("1080"); force(); }}>1080p</button>
+              </div>
+              {live && broadcast.quality === "1080" && <span className="dest-meta" style={{ marginLeft: 8 }}>applies next broadcast</span>}
+            </div>
             <div className="cr-morewrap">
               <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setMoreMenu((v) => !v); setCamMenu(false); setMicMenu(false); }}>More ▾</button>
               {moreMenu && (

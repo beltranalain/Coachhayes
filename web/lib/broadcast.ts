@@ -163,6 +163,11 @@ class StudioEngine {
   mediaHasVideo = false;
   mediaName = "";
   mediaLevel = 1;
+  // Broadcast quality the creator picks: "720" (1280x720, ~6 Mbps — stable,
+  // lighter CPU) or "1080" (1920x1080, ~9 Mbps — sharper, needs a capable
+  // machine + good upload). The canvas is drawn in a fixed 1280x720 coordinate
+  // space and scaled to the backing resolution, so 720 is a pure no-op.
+  quality: "720" | "1080" = "720";
   // Scene transition: animate a snapshot of the previous look over the new one.
   transitionStyle: TransitionStyle = "fade";
   transMs = 380;
@@ -277,8 +282,10 @@ class StudioEngine {
     if (this.started) return;
     this.started = true;
     try { this.autoClearChat = localStorage.getItem("cwac-autoclear-chat") !== "0"; } catch {}
+    try { if (localStorage.getItem("chf-quality") === "1080") this.quality = "1080"; } catch {}
     this.canvas = document.createElement("canvas");
-    this.canvas.width = W; this.canvas.height = H;
+    this.canvas.width = this.quality === "1080" ? 1920 : W;
+    this.canvas.height = this.quality === "1080" ? 1080 : H;
     this.hostVideo = document.createElement("video");
     this.hostVideo.muted = true; (this.hostVideo as any).playsInline = true;
     this.audioCtx = new AudioContext();
@@ -492,6 +499,11 @@ class StudioEngine {
     const now = typeof performance !== "undefined" ? performance.now() : 0;
     if (now - this.lastDraw < 1000 / 30) return;
     this.lastDraw = now;
+    // All drawing uses the fixed 1280x720 coordinate space; scale it to fill the
+    // backing canvas (identity at 720p, 1.5x at 1080p). Source frames (camera,
+    // backgrounds) are sampled at the backing resolution, so 1080p stays crisp.
+    const cv = this.canvas;
+    if (cv) ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
     this.drawProgram(ctx);
     // Transition: the new look is already drawn above; animate the pre-switch
     // snapshot away over it per the chosen style.
@@ -552,6 +564,20 @@ class StudioEngine {
     // Dip needs longer (two phases through black); moving wipes/slides a touch
     // longer than a plain dissolve so the motion reads.
     this.transMs = s === "dip" ? 620 : s === "fade" ? 380 : 440;
+    this.emit();
+  }
+
+  // Creator picks 720p or 1080p. Applied to the preview immediately when off-air;
+  // while live it's remembered and takes effect on the NEXT broadcast (changing
+  // the canvas size mid-stream would disrupt the running WHIP feed).
+  setQuality(q: "720" | "1080") {
+    if (q !== "720" && q !== "1080") return;
+    this.quality = q;
+    try { localStorage.setItem("chf-quality", q); } catch {}
+    if (!this.live && this.canvas) {
+      this.canvas.width = q === "1080" ? 1920 : W;
+      this.canvas.height = q === "1080" ? 1080 : H;
+    }
     this.emit();
   }
 
@@ -2025,10 +2051,13 @@ class StudioEngine {
       this.startBackgroundClock();
       const ingest = this.ingest || (await this.fetchIngest());
       if (!ingest?.whipUrl) throw new Error("Cloudflare Stream is not connected.");
+      // Lock the canvas to the chosen quality before capturing the feed.
+      const qw = this.quality === "1080" ? 1920 : W, qh = this.quality === "1080" ? 1080 : H;
+      if (this.canvas && (this.canvas.width !== qw || this.canvas.height !== qh)) { this.canvas.width = qw; this.canvas.height = qh; }
       const canvasStream = this.canvas!.captureStream(30);
       const out = new MediaStream(canvasStream.getVideoTracks());
       this.audioDest!.stream.getAudioTracks().forEach((t) => out.addTrack(t));
-      this.pc = await whipPublish(ingest.whipUrl, out);
+      this.pc = await whipPublish(ingest.whipUrl, out, this.quality === "1080" ? 9000 : 6000);
       this.pc.onconnectionstatechange = () => {
         if (this.pc && (this.pc.connectionState === "failed" || this.pc.connectionState === "disconnected")) { this.live = false; this.emit(); }
       };
