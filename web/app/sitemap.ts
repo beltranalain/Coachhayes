@@ -12,31 +12,50 @@ export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const { branding } = await getSiteConfig();
   const base = `https://${(branding.domain || "coachhayesfootball.com").replace(/^https?:\/\//, "")}`;
-  const now = new Date();
-
-  const staticPages = ["", "/live", "/community", "/rankings", "/rankings/submit", "/rankings/how-it-works", "/blog", "/fantasy", "/shop", "/membership"].map((p) => ({
-    url: `${base}${p}`,
-    lastModified: now,
-    changeFrequency: (p === "/rankings" || p === "/blog" ? "daily" : "weekly") as "daily" | "weekly",
-    priority: p === "/rankings" ? 0.9 : p === "" ? 1 : 0.7,
-  }));
 
   const [players, facets, posts] = await Promise.all([getAllPlayerSlugs(), getRankingFacets(), getPublishedPosts()]);
+
+  // Real content timestamps so lastmod means "actually changed", not "built
+  // today" (a build-time stamp on every page is a signal crawlers discount).
+  const latestPlayer = players.reduce((m, p) => Math.max(m, p.updatedAt || 0), 0);
+  const latestPost = posts.reduce((m, p) => Math.max(m, p.publishedAt || p.updatedAt || 0), 0);
+  const latestPlayerInClass = (y: string) => players.reduce((m, p) => Math.max(m, (p.slug.endsWith(`-${y}`) ? (p.updatedAt || 0) : 0)), 0);
+
+  // Static pages: only stamp lastmod where there's a real content signal (home,
+  // the board, the blog index). Genuinely static pages omit it entirely.
+  const staticLastMod: Record<string, number> = {
+    "": Math.max(latestPlayer, latestPost),
+    "/rankings": latestPlayer,
+    "/blog": latestPost,
+  };
+  const staticPages = ["", "/live", "/community", "/rankings", "/rankings/submit", "/rankings/how-it-works", "/blog", "/fantasy", "/shop", "/membership"].map((p) => {
+    const ts = staticLastMod[p];
+    return {
+      url: `${base}${p}`,
+      ...(ts ? { lastModified: new Date(ts) } : {}),
+      changeFrequency: (p === "/rankings" || p === "/blog" ? "daily" : "weekly") as "daily" | "weekly",
+      priority: p === "/rankings" ? 0.9 : p === "" ? 1 : 0.7,
+    };
+  });
+
   const playerPages = players.map((p) => ({
     url: `${base}/rankings/${p.slug}`,
-    lastModified: p.updatedAt ? new Date(p.updatedAt) : now,
+    ...(p.updatedAt ? { lastModified: new Date(p.updatedAt) } : {}),
     changeFrequency: "weekly" as const,
     priority: 0.8,
   }));
-  const classPages = facets.years.map((y) => ({
-    url: `${base}/rankings/class/${y}`,
-    lastModified: now,
-    changeFrequency: "daily" as const,
-    priority: 0.8,
-  }));
+  const classPages = facets.years.map((y) => {
+    const ts = latestPlayerInClass(y);
+    return {
+      url: `${base}/rankings/class/${y}`,
+      ...(ts ? { lastModified: new Date(ts) } : {}),
+      changeFrequency: "daily" as const,
+      priority: 0.8,
+    };
+  });
   const blogPages = posts.map((p) => ({
     url: `${base}/blog/${p.slug}`,
-    lastModified: p.publishedAt ? new Date(p.publishedAt) : (p.updatedAt ? new Date(p.updatedAt) : now),
+    ...(p.publishedAt || p.updatedAt ? { lastModified: new Date(p.publishedAt || p.updatedAt) } : {}),
     changeFrequency: "monthly" as const,
     priority: 0.6,
   }));
