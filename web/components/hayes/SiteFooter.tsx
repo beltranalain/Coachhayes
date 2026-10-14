@@ -12,7 +12,10 @@ export default function SiteFooter({ brandName, content, year }: { brandName: st
             <div key={col.key}>
               <h4>{col.heading}</h4>
               {col.links.map((l, i) => (
-                <Link key={i} href={l.href}>{l.label}</Link>
+                // External (http) links open in a new tab; internal use the router.
+                /^https?:\/\//.test(l.href)
+                  ? <a key={i} href={l.href} target="_blank" rel="noopener noreferrer">{l.label}</a>
+                  : <Link key={i} href={l.href}>{l.label}</Link>
               ))}
             </div>
           ))}

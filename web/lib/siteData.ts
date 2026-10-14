@@ -118,7 +118,7 @@ export type SiteContent = {
 
 export const DEFAULT_CONTENT: SiteContent = {
   aboutText:
-    "An independent studio making original shows - live talk, long-form conversation, and series told in chapters. One team, one platform, streaming on our own site and on YouTube at the same time.\n\nEdit this text and everything else in the admin Content and Branding panels once Firestore is connected.",
+    "Coach Hayes has over 20 years of coaching experience in high school and college football. He has built an extensive network of coaches that runs from youth leagues all the way to the NFL, and through those relationships he has gained invaluable knowledge in every aspect of the game.\n\nHe combined that knowledge with his own philosophy, schemes and strategies — an approach that produced a Florida State Championship. Over the years Coach Hayes has had real success on the field, and he has helped numerous players earn college scholarships, with several of them going on to play in the NFL.",
   emailGeneral: BRAND.emailGeneral,
   emailBooking: BRAND.emailBooking,
   portrait: "",
@@ -134,12 +134,12 @@ export const DEFAULT_CONTENT: SiteContent = {
   libraryTitle2: "archive",
   libraryIntro: "The player pulls real uploads from YouTube; the archive grid fills from your own Cloudflare Stream library as broadcasts are saved.",
 
-  aboutEyebrow: `What's ${BRAND.name}?`,
-  aboutTitle1: "One studio.",
-  aboutTitle2: "Many shows.",
-  aboutClosingTitle1: "Behind every show",
-  aboutClosingTitle2: "is a real voice.",
-  aboutClosingText: "Own the platform, keep the audience. Broadcasts go out live here and on YouTube at the same time, so nobody gets left behind while the home base stays fully yours.",
+  aboutEyebrow: "About Coach Hayes",
+  aboutTitle1: "Twenty years",
+  aboutTitle2: "on the field.",
+  aboutClosingTitle1: "Pass it",
+  aboutClosingTitle2: "forward.",
+  aboutClosingText: "“My goal is to pass on to others what was so graciously passed on to me.” — Coach Hayes",
 };
 
 // Visible series in display order - the single source the public site reads.

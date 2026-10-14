@@ -286,21 +286,27 @@ export const DEFAULT_HAYES: HayesContent = {
         { label: "Live", href: "/live" }, { label: "Shows", href: "/shows" },
         { label: "Schedule", href: "/live" }, { label: "Archive", href: "/library" },
       ] },
-      { key: "teams", heading: "Teams", links: [
-        { label: "Miami", href: "/live" }, { label: "Colorado", href: "/live" },
-        { label: "UCF", href: "/live" }, { label: "All CFB", href: "/live" },
-      ] },
       { key: "play", heading: "Play", links: [
-        { label: "Fantasy league", href: "/fantasy" }, { label: "Leaderboard", href: "/fantasy" },
-        { label: "Rules", href: "/fantasy" },
+        { label: "Rankings", href: "/rankings" }, { label: "Fantasy league", href: "/fantasy" },
+        { label: "Blog", href: "/blog" },
       ] },
       { key: "community", heading: "Community", links: [
-        { label: "The Locker Room", href: "/community" }, { label: "Discord", href: "/community" },
-        { label: "Rules", href: "/community" },
+        { label: "The Locker Room", href: "/community" },
+        { label: "Discord", href: "https://discord.gg/YEkK2WqA7M" },
+      ] },
+      { key: "follow", heading: "Follow", links: [
+        { label: "YouTube", href: "https://www.youtube.com/@CoachHayesFootball" },
+        { label: "X", href: "https://x.com/CoachHayesFB" },
+        { label: "Facebook", href: "https://www.facebook.com/coachkylehayes" },
+      ] },
+      { key: "support", heading: "Support", links: [
+        { label: "Membership", href: "/membership" },
+        { label: "CashApp", href: "https://cash.me/$Coachhayesfootball" },
+        { label: "PayPal", href: "https://paypal.me/CoachHayesFootball" },
       ] },
       { key: "more", heading: "More", links: [
-        { label: "Shop", href: "/shop" }, { label: "Membership", href: "/membership" },
-        { label: "Contact", href: "/contact" },
+        { label: "Shop", href: "/shop" }, { label: "Contact", href: "/contact" },
+        { label: "About", href: "/about" },
       ] },
     ],
     legal: [

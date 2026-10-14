@@ -17,10 +17,13 @@ export default function ShopGrid({ emptyTitle, emptyText }: { emptyTitle: string
 
   if (products === null) return <div className="card" style={{ textAlign: "center", padding: "40px 30px", color: "var(--sub)" }}>Loading…</div>;
   if (products.length === 0) {
+    // No on-domain products yet — send shoppers to the live Creator-Spring store
+    // instead of a dead-looking page. (Remove once on-site products are added.)
     return (
       <div className="card" style={{ textAlign: "center", padding: "56px 30px" }}>
         <h3 style={{ marginBottom: 8 }}>{emptyTitle}</h3>
-        <p style={{ color: "var(--sub)", maxWidth: "46ch", margin: "0 auto" }}>{emptyText}</p>
+        <p style={{ color: "var(--sub)", maxWidth: "46ch", margin: "0 auto 18px" }}>{emptyText}</p>
+        <a className="pill" href="https://chfb-2.creator-spring.com" target="_blank" rel="noopener noreferrer">Shop the store</a>
       </div>
     );
   }
