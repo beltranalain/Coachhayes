@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import GoogleIcon from "@/components/hayes/GoogleIcon";
 import YouTubeMemberLink from "@/components/hayes/YouTubeMemberLink";
 import { firebaseConfigured, getFirebaseAuth, getIdToken } from "@/lib/firebase";
+import { isEnvOwner } from "@/lib/admin";
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -22,6 +24,7 @@ import {
 // then see account status. Paid tier checkout (Po' Lil Timmy / The Coordinator)
 // is wired in the membership phase — those buttons explain that for now.
 export default function AccountPage() {
+  const router = useRouter();
   const [viewer, setViewer] = useState<User | null>(null);
   const [ready, setReady] = useState(!firebaseConfigured);
   const [mode, setMode] = useState<"signin" | "signup">("signup");
@@ -44,12 +47,33 @@ export default function AccountPage() {
     if (!auth) { setReady(true); return; }
     getRedirectResult(auth).catch(() => {});
     const unsub = onAuthStateChanged(auth, async (u) => {
+      // Admins don't belong on the member page — send them to the Control Room.
+      // Leave the page in its loading state while we navigate away so the
+      // member card never flashes for an admin.
+      if (u && (await isAdminAccount(u))) {
+        router.replace("/admin/overview");
+        return;
+      }
       setViewer(u); setReady(true);
       if (u) await refreshTier();
       else { setTier(null); setIsTeam(false); }
     });
     return () => unsub();
-  }, []);
+  }, [router]);
+
+  // True if this account can reach the admin: env-owner fast path, otherwise
+  // the server verifies the team role (covers Firestore-granted owners whose
+  // email isn't in the public env list, e.g. on production).
+  async function isAdminAccount(u: User): Promise<boolean> {
+    if (isEnvOwner(u.email)) return true;
+    try {
+      const t = await u.getIdToken();
+      const r = await fetch("/api/admin/whoami", { headers: { Authorization: `Bearer ${t}` }, cache: "no-store" });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  }
 
   // Re-read the member's effective tier (after a YouTube link, upgrade, etc.).
   async function refreshTier() {
