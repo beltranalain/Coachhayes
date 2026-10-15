@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminDb, adminConfigured } from "@/lib/firebaseAdmin";
 import { requireRole } from "@/lib/requireAdmin";
 import { defaultOrder, slugify, sanitizeCategories, sanitizeCategoryNotes, recommendedOverall, CHIP_META, CATEGORIES, type Chip } from "@/lib/rankings";
+import { sanitizeEvaluation, sanitizeAccess, normalizeEmails } from "@/lib/evaluation";
 import { getSiteConfig } from "@/lib/siteConfig";
 
 const CHIPS: Chip[] = ["bronze", "silver", "gold", "blue"];
@@ -90,6 +91,13 @@ export async function POST(request: Request) {
     removed: Boolean(b.removed),
     updatedAt: now,
   };
+
+  // Evaluation + paywall fields — only written when present so existing saves
+  // (the add/edit modal, publish-from-submission) never clobber an evaluation.
+  if ("evaluation" in b) fields.evaluation = sanitizeEvaluation(b.evaluation);
+  if ("evalAccess" in b) fields.evalAccess = sanitizeAccess(b.evalAccess);
+  if ("evalPrice" in b) fields.evalPrice = s(b.evalPrice, 20);
+  if ("evalUnlockEmails" in b) fields.evalUnlockEmails = normalizeEmails(b.evalUnlockEmails);
 
   try {
     if (id) {

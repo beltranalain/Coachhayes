@@ -1,5 +1,37 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, adminConfigured } from "@/lib/firebaseAdmin";
+import { sendEmails, renderEmail, emailConfigured } from "@/lib/email";
+import { getSiteConfig } from "@/lib/siteConfig";
+
+// Notify the coach that a new film came in. Best-effort: never block or fail the
+// submission on an email error. Goes to CONTACT_TO_EMAIL (falls back to the env
+// owners' inbox) only when Resend is configured.
+async function notifyAdmin(doc: Record<string, any>) {
+  if (!emailConfigured) return;
+  const to = (process.env.CONTACT_TO_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+    .split(",").map((x) => x.trim()).filter(Boolean);
+  if (!to.length) return;
+  try {
+    const { branding } = await getSiteConfig();
+    const brandName = branding?.siteName || "Coach Hayes Football";
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+    const ht = doc.heightIn ? `${Math.floor(doc.heightIn / 12)}'${doc.heightIn % 12}"` : "—";
+    const body = [
+      `A new film submission just came in for review.`,
+      `Player: ${doc.playerName}`,
+      `Position: ${doc.position || "—"}    Class: ${doc.classYear || "—"}`,
+      `School: ${[doc.school, doc.city, doc.state].filter(Boolean).join(", ") || "—"}`,
+      `Height: ${ht}    Weight: ${doc.weightLb ? doc.weightLb + " lb" : "—"}`,
+      `Film: ${doc.videoUrl}`,
+      doc.notes ? `Notes: ${doc.notes}` : "",
+      doc.submitterEmail ? `From (${doc.submitterRelation || "submitter"}): ${doc.submitterEmail}` : "",
+      "",
+      `Review it in the Control Room${site ? `: ${site}/admin/evaluations` : " under Evaluations."}`,
+    ].filter(Boolean).join("\n");
+    const html = renderEmail({ brandName, logo: branding?.logo, subject: `New film: ${doc.playerName}`, body, siteUrl: site });
+    await sendEmails(to, `New film submission — ${doc.playerName}`, html);
+  } catch { /* ignore — notification is best-effort */ }
+}
 
 // Public: a player/parent submits film + profile for review. Creates a
 // `submissions` doc the admin reviews (with AI assist). No auth — but we keep
@@ -39,6 +71,7 @@ export async function POST(request: Request) {
     const db = getAdminDb();
     if (!db) throw new Error("no db");
     const ref = await db.collection("submissions").add(doc);
+    await notifyAdmin(doc); // best-effort email to the coach
     return NextResponse.json({ ok: true, id: ref.id });
   } catch {
     return NextResponse.json({ error: "Could not submit. Try again." }, { status: 500 });

@@ -56,7 +56,7 @@ export default function SubmitFilmPage() {
         </div>
         <Field label="Highlight film link * (YouTube or Hudl)" v={f.videoUrl} on={(v) => set("videoUrl", v)} ph="https://…" />
         <div className="g2">
-          <Field label="Height (inches)" v={f.heightIn} on={(v) => set("heightIn", v)} ph="72" />
+          <HeightField v={f.heightIn} on={(v) => set("heightIn", v)} />
           <Field label="Weight (lb)" v={f.weightLb} on={(v) => set("weightLb", v)} ph="185" />
         </div>
         <label style={{ display: "block" }}>
@@ -91,6 +91,23 @@ function Field({ label, v, on, ph }: { label: string; v: string; on: (v: string)
     <label style={{ display: "block" }}>
       <span style={{ display: "block", fontSize: 12, color: "var(--sub)", marginBottom: 6, fontWeight: 600 }}>{label}</span>
       <input value={v} onChange={(e) => on(e.target.value)} placeholder={ph} style={inp} />
+    </label>
+  );
+}
+
+// Height picker: scroll to pick instead of typing inches. Stores total inches as
+// a string (4'8" = 56 … 7'0" = 84) so the API keeps getting a number.
+const HEIGHTS = Array.from({ length: 84 - 56 + 1 }, (_, i) => 56 + i);
+function HeightField({ v, on }: { v: string; on: (v: string) => void }) {
+  return (
+    <label style={{ display: "block" }}>
+      <span style={{ display: "block", fontSize: 12, color: "var(--sub)", marginBottom: 6, fontWeight: 600 }}>Height</span>
+      <select value={v} onChange={(e) => on(e.target.value)} style={inp}>
+        <option value="">Select height</option>
+        {HEIGHTS.map((inches) => (
+          <option key={inches} value={String(inches)}>{Math.floor(inches / 12)}&apos;{inches % 12}&quot;</option>
+        ))}
+      </select>
     </label>
   );
 }

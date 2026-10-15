@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { getPlayerBySlug, getPublishedPlayers, CHIP_META, CATEGORIES, recommendedOverall, type CategoryKey } from "@/lib/rankings";
 import { getSiteConfig } from "@/lib/siteConfig";
 import { CategoryIcon } from "@/components/hayes/CategoryChips";
+import PlayerEvaluation from "@/components/hayes/PlayerEvaluation";
+import { evaluationTeaser } from "@/lib/evaluation";
 
 export const dynamic = "force-dynamic";
 
@@ -230,6 +232,18 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
             </div>
           )}
         </div>
+      )}
+
+      {/* 6b · Honest Evaluation — long-form report (free inline, locked = teaser + unlock) */}
+      {(p.evalAccess ?? "none") !== "none" && p.evaluation && (
+        <PlayerEvaluation
+          slug={p.slug}
+          name={p.name}
+          access={p.evalAccess === "locked" ? "locked" : "free"}
+          evaluation={p.evalAccess === "locked" ? null : p.evaluation}
+          price={p.evalPrice}
+          teaser={p.evalAccess === "locked" ? evaluationTeaser(p.evaluation) : undefined}
+        />
       )}
 
       {/* 7 · FAQ (open in HTML, matches FAQPage schema) */}

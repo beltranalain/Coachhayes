@@ -1,6 +1,7 @@
 import "server-only";
 import { getAdminDb, adminConfigured } from "./firebaseAdmin";
 import { CHIP_META, type Chip, type Categories, type CategoryNotes, sanitizeCategories, sanitizeCategoryNotes } from "./chips";
+import { sanitizeEvaluation, sanitizeAccess, normalizeEmails, type Evaluation, type EvalAccess } from "./evaluation";
 
 // ============================================================================
 // Rankings domain. Each player is graded on 5 categories (Power/Speed/Motor/
@@ -39,6 +40,10 @@ export type Player = {
   videoUrl?: string;       // highlight film (YouTube/Hudl)
   seoTitle?: string;
   seoDescription?: string;
+  evaluation?: Evaluation | null; // long-form "Honest Evaluations" report
+  evalAccess?: EvalAccess;        // none | free | locked (paywall)
+  evalPrice?: string;             // display price for a locked eval
+  evalUnlockEmails?: string[];    // emails manually granted access
   published: boolean;
   removed?: boolean;       // hidden via removal-request flow
   createdAt: number;
@@ -76,6 +81,10 @@ function toPlayer(id: string, d: any): Player {
     videoUrl: d.videoUrl ? String(d.videoUrl) : undefined,
     seoTitle: d.seoTitle ? String(d.seoTitle) : undefined,
     seoDescription: d.seoDescription ? String(d.seoDescription) : undefined,
+    evaluation: sanitizeEvaluation(d.evaluation),
+    evalAccess: sanitizeAccess(d.evalAccess),
+    evalPrice: d.evalPrice ? String(d.evalPrice) : undefined,
+    evalUnlockEmails: normalizeEmails(d.evalUnlockEmails),
     published: Boolean(d.published),
     removed: Boolean(d.removed),
     createdAt: Number(d.createdAt) || 0,

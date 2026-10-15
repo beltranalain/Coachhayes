@@ -29,6 +29,9 @@ export default async function RankingsPage() {
     state: p.state, classYear: p.classYear, chip: p.chip,
     chipLabel: CHIP_META[p.chip].label, chipRing: CHIP_META[p.chip].ring,
     categories: p.categories, videoUrl: p.videoUrl, commit: p.commit, commitLogo: p.commitLogo,
+    // Only flags cross to the client — never the locked evaluation content itself.
+    hasEval: (p.evalAccess ?? "none") !== "none" && !!p.evaluation,
+    evalLocked: p.evalAccess === "locked",
   }));
 
   // JSON-LD: the board as an ItemList of Person entities (SEO + AI extraction).

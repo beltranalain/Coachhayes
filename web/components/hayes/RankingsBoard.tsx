@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import CategoryChips from "@/components/hayes/CategoryChips";
+import EvaluationModal from "@/components/hayes/EvaluationModal";
 import type { Chip, Categories } from "@/lib/chips";
 
 // Client filter over the server-rendered board. Chip colors passed from server.
@@ -10,6 +11,7 @@ type Row = {
   slug: string; rank: number; name: string; position: string; school: string;
   state?: string; classYear: string; chip: string; chipLabel: string; chipRing: string;
   categories?: Categories; videoUrl?: string; commit?: string; commitLogo?: string;
+  hasEval?: boolean; evalLocked?: boolean;
 };
 
 function ytId(url?: string): string | null {
@@ -22,6 +24,7 @@ export default function RankingsBoard({ players, years, positions }: { players: 
   const [year, setYear] = useState<string>("all");
   const [pos, setPos] = useState<string>("all");
   const [playing, setPlaying] = useState<{ id: string; name: string } | null>(null);
+  const [evalFor, setEvalFor] = useState<{ slug: string; name: string } | null>(null);
 
   const rows = useMemo(
     () => players.filter((p) => (year === "all" || p.classYear === year) && (pos === "all" || p.position === pos)),
@@ -46,7 +49,7 @@ export default function RankingsBoard({ players, years, positions }: { players: 
       </div>
 
       <div className="rklist">
-        <div className="rkhead"><span>Rank</span><span>Player</span><span>Pos</span><span>State</span><span>Film</span><span>Chips</span><span>Commit</span><span /></div>
+        <div className="rkhead"><span>Rank</span><span>Player</span><span>Pos</span><span>State</span><span>Film</span><span>Chips</span><span>Commit</span><span>Evaluation</span></div>
         {rows.length > 0 ? (
           rows.map((p, i) => {
             const vid = ytId(p.videoUrl);
@@ -76,7 +79,13 @@ export default function RankingsBoard({ players, years, positions }: { players: 
                 <span className="rkcommit">
                   {p.commitLogo ? <img src={p.commitLogo} alt={p.commit || ""} title={p.commit ? `Committed to ${p.commit}` : ""} /> : <span className="rkcommit-none">—</span>}
                 </span>
-                <Link className="rkgo" href={`/rankings/${p.slug}`}>View ›</Link>
+                {p.hasEval ? (
+                  <button className={`rkeval-btn${p.evalLocked ? " locked" : ""}`} onClick={() => setEvalFor({ slug: p.slug, name: p.name })}>
+                    {p.evalLocked ? "🔒 Unlock" : "Read ›"}
+                  </button>
+                ) : (
+                  <Link className="rkgo" href={`/rankings/${p.slug}`}>View ›</Link>
+                )}
               </div>
             );
           })
@@ -87,6 +96,8 @@ export default function RankingsBoard({ players, years, positions }: { players: 
           </div>
         )}
       </div>
+
+      {evalFor && <EvaluationModal slug={evalFor.slug} playerName={evalFor.name} onClose={() => setEvalFor(null)} />}
 
       {playing && (
         <div className="rkvidmodal" onClick={(e) => { if (e.target === e.currentTarget) setPlaying(null); }}>

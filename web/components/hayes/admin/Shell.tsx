@@ -36,6 +36,7 @@ const GROUPS: Group[] = [
       { key: "schedule", label: "Schedule", href: "/admin/schedule", roles: ["owner", "manager", "host"], icon: I(<><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2v4M13 2v4" /></>) },
       { key: "library", label: "Library", href: "/admin/library", roles: ["owner", "manager", "host"], icon: I(<><path d="M3 6.5 10 3l7 3.5-7 3.5z" /><path d="M3 10.5 10 14l7-3.5M3 14 10 17.5 17 14" /></>) },
       { key: "rankings", label: "Rankings", href: "/admin/rankings", roles: ["owner", "manager"], icon: I(<><circle cx="10" cy="10" r="7" /><path d="M10 6v8M7 9l3-3 3 3" /></>) },
+      { key: "evaluations", label: "Evaluations", href: "/admin/evaluations", roles: ["owner", "manager"], icon: I(<><rect x="4" y="3" width="12" height="14" rx="2" /><path d="M7 7h6M7 10h6M7 13h3" /><circle cx="14.5" cy="13.5" r="3" fill="var(--card)" /><path d="M14.5 12v3M13 13.5h3" /></>) },
       { key: "players", label: "Players", href: "/admin/players", roles: ["owner", "manager"], icon: I(<><circle cx="9" cy="9" r="6" /><path d="M13.5 13.5 18 18" /></>) },
       { key: "content", label: "Website content", href: "/admin/content", roles: ["owner", "manager"], icon: I(<><rect x="4" y="3" width="12" height="14" rx="2" /><path d="M7 7h6M7 10h6M7 13h4" /></>) },
       { key: "blog", label: "Blog", href: "/admin/blog", roles: ["owner", "manager"], icon: I(<><path d="M4 3h8l4 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><path d="M11.5 3v4h4M7 11h6M7 14h4" /></>) },
