@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireAdmin";
-import { transcribeAudio, openaiConfigured } from "@/lib/openai";
+import { transcribeClip, transcribeConfigured } from "@/lib/aiProvider";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -8,7 +8,7 @@ export const maxDuration = 120;
 // Admin: transcribe a recorded audio clip (Coach talking through the film) to
 // text via Whisper. Expects multipart/form-data with an "audio" file field.
 export async function POST(request: Request) {
-  if (!openaiConfigured) return NextResponse.json({ error: "ChatGPT isn't connected — add OPENAI_API_KEY." }, { status: 400 });
+  if (!transcribeConfigured()) return NextResponse.json({ error: "Voice isn't connected — add GROQ_API_KEY (or OPENAI_API_KEY)." }, { status: 400 });
   const role = await requireRole(request);
   if (!role || !["owner", "manager"].includes(role)) return NextResponse.json({ error: "Not authorized." }, { status: 401 });
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
   try {
     const name = (file as File).name || "coach-eval.webm";
-    const text = await transcribeAudio(file, name);
+    const text = await transcribeClip(file, name);
     return NextResponse.json({ ok: true, text });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Transcription failed." }, { status: 500 });

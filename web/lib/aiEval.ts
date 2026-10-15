@@ -1,5 +1,5 @@
 import "server-only";
-import { generateWithOpenAI, openaiConfigured } from "./openai";
+import { generateEvalText, evalConfigured } from "./aiProvider";
 import { sanitizeEvaluation, type Evaluation } from "./evaluation";
 
 // Turns a recruit's profile + EITHER Coach's spoken read of the film (transcript)
@@ -7,7 +7,7 @@ import { sanitizeEvaluation, type Evaluation } from "./evaluation";
 // It does NOT watch the footage — when a transcript is present the content IS
 // Coach's evaluation (we just structure + polish it); otherwise it reasons from
 // the limited signals and stays measured. A human reviews before publish.
-export { openaiConfigured as aiEvalConfigured };
+export const aiEvalConfigured = evalConfigured();
 
 export type EvalInput = {
   playerName: string;
@@ -54,7 +54,7 @@ const JSON_SHAPE = `Return ONLY a JSON object with exactly these keys:
 }`;
 
 export async function generateEvaluation(input: EvalInput): Promise<Evaluation> {
-  if (!openaiConfigured) throw new Error("OPENAI_API_KEY is not set — add it to enable ChatGPT evaluations.");
+  if (!evalConfigured()) throw new Error("No AI provider is connected — add GROQ_API_KEY (or OPENAI/DEEPSEEK) to enable evaluations.");
 
   const ht = input.heightIn ? `${Math.floor(input.heightIn / 12)}'${input.heightIn % 12}"` : "";
   const profile = [
@@ -76,7 +76,7 @@ export async function generateEvaluation(input: EvalInput): Promise<Evaluation> 
 
   const prompt = `${profile}${coachBlock}\nWrite the full ${input.position || "football"} evaluation now as JSON.\n\n${JSON_SHAPE}`;
 
-  const raw = await generateWithOpenAI(prompt, { systemPrompt: SYSTEM, jsonMode: true, temperature: 0.55, maxTokens: 2800 });
+  const raw = await generateEvalText(prompt, { systemPrompt: SYSTEM, jsonMode: true, temperature: 0.55, maxTokens: 2800 });
 
   let parsed: any;
   try { parsed = JSON.parse(raw); } catch { throw new Error("ChatGPT returned an unexpected format. Try again."); }

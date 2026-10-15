@@ -27,7 +27,7 @@ async function ytMeta(url: string): Promise<{ title?: string; description?: stri
 // the editor reviews, edits, then saves it onto the player via /api/admin/players.
 export async function POST(request: Request) {
   if (!adminConfigured) return NextResponse.json({ error: "Not configured." }, { status: 400 });
-  if (!aiEvalConfigured) return NextResponse.json({ error: "ChatGPT isn't connected — add OPENAI_API_KEY." }, { status: 400 });
+  if (!aiEvalConfigured) return NextResponse.json({ error: "No AI provider is connected — add GROQ_API_KEY (or OPENAI/DEEPSEEK)." }, { status: 400 });
   const role = await requireRole(request);
   if (!role || !["owner", "manager"].includes(role)) return NextResponse.json({ error: "Not authorized." }, { status: 401 });
 
