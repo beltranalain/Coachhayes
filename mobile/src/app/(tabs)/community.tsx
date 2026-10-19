@@ -148,9 +148,9 @@ export default function CommunityScreen() {
         )}
 
         <View style={styles.cRow}>
-          <Pressable onPress={pickImage} style={styles.cChip}><Feather name="image" size={14} color={colors.muted} /><Text style={styles.cChipText}>Photo</Text></Pressable>
-          <Pressable onPress={() => setPanel(panel === "clip" ? null : "clip")} style={[styles.cChip, panel === "clip" && styles.cChipOn]}><Feather name="video" size={14} color={panel === "clip" ? colors.amber : colors.muted} /><Text style={[styles.cChipText, panel === "clip" && { color: colors.amber }]}>Clip</Text></Pressable>
-          <Pressable onPress={() => setPanel(panel === "poll" ? null : "poll")} style={[styles.cChip, panel === "poll" && styles.cChipOn]}><Feather name="bar-chart-2" size={14} color={panel === "poll" ? colors.amber : colors.muted} /><Text style={[styles.cChipText, panel === "poll" && { color: colors.amber }]}>Poll</Text></Pressable>
+          <Pressable onPress={pickImage} style={styles.cChip}><Feather name="image" size={13} color={colors.muted} /><Text style={styles.cChipText}>Photo</Text></Pressable>
+          <Pressable onPress={() => setPanel(panel === "clip" ? null : "clip")} style={[styles.cChip, panel === "clip" && styles.cChipOn]}><Feather name="video" size={13} color={panel === "clip" ? colors.amber : colors.muted} /><Text style={[styles.cChipText, panel === "clip" && { color: colors.amber }]}>Clip</Text></Pressable>
+          <Pressable onPress={() => setPanel(panel === "poll" ? null : "poll")} style={[styles.cChip, panel === "poll" && styles.cChipOn]}><Feather name="bar-chart-2" size={13} color={panel === "poll" ? colors.amber : colors.muted} /><Text style={[styles.cChipText, panel === "poll" && { color: colors.amber }]}>Poll</Text></Pressable>
           <Pressable onPress={submit} disabled={posting} style={styles.postBtn}><Text style={styles.postBtnText}>{posting ? "…" : "Post"}</Text></Pressable>
         </View>
       </View>
@@ -305,11 +305,11 @@ const styles = StyleSheet.create({
   preview: { width: "100%", height: 160, borderRadius: 12, backgroundColor: colors.surface2 },
   previewX: { position: "absolute", top: 8, right: 8, width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center" },
   panelInput: { marginTop: 10, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.line, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, fontFamily: fonts.body, fontSize: 13, color: colors.cream },
-  cRow: { flexDirection: "row", alignItems: "center", gap: 7, borderTopWidth: 1, borderTopColor: colors.lineSoft, paddingTop: 12, marginTop: 12 },
-  cChip: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 11 },
+  cRow: { flexDirection: "row", alignItems: "center", columnGap: 6, rowGap: 10, flexWrap: "wrap", borderTopWidth: 1, borderTopColor: colors.lineSoft, paddingTop: 12, marginTop: 12 },
+  cChip: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 10 },
   cChipOn: { borderColor: colors.amber },
-  cChipText: { fontFamily: fonts.semibold, fontSize: 12, color: colors.muted },
-  postBtn: { marginLeft: "auto", backgroundColor: colors.amber, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 18 },
+  cChipText: { fontFamily: fonts.semibold, fontSize: 11.5, color: colors.muted },
+  postBtn: { marginLeft: "auto", backgroundColor: colors.amber, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16 },
   postBtnText: { fontFamily: fonts.bold, fontSize: 13, color: "#171204" },
 
   post: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 14, marginBottom: 14 },
