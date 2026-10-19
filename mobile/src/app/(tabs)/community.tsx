@@ -31,8 +31,7 @@ export default function CommunityScreen() {
   // Composer
   const [text, setText] = useState("");
   const [imageData, setImageData] = useState<string | null>(null);
-  const [clipUrl, setClipUrl] = useState("");
-  const [panel, setPanel] = useState<"clip" | "poll" | null>(null);
+  const [panel, setPanel] = useState<"poll" | null>(null);
   const [pollA, setPollA] = useState("");
   const [pollB, setPollB] = useState("");
   const [posting, setPosting] = useState(false);
@@ -87,14 +86,13 @@ export default function CommunityScreen() {
   async function submit() {
     if (!uid) return requireAuth();
     const poll = panel === "poll" && pollA.trim() && pollB.trim() ? { options: [pollA.trim(), pollB.trim()] } : null;
-    const clip = panel === "clip" && clipUrl.trim() ? clipUrl.trim() : null;
-    if (!text.trim() && !imageData && !clip && !poll) { Alert.alert("Add something to post."); return; }
+    if (!text.trim() && !imageData && !poll) { Alert.alert("Add something to post."); return; }
     setPosting(true);
     try {
-      const r = await createPost({ text: text.trim(), image: imageData, clip, poll });
+      const r = await createPost({ text: text.trim(), image: imageData, poll });
       if (r.post) {
         setPosts((ps) => [r.post as FeedPost, ...ps]);
-        setText(""); setImageData(null); setClipUrl(""); setPollA(""); setPollB(""); setPanel(null);
+        setText(""); setImageData(null); setPollA(""); setPollB(""); setPanel(null);
       } else Alert.alert("Could not post", r.error || "Try again.");
     } finally { setPosting(false); }
   }
@@ -137,9 +135,6 @@ export default function CommunityScreen() {
             <Pressable onPress={() => setImageData(null)} style={styles.previewX}><Feather name="x" size={14} color="#fff" /></Pressable>
           </View>
         )}
-        {panel === "clip" && (
-          <TextInput value={clipUrl} onChangeText={setClipUrl} placeholder="Paste a YouTube link" placeholderTextColor={colors.dim} style={styles.panelInput} autoCapitalize="none" />
-        )}
         {panel === "poll" && (
           <View style={{ gap: 8, marginTop: 10 }}>
             <TextInput value={pollA} onChangeText={setPollA} placeholder="Option 1" placeholderTextColor={colors.dim} style={styles.panelInput} />
@@ -148,9 +143,8 @@ export default function CommunityScreen() {
         )}
 
         <View style={styles.cRow}>
-          <Pressable onPress={pickImage} style={styles.cChip}><Feather name="image" size={13} color={colors.muted} /><Text style={styles.cChipText}>Photo</Text></Pressable>
-          <Pressable onPress={() => setPanel(panel === "clip" ? null : "clip")} style={[styles.cChip, panel === "clip" && styles.cChipOn]}><Feather name="video" size={13} color={panel === "clip" ? colors.amber : colors.muted} /><Text style={[styles.cChipText, panel === "clip" && { color: colors.amber }]}>Clip</Text></Pressable>
-          <Pressable onPress={() => setPanel(panel === "poll" ? null : "poll")} style={[styles.cChip, panel === "poll" && styles.cChipOn]}><Feather name="bar-chart-2" size={13} color={panel === "poll" ? colors.amber : colors.muted} /><Text style={[styles.cChipText, panel === "poll" && { color: colors.amber }]}>Poll</Text></Pressable>
+          <Pressable onPress={pickImage} style={styles.cChip}><Text style={styles.cChipText}>Photo</Text></Pressable>
+          <Pressable onPress={() => setPanel(panel === "poll" ? null : "poll")} style={[styles.cChip, panel === "poll" && styles.cChipOn]}><Text style={[styles.cChipText, panel === "poll" && { color: colors.amber }]}>Poll</Text></Pressable>
           <Pressable onPress={submit} disabled={posting} style={styles.postBtn}><Text style={styles.postBtnText}>{posting ? "…" : "Post"}</Text></Pressable>
         </View>
       </View>
@@ -305,11 +299,11 @@ const styles = StyleSheet.create({
   preview: { width: "100%", height: 160, borderRadius: 12, backgroundColor: colors.surface2 },
   previewX: { position: "absolute", top: 8, right: 8, width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center" },
   panelInput: { marginTop: 10, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.line, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, fontFamily: fonts.body, fontSize: 13, color: colors.cream },
-  cRow: { flexDirection: "row", alignItems: "center", columnGap: 6, rowGap: 10, flexWrap: "wrap", borderTopWidth: 1, borderTopColor: colors.lineSoft, paddingTop: 12, marginTop: 12 },
-  cChip: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 10 },
+  cRow: { flexDirection: "row", alignItems: "center", gap: 8, borderTopWidth: 1, borderTopColor: colors.lineSoft, paddingTop: 12, marginTop: 12 },
+  cChip: { borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 18 },
   cChipOn: { borderColor: colors.amber },
-  cChipText: { fontFamily: fonts.semibold, fontSize: 11.5, color: colors.muted },
-  postBtn: { marginLeft: "auto", backgroundColor: colors.amber, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16 },
+  cChipText: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.muted },
+  postBtn: { marginLeft: "auto", backgroundColor: colors.amber, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 20 },
   postBtnText: { fontFamily: fonts.bold, fontSize: 13, color: "#171204" },
 
   post: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 14, marginBottom: 14 },
