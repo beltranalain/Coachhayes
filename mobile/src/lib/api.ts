@@ -2,6 +2,7 @@
 // to CORS, so we can call these Vercel routes directly and share the backend.
 
 import { API_BASE } from "./config";
+import { getFirebaseAuth } from "./firebase";
 
 export type StreamStatus = { live: boolean };
 
@@ -95,15 +96,53 @@ export function youtubeId(url?: string): string | null {
 }
 
 // ---- Community feed ---------------------------------------------------------
+export type Poll = { options: string[]; votedBy: Record<string, number> };
 export type FeedPost = {
   id: string; uid: string; author: string; picture: string | null; text: string;
-  ts: number; likes: number; commentCount: number; room: string;
-  image: string | null; clip: string | null; kind: string | null;
-  player: any | null; show: any | null;
+  ts: number; likes: number; likedBy: string[]; savedBy: string[]; commentCount: number; room: string;
+  image: string | null; clip: string | null; poll: Poll | null; kind: string | null;
+  player: any | null; show: string | null;
 };
+export type Comment = { id: string; uid?: string; author: string; picture: string | null; text: string; ts: number };
+export type Series = { key: string; title: string; href?: string; art?: string; image?: string };
 
 export function fetchFeed(room = "general"): Promise<{ posts: FeedPost[] }> {
   return getJSON<{ posts: FeedPost[] }>(`/api/community/posts?room=${encodeURIComponent(room)}`);
+}
+
+export async function fetchSeries(): Promise<Series[]> {
+  try { const cfg = await getJSON<any>("/api/site-config"); return Array.isArray(cfg?.content?.series) ? cfg.content.series : []; }
+  catch { return []; }
+}
+
+// Signed-in member auth header (community actions require it).
+async function userTok(): Promise<Record<string, string>> {
+  const t = await getFirebaseAuth().currentUser?.getIdToken().catch(() => null);
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+export async function likePost(id: string): Promise<{ liked?: boolean; likes?: number; error?: string }> {
+  const res = await fetch(`${API_BASE}/api/community/posts/${id}/like`, { method: "POST", headers: await userTok() });
+  return res.json().catch(() => ({ error: "failed" }));
+}
+export async function savePost(id: string): Promise<{ saved?: boolean; error?: string }> {
+  const res = await fetch(`${API_BASE}/api/community/posts/${id}/save`, { method: "POST", headers: await userTok() });
+  return res.json().catch(() => ({ error: "failed" }));
+}
+export async function votePost(id: string, option: number): Promise<{ ok?: boolean; error?: string }> {
+  const res = await fetch(`${API_BASE}/api/community/posts/${id}/vote`, { method: "POST", headers: { "Content-Type": "application/json", ...(await userTok()) }, body: JSON.stringify({ option }) });
+  return res.json().catch(() => ({ error: "failed" }));
+}
+export function fetchComments(id: string): Promise<{ comments: Comment[] }> {
+  return getJSON<{ comments: Comment[] }>(`/api/community/posts/${id}/comments`);
+}
+export async function addComment(id: string, text: string): Promise<{ comment?: Comment; error?: string }> {
+  const res = await fetch(`${API_BASE}/api/community/posts/${id}/comments`, { method: "POST", headers: { "Content-Type": "application/json", ...(await userTok()) }, body: JSON.stringify({ text }) });
+  return res.json().catch(() => ({ error: "failed" }));
+}
+export async function createPost(body: { text?: string; image?: string | null; clip?: string | null; poll?: { options: string[] } | null }): Promise<{ post?: FeedPost; error?: string }> {
+  const res = await fetch(`${API_BASE}/api/community/posts`, { method: "POST", headers: { "Content-Type": "application/json", ...(await userTok()) }, body: JSON.stringify({ room: "general", ...body }) });
+  return res.json().catch(() => ({ error: "failed" }));
 }
 
 // ---- Blog -------------------------------------------------------------------
