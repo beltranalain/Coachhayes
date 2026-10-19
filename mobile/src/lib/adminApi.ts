@@ -25,6 +25,47 @@ async function getAuthedJSON<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+// ---- Evaluations (voice -> transcribe -> AI -> publish) ---------------------
+export type Submission = {
+  id: string; playerName: string; position?: string; school?: string; city?: string; state?: string;
+  classYear?: string; videoUrl?: string; heightIn?: number; weightLb?: number; notes?: string;
+  submitterEmail?: string; submitterRelation?: string; status: string;
+};
+export type EvaluationDraft = {
+  size: string; speed: string; effort: string; positionAnalysis: string;
+  strengths: string[]; improvements: string[]; recommendedTargets: string[];
+  additionalComments: string; developmentPriorities: string[]; finalAssessment: string;
+  projection: string; evaluatedOn: string;
+};
+
+export function fetchSubmissions(): Promise<{ submissions: Submission[] }> {
+  return getAuthedJSON<{ submissions: Submission[] }>("/api/admin/submissions");
+}
+
+// Upload a recorded clip to Whisper (via the web route) and get the transcript.
+export async function transcribeAudio(fileUri: string): Promise<{ ok?: boolean; text?: string; error?: string }> {
+  const form = new FormData();
+  form.append("audio", { uri: fileUri, name: "coach-eval.m4a", type: "audio/m4a" } as any);
+  const res = await fetch(`${API_BASE}/api/admin/transcribe`, { method: "POST", headers: await authHeader(), body: form });
+  return res.json().catch(() => ({ error: "Transcription failed." }));
+}
+
+// Generate the long-form evaluation from the transcript + profile.
+export async function generateEvaluation(payload: Record<string, unknown>): Promise<{ ok?: boolean; evaluation?: EvaluationDraft; error?: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/evaluation`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...(await authHeader()) }, body: JSON.stringify(payload),
+  });
+  return res.json().catch(() => ({ error: "Generate failed." }));
+}
+
+// Create/update the player with the evaluation + access (publish).
+export async function savePlayerEval(payload: Record<string, unknown>): Promise<{ ok?: boolean; id?: string; error?: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/players`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...(await authHeader()) }, body: JSON.stringify(payload),
+  });
+  return res.json().catch(() => ({ error: "Save failed." }));
+}
+
 // ---- Tips -------------------------------------------------------------------
 export type TipEntry = { name: string; amount: number; message: string; ts: number };
 export type TipsResponse = {
@@ -128,7 +169,7 @@ export async function saveTeamMember(
 // ---- Client-side capability matrix (mirrors the web matrix) -----------------
 // Which app admin screens each role may open. Defense-in-depth only; the server
 // still enforces access on every gated API.
-export type AdminScreen = "schedule" | "tips" | "costs" | "settings" | "team";
+export type AdminScreen = "evaluations" | "schedule" | "tips" | "costs" | "settings" | "team";
 
 export function canAccess(role: Role | null | undefined, screen: AdminScreen): boolean {
   if (!role) return false;
@@ -137,6 +178,7 @@ export function canAccess(role: Role | null | undefined, screen: AdminScreen): b
       return role === "owner";
     case "schedule":
       return role === "owner" || role === "manager" || role === "host";
+    case "evaluations":
     case "tips":
     case "costs":
     case "settings":

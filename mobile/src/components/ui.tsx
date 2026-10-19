@@ -170,9 +170,9 @@ const styles = StyleSheet.create({
   display: {
     fontFamily: fonts.display,
     color: colors.cream,
-    textTransform: "uppercase",
+    letterSpacing: -0.8,
     fontSize: 34,
-    lineHeight: 34,
+    lineHeight: 36,
   },
   body: {
     fontFamily: fonts.body,

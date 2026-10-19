@@ -4,14 +4,14 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
-import { useFonts as useAnton, Anton_400Regular } from "@expo-google-fonts/anton";
 import {
-  useFonts as useInter,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from "@expo-google-fonts/inter";
+  useFonts,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from "@expo-google-fonts/plus-jakarta-sans";
 
 import { AuthProvider } from "../lib/auth";
 import { STRIPE_PUBLISHABLE_KEY } from "../lib/config";
@@ -29,7 +29,7 @@ function StripeGate({ children }: { children: React.ReactNode }) {
   return (
     <StripeProvider
       publishableKey={STRIPE_PUBLISHABLE_KEY}
-      merchantIdentifier="merchant.com.yourstudio.app"
+      merchantIdentifier="merchant.com.coachhayes.app"
     >
       {children}
     </StripeProvider>
@@ -37,14 +37,13 @@ function StripeGate({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
-  const [antonLoaded] = useAnton({ Anton_400Regular });
-  const [interLoaded] = useInter({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+  const [ready] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
   });
-  const ready = antonLoaded && interLoaded;
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});

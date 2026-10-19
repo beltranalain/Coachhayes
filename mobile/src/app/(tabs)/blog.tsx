@@ -59,7 +59,7 @@ export default function BlogScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
-  h1: { fontFamily: fonts.display, fontSize: 26, color: colors.cream, textTransform: "uppercase", marginTop: 8 },
+  h1: { fontFamily: fonts.display, fontSize: 26, color: colors.cream, letterSpacing: -0.8, marginTop: 8 },
   row: { flexDirection: "row", gap: 12, alignItems: "center", paddingVertical: 13, borderTopWidth: 1, borderTopColor: colors.lineSoft },
   thumb: { width: 72, height: 54, borderRadius: 10, backgroundColor: colors.surface2 },
   title: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 19, color: colors.cream },

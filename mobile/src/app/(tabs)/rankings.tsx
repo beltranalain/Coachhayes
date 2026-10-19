@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   dim: { fontFamily: fonts.body, color: colors.muted, fontSize: 12.5 },
   empty: { fontFamily: fonts.body, color: colors.muted, fontSize: 13.5, textAlign: "center", paddingHorizontal: 24, paddingVertical: 40 },
   head: { paddingTop: 12, paddingBottom: 6 },
-  h1: { fontFamily: fonts.display, fontSize: 30, color: colors.cream, textTransform: "uppercase", marginTop: 8, lineHeight: 32 },
+  h1: { fontFamily: fonts.display, fontSize: 30, color: colors.cream, letterSpacing: -1, marginTop: 8, lineHeight: 33 },
   statRow: { flexDirection: "row", gap: 26, marginTop: 16, marginBottom: 6 },
   statN: { fontFamily: fonts.display, fontSize: 30, color: colors.cream, lineHeight: 30 },
   statL: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginTop: 4 },

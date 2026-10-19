@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   backText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.cream, flexShrink: 1 },
 
   kick: { fontFamily: fonts.bold, fontSize: 10.5, letterSpacing: 2, color: colors.amber, textTransform: "uppercase" },
-  h1: { fontFamily: fonts.display, fontSize: 26, color: colors.cream, textTransform: "uppercase", marginTop: 8 },
+  h1: { fontFamily: fonts.display, fontSize: 26, color: colors.cream, letterSpacing: -0.8, marginTop: 8 },
   meta: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted, marginTop: 6 },
   date: { fontFamily: fonts.body, fontSize: 12, color: colors.dim, marginBottom: 16 },
 

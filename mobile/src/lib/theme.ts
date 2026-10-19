@@ -43,12 +43,12 @@ export const spacing = {
 };
 
 export const fonts = {
-  // expo-google-fonts export names.
-  display: "Anton_400Regular",
-  body: "Inter_400Regular",
-  medium: "Inter_500Medium",
-  semibold: "Inter_600SemiBold",
-  bold: "Inter_700Bold",
+  // Plus Jakarta Sans everywhere — matches the website's dark theme + the mock.
+  display: "PlusJakartaSans_800ExtraBold",
+  body: "PlusJakartaSans_400Regular",
+  medium: "PlusJakartaSans_500Medium",
+  semibold: "PlusJakartaSans_600SemiBold",
+  bold: "PlusJakartaSans_700Bold",
 };
 
 // The five "art well" palettes from the mockup. Each is a two-stop radial-style

@@ -81,7 +81,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { fontFamily: fonts.display, fontSize: 38, lineHeight: 39, color: colors.cream, textTransform: "uppercase", marginTop: 10 },
+  hero: { fontFamily: fonts.display, fontSize: 38, lineHeight: 41, color: colors.cream, letterSpacing: -1.2, marginTop: 10 },
   dek: { fontFamily: fonts.body, fontSize: 14, lineHeight: 21, color: colors.muted, marginTop: 14 },
   ctaRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 18 },
   primary: { backgroundColor: colors.amber, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 20 },

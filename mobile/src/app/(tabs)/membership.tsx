@@ -52,7 +52,7 @@ export default function MembershipScreen() {
 }
 
 const styles = StyleSheet.create({
-  h1: { fontFamily: fonts.display, fontSize: 26, color: colors.cream, textTransform: "uppercase", marginTop: 12 },
+  h1: { fontFamily: fonts.display, fontSize: 26, color: colors.cream, letterSpacing: -0.8, marginTop: 12 },
   sub: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 9, marginBottom: 16 },
   tier: { borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 13, backgroundColor: colors.surface },
   tierHot: { borderColor: colors.amber },

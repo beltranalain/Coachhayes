@@ -19,6 +19,7 @@ import { canAccess, type AdminScreen, type Role } from "../../lib/adminApi";
 type Item = { label: string; hint: string; route: string; screen: AdminScreen };
 
 const ITEMS: Item[] = [
+  { label: "Evaluations", hint: "Record your read, AI writes it, publish", route: "/admin/evaluations", screen: "evaluations" },
   { label: "Schedule", hint: "Add or remove broadcasts", route: "/admin/schedule", screen: "schedule" },
   { label: "Tips", hint: "Support received from viewers", route: "/admin/tips", screen: "tips" },
   { label: "Costs", hint: "Estimated monthly spend", route: "/admin/costs", screen: "costs" },
@@ -96,7 +97,7 @@ function AdminHomeInner() {
 
 export default function AdminHome() {
   return (
-    <AdminScaffold eyebrow="Creator Studio" title="Admin">
+    <AdminScaffold eyebrow="Coach Hayes · Control Room" title="Admin">
       <AdminHomeInner />
     </AdminScaffold>
   );

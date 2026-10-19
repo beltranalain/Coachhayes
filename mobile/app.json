@@ -19,7 +19,10 @@
     },
     "android": {
       "package": "com.coachhayes.app",
-      "permissions": ["CAMERA", "RECORD_AUDIO"],
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -58,7 +61,8 @@
         }
       ],
       "expo-font",
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -31,6 +31,7 @@ function SafeAreaShell() {
         {/* Routes are file-based; listed explicitly so the group is clear. The
             Team screen (owner-only) is gated by <AdminScaffold require="team">. */}
         <Stack.Screen name="index" />
+        <Stack.Screen name="evaluations" />
         <Stack.Screen name="schedule" />
         <Stack.Screen name="tips" />
         <Stack.Screen name="costs" />

@@ -72,9 +72,9 @@ export function ScreenHeader() {
         )}
         <View style={styles.words}>
           <Text style={styles.wordmark} numberOfLines={1}>
-            {siteName || "Your Studio"}
+            {siteName || "Coach Hayes Football"}
           </Text>
-          <Text style={styles.sub}>{(siteName || "Your Studio").toUpperCase()}</Text>
+          <Text style={styles.sub}>{(siteName || "Coach Hayes Football").toUpperCase()}</Text>
         </View>
       </View>
 
