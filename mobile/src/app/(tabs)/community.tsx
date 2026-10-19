@@ -10,6 +10,7 @@ import { colors, fonts } from "../../lib/theme";
 import { fetchFeed, timeAgo, youtubeId, type FeedPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { VideoModal, PlayTriangle } from "../../components/PlayerCard";
+import PlayerBreakdownCard from "../../components/PlayerBreakdownCard";
 
 export default function CommunityScreen() {
   const router = useRouter();
@@ -69,7 +70,11 @@ function PostCard({ post, onPlay }: { post: FeedPost; onPlay: (id: string, name:
         </View>
       </View>
 
-      {!!post.text && <Text style={styles.pText}>{post.text}</Text>}
+      {post.kind === "player" && post.player ? (
+        <PlayerBreakdownCard p={post.player} />
+      ) : (
+        !!post.text && <Text style={styles.pText}>{post.text}</Text>
+      )}
 
       {post.image ? (
         <Image source={{ uri: post.image }} style={styles.pImage} contentFit="cover" />

@@ -1,19 +1,19 @@
 // BLOG — published articles from the site, opening the full post in the browser.
 
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Linking } from "react-native";
+import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 
 import { colors, fonts } from "../../lib/theme";
-import { API_BASE } from "../../lib/config";
 import { fetchBlog, type BlogPost } from "../../lib/api";
 import { Eyebrow } from "../../components/ui";
 
 export default function BlogScreen() {
+  const router = useRouter();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const site = API_BASE.replace(/\/$/, "");
 
   useEffect(() => {
     let alive = true;
@@ -40,7 +40,7 @@ export default function BlogScreen() {
       ListHeaderComponent={header}
       contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 28 }}
       renderItem={({ item }) => (
-        <Pressable onPress={() => site && Linking.openURL(`${site}/blog/${item.slug}`)} style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}>
+        <Pressable onPress={() => router.push(`/blog/${item.slug}?title=${encodeURIComponent(item.title)}` as never)} style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}>
           {item.cover ? (
             <Image source={{ uri: item.cover }} style={styles.thumb} contentFit="cover" />
           ) : (

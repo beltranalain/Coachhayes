@@ -112,6 +112,12 @@ export function fetchBlog(): Promise<{ posts: BlogPost[] }> {
   return getJSON<{ posts: BlogPost[] }>("/api/blog");
 }
 
+export type BlogArticle = { title: string; content: string; cover: string; category: string; readMins: number; author: string; publishedAt: number };
+export async function fetchBlogPost(slug: string): Promise<{ post?: BlogArticle }> {
+  try { return await getJSON<{ post?: BlogArticle }>(`/api/blog/${encodeURIComponent(slug)}`); }
+  catch { return {}; }
+}
+
 // "3d" / "4h" / "now" style short relative time.
 export function timeAgo(ts?: number): string {
   if (!ts) return "";
