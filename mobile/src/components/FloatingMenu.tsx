@@ -41,11 +41,12 @@ export function useMenu(): MenuContextValue {
 
 // The four sections. `match` is used against the current pathname to mark active.
 const SECTIONS = [
-  { key: "live", label: "Live", route: "/" as const, match: ["/", "/index"] },
+  { key: "home", label: "Home", route: "/" as const, match: ["/", "/index"] },
   { key: "rankings", label: "Rankings", route: "/rankings" as const, match: ["/rankings", "/evaluation"] },
-  { key: "shows", label: "Shows", route: "/shows" as const, match: ["/shows"] },
-  { key: "schedule", label: "Schedule", route: "/schedule" as const, match: ["/schedule"] },
-  { key: "archive", label: "Archive", route: "/archive" as const, match: ["/archive"] },
+  { key: "community", label: "Community", route: "/community" as const, match: ["/community"] },
+  { key: "live", label: "Live", route: "/live" as const, match: ["/live"] },
+  { key: "blog", label: "Blog", route: "/blog" as const, match: ["/blog"] },
+  { key: "membership", label: "Membership", route: "/membership" as const, match: ["/membership"] },
 ];
 
 // Simple camera mark for the "Join the show" entry (View-based, no SVG).
@@ -91,12 +92,59 @@ function RankingsIcon({ color }: { color: string }) {
   );
 }
 
+// A few more View-based marks (no SVG) for the Coach Hayes sections.
+function HomeIcon({ color }: { color: string }) {
+  return (
+    <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 15, height: 9, borderWidth: 1.8, borderTopWidth: 0, borderColor: color, marginTop: 5 }} />
+      <View style={{ position: "absolute", top: 2, width: 12, height: 12, borderLeftWidth: 1.8, borderTopWidth: 1.8, borderColor: color, transform: [{ rotate: "45deg" }] }} />
+    </View>
+  );
+}
+function CommunityIcon({ color }: { color: string }) {
+  return (
+    <View style={{ width: 20, height: 20, justifyContent: "center" }}>
+      <View style={{ position: "absolute", left: 1, top: 4, width: 7, height: 7, borderRadius: 4, borderWidth: 1.7, borderColor: color }} />
+      <View style={{ position: "absolute", right: 1, top: 4, width: 7, height: 7, borderRadius: 4, borderWidth: 1.7, borderColor: color }} />
+      <View style={{ position: "absolute", left: 0, bottom: 2, width: 9, height: 6, borderTopLeftRadius: 5, borderTopRightRadius: 5, borderWidth: 1.7, borderBottomWidth: 0, borderColor: color }} />
+      <View style={{ position: "absolute", right: 0, bottom: 2, width: 9, height: 6, borderTopLeftRadius: 5, borderTopRightRadius: 5, borderWidth: 1.7, borderBottomWidth: 0, borderColor: color }} />
+    </View>
+  );
+}
+function BlogIcon({ color }: { color: string }) {
+  return (
+    <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 14, height: 16, borderRadius: 3, borderWidth: 1.7, borderColor: color, paddingHorizontal: 3, paddingTop: 3, gap: 2 }}>
+        <View style={{ height: 1.6, backgroundColor: color }} />
+        <View style={{ height: 1.6, backgroundColor: color }} />
+        <View style={{ height: 1.6, width: 5, backgroundColor: color }} />
+      </View>
+    </View>
+  );
+}
+function MembershipIcon({ color }: { color: string }) {
+  return (
+    <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 11, height: 11, borderRadius: 6, borderWidth: 1.8, borderColor: color }} />
+      <View style={{ position: "absolute", bottom: 1, width: 15, height: 7, borderTopLeftRadius: 6, borderTopRightRadius: 6, borderWidth: 1.8, borderBottomWidth: 0, borderColor: color }} />
+    </View>
+  );
+}
+
 function SectionIcon({ name, color }: { name: string; color: string }) {
   switch (name) {
+    case "home":
+      return <HomeIcon color={color} />;
     case "live":
       return <LiveIcon color={color} size={20} />;
     case "rankings":
       return <RankingsIcon color={color} />;
+    case "community":
+      return <CommunityIcon color={color} />;
+    case "blog":
+      return <BlogIcon color={color} />;
+    case "membership":
+      return <MembershipIcon color={color} />;
     case "shows":
       return <ShowsIcon color={color} size={20} />;
     case "schedule":

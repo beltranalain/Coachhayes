@@ -94,6 +94,36 @@ export function youtubeId(url?: string): string | null {
   return m ? m[1] : null;
 }
 
+// ---- Community feed ---------------------------------------------------------
+export type FeedPost = {
+  id: string; uid: string; author: string; picture: string | null; text: string;
+  ts: number; likes: number; commentCount: number; room: string;
+  image: string | null; clip: string | null; kind: string | null;
+  player: any | null; show: any | null;
+};
+
+export function fetchFeed(room = "general"): Promise<{ posts: FeedPost[] }> {
+  return getJSON<{ posts: FeedPost[] }>(`/api/community/posts?room=${encodeURIComponent(room)}`);
+}
+
+// ---- Blog -------------------------------------------------------------------
+export type BlogPost = { id: string; slug: string; title: string; excerpt: string; category: string; readMins: number; cover: string; publishedAt: number };
+export function fetchBlog(): Promise<{ posts: BlogPost[] }> {
+  return getJSON<{ posts: BlogPost[] }>("/api/blog");
+}
+
+// "3d" / "4h" / "now" style short relative time.
+export function timeAgo(ts?: number): string {
+  if (!ts) return "";
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return "now";
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24); if (d < 7) return `${d}d`;
+  const w = Math.floor(d / 7); if (w < 5) return `${w}w`;
+  return `${Math.floor(d / 30)}mo`;
+}
+
 // Is the Cloudflare live input currently receiving a broadcast?
 export function fetchStreamStatus(): Promise<StreamStatus> {
   return getJSON<StreamStatus>("/api/stream/status");

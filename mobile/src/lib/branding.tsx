@@ -15,8 +15,8 @@ type BrandingState = {
 
 const DEFAULTS: BrandingState = {
   logo: "",
-  siteName: "Your Studio",
-  tagline: "Five shows. One camera.",
+  siteName: "Coach Hayes Football",
+  tagline: "Graded on film.",
   loaded: false,
 };
 

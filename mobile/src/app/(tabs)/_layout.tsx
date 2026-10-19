@@ -40,11 +40,12 @@ function SafeAreaWrapper() {
           tabBarStyle: { display: "none" },
         }}
       >
-        <Tabs.Screen name="index" options={{ title: "Live" }} />
+        <Tabs.Screen name="index" options={{ title: "Home" }} />
         <Tabs.Screen name="rankings" options={{ title: "Rankings" }} />
-        <Tabs.Screen name="shows" options={{ title: "Shows" }} />
-        <Tabs.Screen name="schedule" options={{ title: "Schedule" }} />
-        <Tabs.Screen name="archive" options={{ title: "Archive" }} />
+        <Tabs.Screen name="community" options={{ title: "Community" }} />
+        <Tabs.Screen name="live" options={{ title: "Live" }} />
+        <Tabs.Screen name="blog" options={{ title: "Blog" }} />
+        <Tabs.Screen name="membership" options={{ title: "Membership" }} />
       </Tabs>
 
       {/* Floating menu overlay, rendered above the screens. */}
