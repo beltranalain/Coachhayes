@@ -143,9 +143,15 @@ export default function CommunityScreen() {
         )}
 
         <View style={styles.cRow}>
-          <Pressable onPress={pickImage} style={styles.cChip}><Text style={styles.cChipText}>Photo</Text></Pressable>
-          <Pressable onPress={() => setPanel(panel === "poll" ? null : "poll")} style={[styles.cChip, panel === "poll" && styles.cChipOn]}><Text style={[styles.cChipText, panel === "poll" && { color: colors.amber }]}>Poll</Text></Pressable>
-          <Pressable onPress={submit} disabled={posting} style={styles.postBtn}><Text style={styles.postBtnText}>{posting ? "…" : "Post"}</Text></Pressable>
+          <Pressable onPress={pickImage} style={styles.cChip}>
+            <Feather name="image" size={14} color={colors.muted} /><Text style={styles.cChipText}>Photo</Text>
+          </Pressable>
+          <Pressable onPress={() => setPanel(panel === "poll" ? null : "poll")} style={[styles.cChip, panel === "poll" && styles.cChipOn]}>
+            <Feather name="bar-chart-2" size={14} color={panel === "poll" ? colors.amber : colors.muted} /><Text style={[styles.cChipText, panel === "poll" && { color: colors.amber }]}>Poll</Text>
+          </Pressable>
+          <Pressable onPress={submit} disabled={posting} style={styles.postBtn}>
+            <Text style={styles.postBtnText}>{posting ? "…" : "Post"}</Text>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -300,10 +306,10 @@ const styles = StyleSheet.create({
   previewX: { position: "absolute", top: 8, right: 8, width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center" },
   panelInput: { marginTop: 10, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.line, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, fontFamily: fonts.body, fontSize: 13, color: colors.cream },
   cRow: { flexDirection: "row", alignItems: "center", gap: 8, borderTopWidth: 1, borderTopColor: colors.lineSoft, paddingTop: 12, marginTop: 12 },
-  cChip: { borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 18 },
+  cChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 9 },
   cChipOn: { borderColor: colors.amber },
   cChipText: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.muted },
-  postBtn: { marginLeft: "auto", backgroundColor: colors.amber, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 20 },
+  postBtn: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.amber, borderWidth: 1, borderColor: colors.amber, borderRadius: 999, paddingVertical: 9 },
   postBtnText: { fontFamily: fonts.bold, fontSize: 13, color: "#171204" },
 
   post: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 14, marginBottom: 14 },
