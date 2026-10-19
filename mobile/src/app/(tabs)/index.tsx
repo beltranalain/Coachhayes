@@ -11,14 +11,13 @@ import {
   youtubeId, type RankPlayer, type ScheduleItem,
 } from "../../lib/api";
 import { Eyebrow } from "../../components/ui";
-import { PlayerCard, VideoModal, evalHref } from "../../components/PlayerCard";
+import { PlayerCard, watchHref, evalHref } from "../../components/PlayerCard";
 
 export default function HomeScreen() {
   const router = useRouter();
   const [players, setPlayers] = useState<RankPlayer[]>([]);
   const [live, setLive] = useState(false);
   const [next, setNext] = useState<ScheduleItem | null>(null);
-  const [playing, setPlaying] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -32,12 +31,11 @@ export default function HomeScreen() {
 
   function openVideo(p: RankPlayer) {
     const id = youtubeId(p.videoUrl);
-    if (id) setPlaying({ id, name: p.name });
+    if (id) router.push(watchHref(id, p.name) as never);
     else if (p.videoUrl) Linking.openURL(p.videoUrl).catch(() => {});
   }
 
   return (
-    <>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30 }}>
         <View style={{ paddingTop: 14 }}>
           <Eyebrow>Film-first recruiting</Eyebrow>
@@ -75,8 +73,6 @@ export default function HomeScreen() {
         ))}
         {players.length === 0 && <Text style={styles.empty}>The board is opening soon.</Text>}
       </ScrollView>
-      <VideoModal playing={playing} onClose={() => setPlaying(null)} />
-    </>
   );
 }
 

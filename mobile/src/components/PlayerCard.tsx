@@ -3,12 +3,16 @@
 // Read / Unlock button. Plus the fullscreen VideoModal both screens render.
 
 import React from "react";
-import { View, Text, StyleSheet, Pressable, Modal, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
-import { WebView } from "react-native-webview";
 import { colors, fonts, chipColors } from "../lib/theme";
 import { youtubeId, type RankPlayer } from "../lib/api";
 import { ArtWell } from "./ui";
+
+// Route to the full-screen highlight player (avoids the WebView-in-Modal bug).
+export function watchHref(id: string, name: string): string {
+  return `/watch?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}`;
+}
 
 const CAT_ORDER = ["power", "speed", "motor", "technique", "iq"] as const;
 
@@ -57,28 +61,6 @@ export function PlayerCard({ player, rank, onPlay, onEval }: { player: RankPlaye
         ) : <View style={{ width: 4 }} />}
       </View>
     </View>
-  );
-}
-
-export function VideoModal({ playing, onClose }: { playing: { id: string; name: string } | null; onClose: () => void }) {
-  const { width } = useWindowDimensions();
-  if (!playing) return null;
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.vScrim} onPress={onClose}>
-        <Pressable style={{ width: "100%" }} onPress={() => {}}>
-          <View style={[styles.vBox, { height: (Math.min(width, 520) - 40) * 9 / 16 }]}>
-            <WebView
-              source={{ uri: `https://www.youtube.com/embed/${playing.id}?autoplay=1&playsinline=1&rel=0` }}
-              style={{ flex: 1, backgroundColor: "#000" }}
-              allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} javaScriptEnabled allowsFullscreenVideo scrollEnabled={false}
-            />
-          </View>
-          <Text style={styles.vName}>Highlight film · {playing.name}</Text>
-          <Pressable onPress={onClose} style={styles.vClose}><Text style={styles.vCloseText}>Close</Text></Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
   );
 }
 

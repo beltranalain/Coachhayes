@@ -15,7 +15,7 @@ import {
   timeAgo, youtubeId, type FeedPost, type Series, type Comment,
 } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { VideoModal, PlayTriangle } from "../../components/PlayerCard";
+import { PlayTriangle, watchHref } from "../../components/PlayerCard";
 import PlayerBreakdownCard from "../../components/PlayerBreakdownCard";
 
 export default function CommunityScreen() {
@@ -26,7 +26,6 @@ export default function CommunityScreen() {
   const [series, setSeries] = useState<Series[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilter, setShowFilter] = useState<string | null>(null);
-  const [playing, setPlaying] = useState<{ id: string; name: string } | null>(null);
 
   // Composer
   const [text, setText] = useState("");
@@ -168,11 +167,10 @@ export default function CommunityScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 28, paddingTop: 14 }}
         renderItem={({ item }) => (
           <PostCard post={item} uid={uid} onLike={() => onLike(item)} onSave={() => onSave(item)} onVote={(i) => onVote(item, i)}
-            onPlay={(id, name) => setPlaying({ id, name })} requireAuth={requireAuth} onCount={(n) => updatePost(item.id, { commentCount: n })} />
+            onPlay={(id, name) => router.push(watchHref(id, name) as never)} requireAuth={requireAuth} onCount={(n) => updatePost(item.id, { commentCount: n })} />
         )}
         ListEmptyComponent={<Text style={styles.empty}>No posts yet.</Text>}
       />
-      <VideoModal playing={playing} onClose={() => setPlaying(null)} />
     </>
   );
 }

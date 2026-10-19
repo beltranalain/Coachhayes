@@ -8,14 +8,13 @@ import { useRouter } from "expo-router";
 import { colors, fonts } from "../../lib/theme";
 import { fetchPlayers, youtubeId, type RankPlayer } from "../../lib/api";
 import { Eyebrow } from "../../components/ui";
-import { PlayerCard, VideoModal, evalHref } from "../../components/PlayerCard";
+import { PlayerCard, watchHref, evalHref } from "../../components/PlayerCard";
 
 export default function RankingsScreen() {
   const router = useRouter();
   const [players, setPlayers] = useState<RankPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [playing, setPlaying] = useState<{ id: string; name: string } | null>(null);
   const [pos, setPos] = useState<string>("all");
   const [year, setYear] = useState<string>("all");
 
@@ -43,7 +42,7 @@ export default function RankingsScreen() {
 
   function openVideo(p: RankPlayer) {
     const id = youtubeId(p.videoUrl);
-    if (id) setPlaying({ id, name: p.name });
+    if (id) router.push(watchHref(id, p.name) as never);
     else if (p.videoUrl) Linking.openURL(p.videoUrl).catch(() => {});
   }
 
@@ -71,21 +70,18 @@ export default function RankingsScreen() {
   }
 
   return (
-    <>
-      <FlatList
-        data={rows}
-        keyExtractor={(p) => p.slug}
-        ListHeaderComponent={header}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 28 }}
-        renderItem={({ item, index }) => (
-          <PlayerCard player={item} rank={players.indexOf(item) + 1} onPlay={() => openVideo(item)} onEval={() => router.push(evalHref(item) as never)} />
-        )}
-        ListEmptyComponent={
-          <Text style={styles.empty}>{error ? "Couldn't reach the board. Check your connection." : "No players match that filter yet."}</Text>
-        }
-      />
-      <VideoModal playing={playing} onClose={() => setPlaying(null)} />
-    </>
+    <FlatList
+      data={rows}
+      keyExtractor={(p) => p.slug}
+      ListHeaderComponent={header}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 28 }}
+      renderItem={({ item }) => (
+        <PlayerCard player={item} rank={players.indexOf(item) + 1} onPlay={() => openVideo(item)} onEval={() => router.push(evalHref(item) as never)} />
+      )}
+      ListEmptyComponent={
+        <Text style={styles.empty}>{error ? "Couldn't reach the board. Check your connection." : "No players match that filter yet."}</Text>
+      }
+    />
   );
 }
 
