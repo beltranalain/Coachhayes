@@ -41,6 +41,7 @@ function SafeAreaWrapper() {
         }}
       >
         <Tabs.Screen name="index" options={{ title: "Live" }} />
+        <Tabs.Screen name="rankings" options={{ title: "Rankings" }} />
         <Tabs.Screen name="shows" options={{ title: "Shows" }} />
         <Tabs.Screen name="schedule" options={{ title: "Schedule" }} />
         <Tabs.Screen name="archive" options={{ title: "Archive" }} />

@@ -1,19 +1,22 @@
 // Design tokens lifted from the web mockup (mockup/ios-app-mock.html) so the
 // native app matches the site's dark, cinematic look.
 
+// Aligned 1:1 with the website's dark theme tokens (hayes-ds.css [data-theme=dark]):
+// pure-black surface, muted-tan accent. `amber` is kept as the token NAME used
+// across components, but now holds the site's accent value so the app matches.
 export const colors = {
-  bg: "#0A0908",
-  bgDeep: "#050403",
-  surface: "#141110",
-  surface2: "#1C1714",
-  cream: "#F3EFE7",
-  muted: "#9A9287",
-  dim: "#6B6055",
-  amber: "#F5A524",
-  highlight: "#FFBE4A",
-  live: "#E8402A",
-  line: "rgba(243,239,231,0.14)",
-  lineSoft: "rgba(243,239,231,0.08)",
+  bg: "#000000",        // --app
+  bgDeep: "#000000",    // --deep
+  surface: "#131316",   // --card
+  surface2: "#0D0D10",  // --alt
+  cream: "#F5F5F7",     // --ink
+  muted: "#86868B",     // --sub
+  dim: "#5A5A60",       // --dim
+  amber: "#C8A96B",     // --acc (site accent)
+  highlight: "#D8BE86",
+  live: "#FF453A",      // --live
+  line: "rgba(245,245,247,0.13)",   // --hair
+  lineSoft: "rgba(245,245,247,0.07)", // --hair2
 };
 
 export const radii = {
@@ -21,6 +24,14 @@ export const radii = {
   md: 12,
   lg: 16,
   pill: 999,
+};
+
+// Chip tier colors — identical to the website's CHIP_META rings.
+export const chipColors: Record<string, string> = {
+  blue: "#2D6BFF",
+  gold: "#F5C542",
+  silver: "#A9B2BD",
+  bronze: "#C98A5E",
 };
 
 export const spacing = {

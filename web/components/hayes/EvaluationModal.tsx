@@ -69,7 +69,7 @@ export default function EvaluationModal({ slug, playerName, onClose }: { slug: s
 
           {state.phase === "locked" && (
             <div className="evlock">
-              <div className="evlock-badge">🔒 Full breakdown locked</div>
+              <div className="evlock-badge">Full breakdown locked</div>
               <p className="evp">{state.teaser}</p>
               <div className="evlock-cta">
                 <h3>Unlock the full film evaluation{state.price ? ` — ${state.price}` : ""}</h3>

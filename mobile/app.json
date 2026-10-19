@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Your Studio",
-    "slug": "your-studio-app",
+    "name": "Coach Hayes Football",
+    "slug": "coach-hayes-football",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "scheme": "yourstudio",
+    "scheme": "coachhayes",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0A0908",
+    "backgroundColor": "#000000",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourstudio.app",
+      "bundleIdentifier": "com.coachhayes.app",
       "icon": "./assets/images/icon.png",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses your camera so you can join the show as a guest.",
@@ -18,10 +18,10 @@
       }
     },
     "android": {
-      "package": "com.yourstudio.app",
+      "package": "com.coachhayes.app",
       "permissions": ["CAMERA", "RECORD_AUDIO"],
       "adaptiveIcon": {
-        "backgroundColor": "#0A0908",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -37,7 +37,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0A0908",
+          "backgroundColor": "#000000",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200
         }
@@ -47,7 +47,7 @@
       [
         "@stripe/stripe-react-native",
         {
-          "merchantIdentifier": "merchant.com.yourstudio.app",
+          "merchantIdentifier": "merchant.com.coachhayes.app",
           "enableGooglePay": true
         }
       ],

@@ -13,8 +13,9 @@ const LINKS = [
   { href: "/community", label: "Community" },
   { href: "/rankings", label: "Rankings" },
   { href: "/blog", label: "Blog" },
-  { href: "/fantasy", label: "Fantasy" },
-  { href: "/shop", label: "Shop" },
+  // Hidden for now (pages kept — just not in the nav). Re-add to show again.
+  // { href: "/fantasy", label: "Fantasy" },
+  // { href: "/shop", label: "Shop" },
   { href: "/membership", label: "Membership" },
 ];
 

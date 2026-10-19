@@ -42,6 +42,7 @@ export function useMenu(): MenuContextValue {
 // The four sections. `match` is used against the current pathname to mark active.
 const SECTIONS = [
   { key: "live", label: "Live", route: "/" as const, match: ["/", "/index"] },
+  { key: "rankings", label: "Rankings", route: "/rankings" as const, match: ["/rankings", "/evaluation"] },
   { key: "shows", label: "Shows", route: "/shows" as const, match: ["/shows"] },
   { key: "schedule", label: "Schedule", route: "/schedule" as const, match: ["/schedule"] },
   { key: "archive", label: "Archive", route: "/archive" as const, match: ["/archive"] },
@@ -79,10 +80,23 @@ function AdminIcon({ color }: { color: string }) {
   );
 }
 
+// Rankings mark: a ring with an up-chevron (matches the web rankings glyph).
+function RankingsIcon({ color }: { color: string }) {
+  return (
+    <View style={{ width: 20, height: 20, alignItems: "center", justifyContent: "center" }}>
+      <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 1.8, borderColor: color }} />
+      <View style={{ position: "absolute", width: 7, height: 1.8, backgroundColor: color, borderRadius: 2, transform: [{ translateX: -2 }, { translateY: 1 }, { rotate: "-45deg" }] }} />
+      <View style={{ position: "absolute", width: 7, height: 1.8, backgroundColor: color, borderRadius: 2, transform: [{ translateX: 2 }, { translateY: 1 }, { rotate: "45deg" }] }} />
+    </View>
+  );
+}
+
 function SectionIcon({ name, color }: { name: string; color: string }) {
   switch (name) {
     case "live":
       return <LiveIcon color={color} size={20} />;
+    case "rankings":
+      return <RankingsIcon color={color} />;
     case "shows":
       return <ShowsIcon color={color} size={20} />;
     case "schedule":

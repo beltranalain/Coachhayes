@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Coach Hayes Football — Live Mobile Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Both theme token sets are lifted 1:1 from hayes-ds.css (.hz light + dark). */
+  .screen[data-theme="dark"]{
+    --app:#000; --alt:#0D0D10; --card:#131316; --ink:#F5F5F7; --sub:#86868B; --dim:#5A5A60;
+    --hair:rgba(245,245,247,.13); --hair2:rgba(245,245,247,.07);
+    --acc:#C8A96B; --accInk:#171204; --green:#30D158; --live:#FF453A; --amber:#FFD60A;
+    --fb:"Plus Jakarta Sans"; --fd:"Plus Jakarta Sans";
+  }
+  .screen[data-theme="light"]{
+    --app:#FFFFFF; --alt:#F5F5F7; --card:#FFFFFF; --ink:#1D1D1F; --sub:#6E6E73; --dim:#A1A1A6;
+    --hair:rgba(0,0,0,.1); --hair2:rgba(0,0,0,.055);
+    --acc:#0B6BFF; --accInk:#FFFFFF; --green:#34C759; --live:#E8342A; --amber:#FF9F0A;
+    --fb:"Inter"; --fd:"Inter Tight";
+  }
+  :root{ --blue:#2D6BFF; --c-gold:#F5C542; --silver:#A9B2BD; --bronze:#C98A5E; }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{background:radial-gradient(1100px 600px at 50% -5%,#1b1b1e,#060607) fixed,#060607;color:#d9d6d0;
+    font-family:"Plus Jakarta Sans",system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;
+    align-items:center;padding:34px 16px 60px}
+
+  .intro{text-align:center;max-width:560px;margin-bottom:22px}
+  .intro h1{font-size:22px;font-weight:600;letter-spacing:-.03em;color:#f3efe8}
+  .intro p{font-size:13.5px;color:#9a948b;margin-top:8px;line-height:1.5}
+  .hint{display:inline-flex;gap:7px;align-items:center;margin-top:12px;font-size:12px;color:#8a857c;border:1px solid #ffffff1f;border-radius:980px;padding:6px 14px}
+  .hint b{color:#c8a96b;font-weight:600}
+
+  /* Phone */
+  .phone{position:relative;width:368px;height:772px;background:#0a0a0a;border-radius:52px;padding:11px;
+    box-shadow:0 34px 80px rgba(0,0,0,.65),0 0 0 2px #26231f}
+  .screen{position:relative;width:100%;height:100%;background:var(--app);border-radius:42px;overflow:hidden;
+    display:flex;flex-direction:column;font-family:var(--fb),system-ui,sans-serif;color:var(--ink);
+    font-size:15px;line-height:1.5;letter-spacing:-.012em}
+  .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:128px;height:27px;background:#0a0a0a;border-radius:0 0 17px 17px;z-index:60}
+  h1,h2,h3,h4{font-family:var(--fd),system-ui,sans-serif;font-weight:600;letter-spacing:-.032em;line-height:1.07}
+
+  .statusbar{height:42px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 22px 5px;font-size:12.5px;font-weight:600;z-index:30;color:var(--ink)}
+  .statusbar .r{display:inline-flex;gap:6px;align-items:center}
+
+  /* NAV */
+  .nav{border-bottom:1px solid var(--hair);background:color-mix(in srgb,var(--app) 80%,transparent);position:relative;z-index:20}
+  .navrow{height:48px;display:none;align-items:center;justify-content:space-between;padding:0 15px}
+  .navrow.on{display:flex}
+  .brand{display:flex;align-items:center;gap:8px;font-family:var(--fd);font-weight:600;font-size:14.5px;letter-spacing:-.03em}
+  .mk{width:25px;height:25px;border-radius:50%;background:radial-gradient(circle at 36% 30%,#2a2724,#0c0b0a);
+    border:1.25px solid var(--acc);display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--acc)}
+  .light .mk,[data-theme="light"] .mk{background:radial-gradient(circle at 36% 30%,#eef1f6,#dfe4ec)}
+  .nright{display:flex;align-items:center;gap:9px}
+  .tsw{display:flex;border:1px solid var(--hair);border-radius:980px;overflow:hidden}
+  .tsw b{padding:4px 10px;font-size:10.5px;color:var(--sub);font-weight:500;cursor:pointer}
+  .tsw b.on{background:var(--ink);color:var(--app)}
+  .iconbtn{width:30px;height:30px;border-radius:9px;border:1px solid var(--hair);display:grid;place-items:center;cursor:pointer}
+  .iconbtn svg{width:16px;height:16px;stroke:var(--ink)}
+  .navback{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--fd);letter-spacing:-.02em}
+  .navback svg{width:17px;height:17px;stroke:var(--ink);fill:none}
+  .crdot{width:7px;height:7px;border-radius:50%;background:var(--acc)}
+
+  /* MENU overlay */
+  .menu{position:absolute;top:90px;left:12px;right:12px;background:var(--card);border:1px solid var(--hair);
+    border-radius:18px;box-shadow:0 24px 50px rgba(0,0,0,.45);z-index:50;padding:8px;opacity:0;visibility:hidden;
+    transform:translateY(-8px);transition:.16s}
+  .menu.open{opacity:1;visibility:visible;transform:none}
+  .menu a{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:12px;font-size:15px;font-weight:500;cursor:pointer}
+  .menu a:hover{background:var(--alt)}
+  .menu a.acct{color:var(--acc);font-weight:600}
+  .menu .sep{height:1px;background:var(--hair);margin:6px 10px}
+  .menu small{display:block;padding:4px 14px 8px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);font-weight:700}
+
+  .body{flex:1;overflow:hidden;position:relative}
+  .view{position:absolute;inset:0;overflow-y:auto;padding:16px 15px 26px;display:none}
+  .view.on{display:block}
+  .view::-webkit-scrollbar{width:0}
+
+  /* Primitives */
+  .kick{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc)}
+  h2.hero{font-size:30px;line-height:1.05;margin:9px 0 0}
+  .sub{color:var(--sub)}
+  .card{background:var(--card);border:1px solid var(--hair);border-radius:20px;padding:16px}
+  .pill{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--acc);color:var(--accInk);
+    border-radius:980px;padding:10px 18px;font-size:14px;font-weight:500;border:0;cursor:pointer}
+  .pill.soft{background:var(--card);color:var(--ink);border:1px solid var(--hair)}
+  [data-theme="light"] .pill.soft{background:var(--alt)}
+  .pill.sm{padding:7px 14px;font-size:12.5px}
+  .link{color:var(--acc);font-size:13.5px;font-weight:500;cursor:pointer}
+  .chipdot{border-radius:50%;display:inline-block;flex-shrink:0}
+  .b-blue{background:var(--blue)} .b-gold{background:var(--c-gold)} .b-silver{background:var(--silver)} .b-bronze{background:var(--bronze)}
+
+  /* Rankings */
+  .rkstat{display:flex;gap:18px;margin:16px 0 14px}
+  .rkstat .n{font-family:var(--fd);font-size:30px;font-weight:600;letter-spacing:-.04em;line-height:1}
+  .rkstat .l{font-size:12.5px;color:var(--sub);margin-top:4px}
+  .filters{display:flex;gap:6px;overflow:hidden;margin-bottom:10px}
+  .fchip{font-size:12px;border:1px solid var(--hair);border-radius:980px;padding:5px 12px;color:var(--sub);background:var(--card);cursor:pointer;white-space:nowrap}
+  .fchip.on{background:var(--ink);border-color:var(--ink);color:var(--app);font-weight:500}
+  .rkrow{display:flex;align-items:center;gap:11px;padding:12px 0;border-top:1px solid var(--hair2)}
+  .rkrow:first-child{border-top:0}
+  .rknum{font-family:var(--fd);font-weight:600;color:var(--acc);font-size:19px;letter-spacing:-.04em;width:20px;text-align:center}
+  .rkwho{flex:1;min-width:0}
+  .rkwho b{font-size:14px;font-weight:600;display:block}
+  .rkwho em{font-size:11.5px;color:var(--sub);font-style:normal}
+  .rkchips{display:flex;gap:4px;margin-top:6px}
+  .rkchips .chipdot{width:14px;height:14px}
+  .evbtn{font-size:12px;font-weight:600;color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent);
+    border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);border-radius:980px;padding:6px 12px;white-space:nowrap;
+    display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+  .evbtn.lock{color:var(--ink);background:var(--alt);border-color:var(--hair)}
+  .evbtn svg{width:11px;height:11px;stroke:currentColor;fill:none}
+
+  /* Rankings video cards (match the website: playable highlight thumbnail) */
+  .rkcard{background:var(--card);border:1px solid var(--hair);border-radius:18px;padding:11px;margin-bottom:12px}
+  .vthumb{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;cursor:pointer;
+    background:linear-gradient(115deg,var(--g1,#2a2a2a) 0 46%,var(--g2,#444) 54% 100%)}
+  .vthumb::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 42%,transparent,rgba(0,0,0,.5))}
+  .vthumb .wre{position:absolute;top:8px;left:11px;font-family:var(--fd);font-weight:700;font-size:15px;color:#fff;letter-spacing:.08em;text-shadow:0 1px 5px rgba(0,0,0,.6);z-index:2}
+  .vthumb .hudl{position:absolute;bottom:8px;left:11px;font-size:10px;font-weight:700;color:#fff;opacity:.92;z-index:2;letter-spacing:.02em}
+  .vthumb .rank{position:absolute;bottom:7px;right:11px;font-family:var(--fd);font-weight:700;font-size:13px;color:#fff;opacity:.9;z-index:2}
+  .vthumb .yt{position:absolute;inset:0;display:grid;place-items:center;z-index:2}
+  .vthumb .yt i{width:50px;height:35px;border-radius:9px;background:#e21f1f;display:grid;place-items:center;box-shadow:0 5px 16px rgba(0,0,0,.45)}
+  .vthumb .yt svg{width:18px;height:18px;fill:#fff}
+  .rkhead2{display:flex;align-items:center;gap:11px;margin-top:11px}
+  .rkhead2 .who{flex:1;min-width:0}
+  .rkhead2 .who b{font-size:14.5px;font-weight:600;display:block;letter-spacing:-.02em}
+  .rkhead2 .who em{font-size:11.5px;color:var(--sub);font-style:normal}
+  .commit{width:27px;height:27px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:800;color:#fff;flex-shrink:0}
+  .rkfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:11px}
+  .rkfoot .lhs{display:flex;align-items:center;gap:9px;min-width:0}
+  .rkfoot .lbl{font-size:12.5px;font-weight:600}
+
+  /* In-app video player */
+  .vmodal{position:absolute;inset:0;background:rgba(0,0,0,.9);z-index:70;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+  .vmodal.open{display:flex}
+  .vbox{width:100%;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+  .vposter{aspect-ratio:16/9;position:relative;display:grid;place-items:center;background:linear-gradient(115deg,#1b5e3a,#b5561e)}
+  .vposter::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,transparent,rgba(0,0,0,.4))}
+  .pp{width:60px;height:42px;border-radius:11px;background:#e21f1f;display:grid;place-items:center;cursor:pointer;z-index:2}
+  .pp svg{width:22px;height:22px;fill:#fff}
+  .pp svg.play{display:none}
+  .vmodal.paused .pp svg.play{display:block}
+  .vmodal.paused .pp svg.pause{display:none}
+  .vbar{height:4px;background:#ffffff2e}
+  .vfill{height:100%;width:0;background:#e21f1f}
+  .vmodal.open .vfill{animation:prog 42s linear forwards}
+  .vmodal.paused .vfill{animation-play-state:paused}
+  @keyframes prog{from{width:0}to{width:100%}}
+  .vmeta{color:#fff;font-size:13px;margin-top:14px;text-align:center;font-weight:500}
+  .vclose{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:50%;background:#ffffff1f;display:grid;place-items:center;cursor:pointer;z-index:3}
+  .vclose svg{width:16px;height:16px;stroke:#fff;fill:none}
+
+  /* Evaluation */
+  .evdate{font-size:12px;color:var(--dim);margin:6px 0 16px}
+  .evsec{margin-bottom:18px}
+  .evsec h3{font-size:15px;margin-bottom:7px}
+  .evp{font-size:13.5px;line-height:1.65;color:var(--ink)}
+  .evlist{margin:7px 0 0;padding-left:18px}
+  .evlist li{font-size:13px;line-height:1.55;margin-bottom:6px}
+  .evlock-badge{display:inline-block;font-size:11.5px;font-weight:700;color:var(--acc);
+    background:color-mix(in srgb,var(--acc) 12%,transparent);border-radius:980px;padding:6px 13px;margin-bottom:12px}
+  .evlock-cta{margin-top:12px;padding:18px;border:1px solid var(--hair);border-radius:16px;background:var(--alt)}
+  .evlock-cta h3{font-size:16px;margin-bottom:8px}
+  .evsteps{margin:12px 0 0;padding-left:18px;color:var(--sub);font-size:12.5px;line-height:1.7}
+
+  /* Community */
+  .stories{display:flex;gap:12px;overflow:hidden;padding-bottom:14px;border-bottom:1px solid var(--hair);margin-bottom:14px}
+  .story{text-align:center;flex-shrink:0;width:56px}
+  .story i{display:block;width:52px;height:52px;border-radius:50%;border:2px solid var(--acc);padding:2px}
+  .story i u{display:block;width:100%;height:100%;border-radius:50%;background:var(--alt)}
+  .story span{font-size:9.5px;color:var(--sub);display:block;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .composer{border:1px solid var(--hair);border-radius:16px;padding:14px;margin-bottom:14px;background:var(--card)}
+  .composer .in{color:var(--sub);font-size:13.5px;padding:2px 0 14px}
+  .composer .row{display:flex;gap:7px;align-items:center;border-top:1px solid var(--hair);padding-top:11px}
+  .cbtn{font-size:12px;color:var(--sub);border:1px solid var(--hair);border-radius:980px;padding:5px 12px}
+  .post{border:1px solid var(--hair);border-radius:16px;padding:14px;margin-bottom:14px;background:var(--card)}
+  .post .ph{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+  .post .ph .av{width:34px;height:34px;border-radius:50%;background:var(--alt);display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--acc)}
+  .post .ph b{font-size:13.5px;font-weight:600}
+  .post .ph span{font-size:11px;color:var(--sub)}
+  .post .txt{font-size:13.5px;line-height:1.5}
+  .thumb{margin-top:11px;border-radius:12px;overflow:hidden;position:relative;aspect-ratio:16/9;background:linear-gradient(115deg,#0d7a3e 0 46%,#d2691e 54% 100%)}
+  .thumb .pl{position:absolute;inset:0;display:grid;place-items:center}
+  .thumb .pl i{width:44px;height:30px;border-radius:8px;background:#e21f1f;display:grid;place-items:center}
+  .thumb .pl svg{width:16px;height:16px;fill:#fff}
+  .thumb b{position:absolute;left:10px;top:9px;right:10px;font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.7)}
+  .postact{display:flex;gap:18px;margin-top:11px;color:var(--sub);font-size:12.5px;font-weight:500;align-items:center}
+  .postact span{display:inline-flex;align-items:center;gap:5px}
+  .postact svg{width:15px;height:15px;stroke:currentColor;fill:none}
+
+  /* Live */
+  .livewell{aspect-ratio:9/10;border-radius:20px;border:1px solid var(--hair);
+    background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--card) 70%,transparent),transparent 72%),var(--card);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:22px}
+  .livewell .mk{width:72px;height:72px;font-size:17px;border-width:2px}
+  .livewell .off{font-size:16px;font-weight:600;font-family:var(--fd);letter-spacing:-.02em}
+  .schedrow{display:flex;gap:11px;align-items:center}
+  .schedrow .d{width:42px;height:42px;border-radius:11px;background:var(--alt);display:grid;place-items:center;font-weight:600;color:var(--acc);font-size:12px}
+
+  /* Blog */
+  .blogrow{display:flex;gap:12px;padding:13px 0;border-top:1px solid var(--hair2);align-items:center}
+  .blogrow:first-child{border-top:0}
+  .blogrow .th{width:64px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--alt),color-mix(in srgb,var(--acc) 22%,var(--alt)));flex-shrink:0}
+  .blogrow b{font-size:13.5px;font-weight:600;display:block;line-height:1.3}
+  .blogrow span{font-size:11.5px;color:var(--sub)}
+
+  /* Membership */
+  .tier{border:1px solid var(--hair);border-radius:20px;padding:18px;margin-bottom:13px;background:var(--card)}
+  .tier.hot{border-color:var(--acc)}
+  .badge{display:inline-flex;border-radius:980px;padding:3px 11px;font-size:11px;font-weight:600;margin-bottom:9px;
+    background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
+  .tier .nm{font-size:16px;font-weight:600;font-family:var(--fd);letter-spacing:-.02em}
+  .tier .pr{font-family:var(--fd);font-size:30px;font-weight:600;letter-spacing:-.04em;margin:5px 0}
+  .tier .pr small{font-size:12.5px;color:var(--sub);font-weight:500;letter-spacing:0;font-family:var(--fb)}
+  .tier ul{margin:10px 0 14px;padding-left:17px}
+  .tier li{font-size:12.5px;line-height:1.65}
+
+  /* Admin / Control Room */
+  .rec{display:flex;align-items:center;gap:12px;background:var(--alt);border:1px solid var(--hair);border-radius:16px;padding:14px;margin-bottom:14px}
+  .rec .dot{width:46px;height:46px;border-radius:50%;background:var(--live);display:grid;place-items:center;box-shadow:0 0 0 6px color-mix(in srgb,var(--live) 16%,transparent);flex-shrink:0;cursor:pointer}
+  .rec .dot svg{width:20px;height:20px;stroke:#fff;fill:none}
+  .rec .rt{font-size:13px;font-weight:600;color:var(--live)}
+  .wave{display:flex;align-items:center;gap:3px;height:26px;margin-top:5px}
+  .wave i{width:3px;background:var(--acc);border-radius:2px;animation:w 1s ease-in-out infinite}
+  @keyframes w{0%,100%{height:6px}50%{height:24px}}
+  .flabel{font-size:11.5px;color:var(--sub);font-weight:600;margin:14px 0 6px}
+  .finput{border:1px solid var(--hair);border-radius:12px;background:var(--alt);padding:11px 13px;font-size:12.5px;color:var(--sub);line-height:1.55}
+  .genbtn{display:flex;align-items:center;justify-content:center;gap:7px;background:var(--acc);color:var(--accInk);font-weight:600;border-radius:12px;padding:12px;font-size:13.5px;margin-top:14px;cursor:pointer}
+  .genbtn svg{width:15px;height:15px;fill:currentColor}
+
+  .foot{margin-top:26px;font-size:12px;color:#6a645c;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Coach Hayes Football — live demo</h1>
+  <p>Tap around — open the menu, switch Light/Dark, and tap a player's Read/Unlock to open the evaluation. This is the real theme, on a phone.</p>
+  <span class="hint">Try: <b>menu</b> ·&nbsp; <b>Light/Dark</b> ·&nbsp; <b>Unlock</b> on a ranking</span>
+</div>
+
+<div class="phone"><div class="notch"></div>
+  <div class="screen" data-theme="dark" id="screen">
+    <div class="statusbar"><span>9:41</span><span class="r">
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><rect x="0" y="6" width="3" height="5" rx="1"/><rect x="4.5" y="4" width="3" height="7" rx="1"/><rect x="9" y="2" width="3" height="9" rx="1"/><rect x="13" y="0" width="3" height="11" rx="1"/></svg>
+      <svg width="23" height="11" viewBox="0 0 23 11" fill="none"><rect x="1" y="1" width="18.5" height="9" rx="2.5" stroke="currentColor"/><rect x="2.5" y="2.5" width="13" height="6" rx="1" fill="currentColor"/><rect x="20.5" y="4" width="1.5" height="3" rx="1" fill="currentColor"/></svg></span></div>
+
+    <!-- NAV (three modes) -->
+    <div class="nav">
+      <div class="navrow on" id="navMain">
+        <div class="brand"><span class="mk">CH</span><span id="navTitle">Coach Hayes Football</span></div>
+        <div class="nright">
+          <div class="tsw"><b data-t="light" onclick="setTheme('light')">Light</b><b data-t="dark" class="on" onclick="setTheme('dark')">Dark</b></div>
+          <div class="iconbtn" onclick="toggleMenu()"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></div>
+        </div>
+      </div>
+      <div class="navrow" id="navSub">
+        <div class="navback" onclick="go('rankings')"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg><span id="navSubTitle">Player</span></div>
+        <div class="link">Share</div>
+      </div>
+      <div class="navrow" id="navAdmin">
+        <div class="brand"><span class="crdot"></span>Control Room · Evaluations</div>
+        <div class="link" onclick="go('home')">Exit</div>
+      </div>
+
+      <div class="menu" id="menu">
+        <small>Menu</small>
+        <a onclick="go('home')">Home</a>
+        <a onclick="go('live')">Live</a>
+        <a onclick="go('community')">Community</a>
+        <a onclick="go('rankings')">Rankings</a>
+        <a onclick="go('blog')">Blog</a>
+        <a onclick="go('membership')">Membership</a>
+        <div class="sep"></div>
+        <a class="acct" onclick="go('admin')">Control Room · Evaluations</a>
+      </div>
+    </div>
+
+    <div class="body">
+
+      <!-- HOME -->
+      <div class="view on" data-view="home">
+        <p class="kick">Film-first recruiting</p>
+        <h2 class="hero">Four chips.<br>One grade.<br>Earned on film.</h2>
+        <p class="sub" style="font-size:14px;line-height:1.5;margin:12px 0 16px">Every recruit graded on tape by Coach Hayes. No stars, no camp buzz, no offer counting.</p>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px"><span class="pill" onclick="go('rankings')">View the rankings</span><span class="link" onclick="go('rankings')">How it works ›</span></div>
+        <div class="card" style="display:flex;align-items:center;gap:13px;margin-bottom:13px;padding:14px">
+          <div style="width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--live) 14%,transparent);display:grid;place-items:center">
+            <span style="width:11px;height:11px;border-radius:50%;background:var(--live);display:block"></span></div>
+          <div style="flex:1"><b style="font-size:14px;font-weight:600">The Live Show</b><div class="sub" style="font-size:12px">Off air · next Fri 8:00 PM</div></div>
+          <span class="pill soft sm" onclick="go('live')">Live</span></div>
+        <p class="kick" style="margin-bottom:10px">Top of the board</p>
+        <div class="rkcard">
+          <div class="vthumb" style="--g1:#0d7a3e;--g2:#f47321" onclick="openVideo('Amir Sears','#0d7a3e','#f47321')">
+            <span class="wre">W.R.E</span><span class="hudl">hudl</span><span class="rank">No. 1</span>
+            <span class="yt"><i><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></i></span></div>
+          <div class="rkhead2"><div class="who"><b>Amir Sears</b><em>WR · Columbus · 2027</em></div><span class="commit" style="background:#f47321">U</span></div>
+          <div class="rkfoot"><div class="lhs"><div class="rkchips"><i class="chipdot b-gold"></i><i class="chipdot b-blue"></i><i class="chipdot b-gold"></i><i class="chipdot b-gold"></i><i class="chipdot b-blue"></i></div><span class="lbl">Gold chip</span></div>
+            <span class="evbtn" onclick="go('evalFree')">Read ›</span></div>
+        </div>
+        <div class="rkcard">
+          <div class="vthumb" style="--g1:#ba0c2f;--g2:#111" onclick="openVideo('Jamir Dean','#ba0c2f','#111')">
+            <span class="wre">W.R.E</span><span class="hudl">hudl</span><span class="rank">No. 2</span>
+            <span class="yt"><i><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></i></span></div>
+          <div class="rkhead2"><div class="who"><b>Jamir Dean</b><em>WR · 2027</em></div><span class="commit" style="background:#ba0c2f">G</span></div>
+          <div class="rkfoot"><div class="lhs"><div class="rkchips"><i class="chipdot b-blue"></i><i class="chipdot b-gold"></i><i class="chipdot b-bronze"></i><i class="chipdot b-silver"></i><i class="chipdot b-gold"></i></div><span class="lbl">Gold chip</span></div>
+            <span class="evbtn lock" onclick="go('evalLocked')"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Unlock</span></div>
+        </div>
+      </div>
+
+      <!-- RANKINGS -->
+      <div class="view" data-view="rankings">
+        <p class="kick">Coach Hayes · Player Rankings</p>
+        <h2 class="hero" style="font-size:26px">Four chips. One grade.</h2>
+        <div class="rkstat"><div><div class="n">12</div><div class="l">Players graded</div></div><div><div class="n">4</div><div class="l">Chip tiers</div></div></div>
+        <div class="filters"><span class="fchip on">All</span><span class="fchip">WR</span><span class="fchip">CB</span><span class="fchip">S</span><span class="fchip">QB</span></div>
+
+        <div class="rkcard">
+          <div class="vthumb" style="--g1:#0d7a3e;--g2:#f47321" onclick="openVideo('Amir Sears','#0d7a3e','#f47321')">
+            <span class="wre">W.R.E</span><span class="hudl">hudl</span><span class="rank">No. 1</span>
+            <span class="yt"><i><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></i></span></div>
+          <div class="rkhead2"><div class="who"><b>Amir Sears</b><em>WR · Columbus · 2027</em></div><span class="commit" style="background:#f47321">U</span></div>
+          <div class="rkfoot"><div class="lhs"><div class="rkchips"><i class="chipdot b-gold"></i><i class="chipdot b-blue"></i><i class="chipdot b-gold"></i><i class="chipdot b-gold"></i><i class="chipdot b-blue"></i></div><span class="lbl">Gold chip</span></div>
+            <span class="evbtn" onclick="go('evalFree')">Read ›</span></div>
+        </div>
+
+        <div class="rkcard">
+          <div class="vthumb" style="--g1:#ba0c2f;--g2:#111" onclick="openVideo('Jamir Dean','#ba0c2f','#111')">
+            <span class="wre">W.R.E</span><span class="hudl">hudl</span><span class="rank">No. 2</span>
+            <span class="yt"><i><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></i></span></div>
+          <div class="rkhead2"><div class="who"><b>Jamir Dean</b><em>WR · 2027 · Georgia</em></div><span class="commit" style="background:#ba0c2f">G</span></div>
+          <div class="rkfoot"><div class="lhs"><div class="rkchips"><i class="chipdot b-blue"></i><i class="chipdot b-gold"></i><i class="chipdot b-bronze"></i><i class="chipdot b-silver"></i><i class="chipdot b-gold"></i></div><span class="lbl">Gold chip</span></div>
+            <span class="evbtn lock" onclick="go('evalLocked')"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Unlock</span></div>
+        </div>
+
+        <div class="rkcard">
+          <div class="vthumb" style="--g1:#841617;--g2:#111" onclick="openVideo('Trenton Blaylock','#841617','#111')">
+            <span class="wre">W.R.E</span><span class="hudl">hudl</span><span class="rank">No. 3</span>
+            <span class="yt"><i><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></i></span></div>
+          <div class="rkhead2"><div class="who"><b>Trenton Blaylock</b><em>CB · 2027 · Oklahoma</em></div><span class="commit" style="background:#841617">OU</span></div>
+          <div class="rkfoot"><div class="lhs"><div class="rkchips"><i class="chipdot b-blue"></i><i class="chipdot b-silver"></i><i class="chipdot b-gold"></i><i class="chipdot b-gold"></i><i class="chipdot b-gold"></i></div><span class="lbl">Gold chip</span></div>
+            <span class="evbtn lock" onclick="go('evalLocked')"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Unlock</span></div>
+        </div>
+
+        <div class="rkcard">
+          <div class="vthumb" style="--g1:#630031;--g2:#cf4420" onclick="openVideo('Ammari Irvin','#630031','#cf4420')">
+            <span class="wre">W.R.E</span><span class="hudl">hudl</span><span class="rank">No. 4</span>
+            <span class="yt"><i><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></i></span></div>
+          <div class="rkhead2"><div class="who"><b>Ammari Irvin</b><em>LB · 2027 · Virginia Tech</em></div><span class="commit" style="background:#630031">VT</span></div>
+          <div class="rkfoot"><div class="lhs"><div class="rkchips"><i class="chipdot b-bronze"></i><i class="chipdot b-bronze"></i><i class="chipdot b-bronze"></i><i class="chipdot b-bronze"></i><i class="chipdot b-bronze"></i></div><span class="lbl">Bronze chip</span></div>
+            <span class="evbtn" onclick="go('evalFree')">Read ›</span></div>
+        </div>
+
+        <div class="rkcard">
+          <div class="vthumb" style="--g1:#7a0019;--g2:#111" onclick="openVideo('Jalaythan Mayfield','#7a0019','#111')">
+            <span class="wre">W.R.E</span><span class="hudl">hudl</span><span class="rank">No. 5</span>
+            <span class="yt"><i><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></i></span></div>
+          <div class="rkhead2"><div class="who"><b>Jalaythan Mayfield</b><em>S · 2027 · Indiana</em></div><span class="commit" style="background:#7a0019">IU</span></div>
+          <div class="rkfoot"><div class="lhs"><div class="rkchips"><i class="chipdot b-bronze"></i><i class="chipdot b-bronze"></i><i class="chipdot b-bronze"></i><i class="chipdot b-bronze"></i><i class="chipdot b-bronze"></i></div><span class="lbl">Bronze chip</span></div>
+            <span class="evbtn lock" onclick="go('evalLocked')"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Unlock</span></div>
+        </div>
+      </div>
+
+      <!-- EVAL FREE -->
+      <div class="view" data-view="evalFree">
+        <p class="kick">Honest Evaluation</p>
+        <h2 class="hero" style="font-size:24px">Amir Sears</h2>
+        <p class="evdate">WR · Columbus · 2027 &nbsp;·&nbsp; Evaluated 10/14/26</p>
+        <div class="evsec"><h3>Size</h3><p class="evp">Prototype outside-receiver frame with the length to win at the catch point. Plays bigger than his listed weight, with room to add functional strength without losing burst.</p></div>
+        <div class="evsec"><h3>Speed &amp; Movement</h3><p class="evp">Easy long speed that shows up vertically and after the catch. Smooth out of his breaks — he decelerates and re-accelerates without gathering.</p></div>
+        <div class="evsec"><h3>Areas of Strength</h3><ul class="evlist"><li>Tracks the deep ball over either shoulder.</li><li>Strong hands away from his frame.</li><li>Separates at the top of the route.</li></ul></div>
+        <div class="evsec"><h3>Projection</h3><p class="evp" style="color:var(--acc);font-weight:600">Power Four starter upside · Gold chip</p></div>
+      </div>
+
+      <!-- EVAL LOCKED -->
+      <div class="view" data-view="evalLocked">
+        <p class="kick">Honest Evaluation</p>
+        <h2 class="hero" style="font-size:24px">Ian Ellis, Jr.</h2>
+        <p class="evdate">C · St. James Academy · 2027</p>
+        <div class="evsec"><h3>Size</h3><p class="evp">At 6'4" and 315, he has the physical dimensions sought after along a Power Four interior line. How effectively he uses that frame against collegiate…</p></div>
+        <div class="evlock-cta">
+          <span class="evlock-badge">Full breakdown locked</span>
+          <h3>Unlock the full evaluation — $49</h3>
+          <p class="sub" style="font-size:12.5px;line-height:1.55">Size, movement, effort, strengths, areas to improve, recruiting targets and a final projection.</p>
+          <ol class="evsteps"><li>Pay $49 via CashApp or PayPal.</li><li>Include the player's name and your sign-in email.</li><li>Coach unlocks it to your account.</li></ol>
+          <div style="display:flex;gap:8px;margin-top:14px"><span class="pill sm" onclick="go('membership')">Payment options</span><span class="pill soft sm">Contact Coach</span></div>
+        </div>
+      </div>
+
+      <!-- COMMUNITY -->
+      <div class="view" data-view="community">
+        <div class="stories">
+          <div class="story"><i style="border-color:var(--live)"><u style="display:grid;place-items:center;color:var(--live);font-size:9px;font-weight:700;background:color-mix(in srgb,var(--live) 14%,transparent)">LIVE</u></i><span>Live</span></div>
+          <div class="story"><i><u></u></i><span>Long Play</span></div>
+          <div class="story"><i><u></u></i><span>Quick Takes</span></div>
+          <div class="story"><i><u></u></i><span>On The Road</span></div>
+        </div>
+        <div class="composer"><div class="in">Say something…</div><div class="row"><span class="cbtn">Photo</span><span class="cbtn">Clip</span><span class="cbtn">Poll</span><span style="margin-left:auto" class="pill sm">Post</span></div></div>
+        <div class="post">
+          <div class="ph"><div class="av">D</div><div><b>Donkey Ideas</b><br><span>16d · The Live Show</span></div></div>
+          <div class="txt">Big night planned. Who's pulling up?</div>
+          <div class="postact"><span><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 5.5-7 10-7 10z"/></svg>12</span><span><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a8 8 0 0 1-11 7l-5 2 2-5a8 8 0 1 1 14-4z"/></svg>Reply</span><span style="margin-left:auto"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M6 4h12v16l-6-4-6 4z"/></svg>Save</span></div>
+        </div>
+        <div class="post">
+          <div class="ph"><div class="av">CH</div><div><b>Coach Hayes Football</b><br><span>16d · Show</span></div></div>
+          <div class="txt">A documentary series told in chapters. The turns, the setbacks, and the comebacks.</div>
+          <div class="thumb"><b>Miami vs. Clemson: The Hurricanes Could Pick Clemson Apart</b><div class="pl"><i><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></i></div></div>
+          <div class="postact"><span><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 5.5-7 10-7 10z"/></svg>34</span><span><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a8 8 0 0 1-11 7l-5 2 2-5a8 8 0 1 1 14-4z"/></svg>Reply</span><span style="margin-left:auto"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M6 4h12v16l-6-4-6 4z"/></svg>Save</span></div>
+        </div>
+      </div>
+
+      <!-- LIVE -->
+      <div class="view" data-view="live">
+        <div class="livewell"><div class="mk">CH</div><span class="pill soft sm">Off air</span><div class="off">The show appears here the moment it goes live.</div><a class="pill sm">Notify me when live</a></div>
+        <p class="kick" style="margin:18px 0 10px">Up next</p>
+        <div class="card" style="padding:14px;margin-bottom:11px"><div class="schedrow"><div class="d">Fri</div><div style="flex:1"><b style="font-size:13.5px;font-weight:600">Canes Talk Live</b><div class="sub" style="font-size:12px">Fri · 8:00 PM</div></div></div></div>
+        <div class="card" style="padding:14px"><div class="schedrow"><div class="d">Sun</div><div style="flex:1"><b style="font-size:13.5px;font-weight:600">Film Breakdown</b><div class="sub" style="font-size:12px">Sun · 6:00 PM</div></div></div></div>
+      </div>
+
+      <!-- BLOG -->
+      <div class="view" data-view="blog">
+        <p class="kick">The Blog</p>
+        <h2 class="hero" style="font-size:25px;margin-bottom:14px">Film &amp; recruiting notes.</h2>
+        <div class="card" style="padding:6px 16px">
+          <div class="blogrow"><div class="th"></div><div><b>What a Gold chip really means</b><span>Grading · 4 min read</span></div></div>
+          <div class="blogrow"><div class="th"></div><div><b>Five traits that travel to Saturdays</b><span>Development · 6 min read</span></div></div>
+          <div class="blogrow"><div class="th"></div><div><b>How to send film that gets watched</b><span>Recruiting · 3 min read</span></div></div>
+        </div>
+      </div>
+
+      <!-- MEMBERSHIP -->
+      <div class="view" data-view="membership">
+        <h2 class="hero" style="font-size:24px">Join the locker room.</h2>
+        <p class="sub" style="font-size:13px;margin:9px 0 16px">One login across the site, the community and the live chat.</p>
+        <div class="tier"><div class="nm">Po' Lil Timmy</div><div class="pr">$5<small> /mo</small></div>
+          <ul><li>Members' rooms</li><li>Priority film review</li><li>Supporter badge</li></ul>
+          <span class="pill soft" style="width:100%">Choose Timmy</span></div>
+        <div class="tier hot"><span class="badge">Most popular</span>
+          <div class="nm">The Coordinator</div><div class="pr">$15<small> /mo</small></div>
+          <ul><li>Everything in Timmy</li><li>The Film Room unlocked</li><li>Front-of-line evaluations</li></ul>
+          <span class="pill" style="width:100%">Choose Coordinator</span></div>
+      </div>
+
+      <!-- ADMIN -->
+      <div class="view" data-view="admin">
+        <p style="font-size:13px;font-weight:600;letter-spacing:-.02em">New evaluation — Ian Ellis, Jr.</p>
+        <p class="sub" style="font-size:11.5px;margin:4px 0 14px">Talk through the film. We transcribe it, then write the full report from your words.</p>
+        <div class="rec"><div class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3" fill="#fff" stroke="none"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg></div>
+          <div style="flex:1"><div class="rt">Recording… 0:42</div><div class="wave"><i style="animation-delay:0s"></i><i style="animation-delay:.1s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.3s"></i><i style="animation-delay:.15s"></i><i style="animation-delay:.25s"></i><i style="animation-delay:.05s"></i><i style="animation-delay:.35s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.1s"></i><i style="animation-delay:.3s"></i></div></div>
+          <span class="pill soft sm" style="border-color:var(--live);color:var(--live)">Stop</span></div>
+        <div class="flabel">Coach's read (transcribed)</div>
+        <div class="finput">Big frame, moves well in tight spaces. Needs to sink his hips and stay low against bigger D-linemen. Finishes blocks, plays through the whistle. Second-level work needs refining…</div>
+        <div class="genbtn"><svg viewBox="0 0 24 24"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z"/></svg>Generate with AI</div>
+        <div class="flabel">Access</div>
+        <div class="filters"><span class="fchip on" style="background:var(--acc);border-color:var(--acc);color:var(--accInk)">Locked · $49</span><span class="fchip">Free</span></div>
+      </div>
+
+    </div>
+
+    <!-- In-app highlight player (opens from any ranking thumbnail) -->
+    <div class="vmodal" id="vmodal" onclick="if(event.target===this)closeVideo()">
+      <div style="width:100%;position:relative">
+        <div class="vclose" onclick="closeVideo()"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+        <div class="vbox">
+          <div class="vposter" id="vposter">
+            <div class="pp" onclick="togglePlay(event)">
+              <svg class="pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+              <svg class="play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
+          <div class="vbar"><div class="vfill"></div></div>
+        </div>
+        <div class="vmeta" id="vname">Highlight film</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<p class="foot">Live prototype · Coach Hayes Football · reflects features built today. Not the production app.</p>
+
+<script>
+  var MAIN = ['home','rankings','community','live','blog','membership'];
+  var TITLES = {home:'Coach Hayes Football',rankings:'Rankings',community:'Community',live:'Live',blog:'Blog',membership:'Membership'};
+  function show(id,on){ document.getElementById(id).classList.toggle('on',on); }
+  function go(view){
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.toggle('on', v.dataset.view===view); });
+    var sub = (view==='evalFree'||view==='evalLocked');
+    var admin = (view==='admin');
+    show('navMain', !sub && !admin);
+    show('navSub', sub);
+    show('navAdmin', admin);
+    if(sub) document.getElementById('navSubTitle').textContent = (view==='evalFree'?'Amir Sears':'Ian Ellis, Jr.');
+    if(MAIN.indexOf(view)>=0) document.getElementById('navTitle').textContent = TITLES[view];
+    document.getElementById('menu').classList.remove('open');
+    var v = document.querySelector('.view.on'); if(v) v.scrollTop = 0;
+  }
+  function toggleMenu(){ document.getElementById('menu').classList.toggle('open'); }
+  function setTheme(t){
+    document.getElementById('screen').dataset.theme = t;
+    document.querySelectorAll('.tsw b').forEach(function(b){ b.classList.toggle('on', b.dataset.t===t); });
+  }
+  function openVideo(name, g1, g2){
+    var m = document.getElementById('vmodal');
+    document.getElementById('vname').textContent = 'Highlight film · ' + name;
+    document.getElementById('vposter').style.background = 'linear-gradient(115deg,' + g1 + ',' + g2 + ')';
+    m.classList.remove('paused');
+    m.classList.remove('open'); void m.offsetWidth; // restart the progress animation
+    m.classList.add('open');
+  }
+  function closeVideo(){ document.getElementById('vmodal').classList.remove('open'); }
+  function togglePlay(e){ if(e) e.stopPropagation(); document.getElementById('vmodal').classList.toggle('paused'); }
+</script>
+</body>
+</html>

@@ -81,7 +81,7 @@ export default function RankingsBoard({ players, years, positions }: { players: 
                 </span>
                 {p.hasEval ? (
                   <button className={`rkeval-btn${p.evalLocked ? " locked" : ""}`} onClick={() => setEvalFor({ slug: p.slug, name: p.name })}>
-                    {p.evalLocked ? "🔒 Unlock" : "Read ›"}
+                    {p.evalLocked ? "Unlock" : "Read ›"}
                   </button>
                 ) : (
                   <Link className="rkgo" href={`/rankings/${p.slug}`}>View ›</Link>

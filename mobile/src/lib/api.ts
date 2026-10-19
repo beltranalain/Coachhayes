@@ -49,6 +49,51 @@ async function getJSON<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+// ---- Rankings + evaluations -------------------------------------------------
+export type ChipKey = "bronze" | "silver" | "gold" | "blue";
+export type Categories = Partial<Record<"power" | "speed" | "motor" | "technique" | "iq", ChipKey>>;
+
+export type RankPlayer = {
+  slug: string; name: string; position: string; school: string; city: string; state: string;
+  classYear: string; chip: ChipKey; chipLabel: string; categories: Categories | null;
+  videoUrl: string; commit: string; commitLogo: string;
+  hasEval: boolean; evalAccess: "none" | "free" | "locked"; evalPrice: string;
+};
+
+export type Evaluation = {
+  size: string; speed: string; effort: string; positionAnalysis: string;
+  strengths: string[]; improvements: string[]; recommendedTargets: string[];
+  additionalComments: string; developmentPriorities: string[]; finalAssessment: string;
+  projection: string; evaluatedOn: string;
+};
+export type EvalResponse = {
+  hasEval: boolean; locked?: boolean; evaluation?: Evaluation;
+  teaser?: string; price?: string; evaluatedOn?: string;
+};
+
+// Public board feed (published players, no evaluation content).
+export function fetchPlayers(): Promise<{ players: RankPlayer[] }> {
+  return getJSON<{ players: RankPlayer[] }>("/api/rankings/players");
+}
+
+// Paywall-gated evaluation. Pass the signed-in user's ID token so admins /
+// unlocked viewers get the full report; everyone else gets the teaser.
+export async function fetchEvaluation(slug: string, token?: string | null): Promise<EvalResponse> {
+  const res = await fetch(`${API_BASE}/api/rankings/evaluation?slug=${encodeURIComponent(slug)}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return { hasEval: false };
+  return (await res.json()) as EvalResponse;
+}
+
+// Pull a YouTube video id from a URL (for the thumbnail + inline player). Hudl
+// and other links return null — the card then uses a gradient poster.
+export function youtubeId(url?: string): string | null {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
 // Is the Cloudflare live input currently receiving a broadcast?
 export function fetchStreamStatus(): Promise<StreamStatus> {
   return getJSON<StreamStatus>("/api/stream/status");
