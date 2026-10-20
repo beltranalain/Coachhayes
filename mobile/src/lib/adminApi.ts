@@ -169,13 +169,16 @@ export async function saveTeamMember(
 // ---- Client-side capability matrix (mirrors the web matrix) -----------------
 // Which app admin screens each role may open. Defense-in-depth only; the server
 // still enforces access on every gated API.
-export type AdminScreen = "evaluations" | "schedule" | "tips" | "costs" | "settings" | "team";
+export type AdminScreen = "studio" | "locker" | "evaluations" | "schedule" | "tips" | "costs" | "settings" | "team";
 
 export function canAccess(role: Role | null | undefined, screen: AdminScreen): boolean {
   if (!role) return false;
   switch (screen) {
     case "team":
       return role === "owner";
+    case "locker":
+      return true; // any signed-in admin can post to the Locker Room
+    case "studio":
     case "schedule":
       return role === "owner" || role === "manager" || role === "host";
     case "evaluations":

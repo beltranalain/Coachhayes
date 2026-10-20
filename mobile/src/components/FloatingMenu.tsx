@@ -67,7 +67,7 @@ export function FloatingMenuOverlay({ topInset }: { topInset: number }) {
             <>
               <View style={styles.sep} />
               <Pressable onPress={() => go("/admin")} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                <Text style={styles.control}>Control Room · Evaluations</Text>
+                <Text style={styles.control}>Control Room</Text>
               </Pressable>
             </>
           )}
