@@ -6,11 +6,14 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 
-import { colors, fonts } from "../../lib/theme";
+import { colors, fonts, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { fetchBlog, type BlogPost } from "../../lib/api";
 import { Eyebrow } from "../../components/ui";
 
 export default function BlogScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +60,7 @@ export default function BlogScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
   h1: { fontFamily: fonts.display, fontSize: 26, color: colors.cream, letterSpacing: -0.8, marginTop: 8 },
   row: { flexDirection: "row", gap: 12, alignItems: "center", paddingVertical: 13, borderTopWidth: 1, borderTopColor: colors.lineSoft },

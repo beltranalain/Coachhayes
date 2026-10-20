@@ -4,7 +4,8 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from "react-native";
 import { useRouter } from "expo-router";
-import { colors, fonts } from "../../lib/theme";
+import { colors, fonts, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { API_BASE } from "../../lib/config";
 import { useAuth } from "../../lib/auth";
 
@@ -14,6 +15,8 @@ const TIERS = [
 ];
 
 export default function MembershipScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const { user } = useAuth();
   const site = API_BASE.replace(/\/$/, "");
@@ -51,7 +54,7 @@ export default function MembershipScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   h1: { fontFamily: fonts.display, fontSize: 26, color: colors.cream, letterSpacing: -0.8, marginTop: 12 },
   sub: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 9, marginBottom: 16 },
   tier: { borderWidth: 1, borderColor: colors.line, borderRadius: 20, padding: 18, marginBottom: 13, backgroundColor: colors.surface },
@@ -67,6 +70,6 @@ const styles = StyleSheet.create({
   btn: { borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 12, alignItems: "center" },
   btnText: { fontFamily: fonts.bold, fontSize: 13.5, color: colors.cream },
   btnHot: { backgroundColor: colors.amber, borderRadius: 999, paddingVertical: 12, alignItems: "center" },
-  btnHotText: { fontFamily: fonts.bold, fontSize: 13.5, color: "#171204" },
+  btnHotText: { fontFamily: fonts.bold, fontSize: 13.5, color: colors.onAccent },
   note: { fontFamily: fonts.body, fontSize: 11.5, color: colors.dim, marginTop: 8, textAlign: "center" },
 });

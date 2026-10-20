@@ -4,16 +4,9 @@
 // endpoint with the admin Bearer token, mirroring the website's Studio.
 
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  RefreshControl,
-  ActivityIndicator,
-} from "react-native";
-import { colors, fonts, radii } from "../../lib/theme";
+import { View, Text, TextInput, Pressable, StyleSheet, RefreshControl, ActivityIndicator, } from "react-native";
+import { colors, fonts, radii, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { fetchSiteConfig, countdownLabel, type ScheduleItem } from "../../lib/api";
 import {
   saveSchedule,
@@ -25,6 +18,8 @@ import { AdminScaffold } from "../../components/AdminScaffold";
 import { AmberButton } from "../../components/ui";
 
 export default function AdminScheduleScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [items, setItems] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -224,7 +219,7 @@ export default function AdminScheduleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   msg: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.amber, marginBottom: 12 },
   panel: {
     backgroundColor: colors.surface,

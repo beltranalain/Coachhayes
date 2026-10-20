@@ -5,10 +5,10 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator, Alert } from "react-native";
 import {
-  useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule, setAudioModeAsync,
-} from "expo-audio";
+  useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule, setAudioModeAsync, } from "expo-audio";
 
-import { colors, fonts } from "../../lib/theme";
+import { colors, fonts, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { AdminScaffold } from "../../components/AdminScaffold";
 import {
   fetchSubmissions, transcribeAudio, generateEvaluation, savePlayerEval,
@@ -31,6 +31,8 @@ function fmtDur(ms: number): string {
 }
 
 function Inner() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [subs, setSubs] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [sel, setSel] = useState<Submission | null>(null);
@@ -192,7 +194,7 @@ function Inner() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   msg: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.amber, backgroundColor: "rgba(200,169,107,0.1)", borderRadius: 10, padding: 11, marginBottom: 14 },
   section: { fontFamily: fonts.bold, fontSize: 13, color: colors.cream, marginTop: 10, marginBottom: 6 },
   hint: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, marginBottom: 12 },
@@ -211,7 +213,7 @@ const styles = StyleSheet.create({
   recDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: colors.live },
   recText: { fontFamily: fonts.bold, fontSize: 13, color: colors.cream },
   genBtn: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.amber, borderRadius: 12, paddingVertical: 11 },
-  genText: { fontFamily: fonts.bold, fontSize: 13, color: "#171204" },
+  genText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onAccent },
 
   transcript: { minHeight: 90, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 12, fontFamily: fonts.body, fontSize: 13, color: colors.cream, textAlignVertical: "top" },
 
@@ -225,12 +227,12 @@ const styles = StyleSheet.create({
   accPill: { borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: colors.surface },
   accPillOn: { backgroundColor: colors.amber, borderColor: colors.amber },
   accText: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.muted },
-  accTextOn: { color: "#171204" },
+  accTextOn: { color: colors.onAccent },
   priceInput: { marginTop: 10, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.line, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 13, fontFamily: fonts.body, fontSize: 13, color: colors.cream },
 
   footer: { flexDirection: "row", gap: 10, marginTop: 18 },
   pubBtn: { flex: 1, alignItems: "center", backgroundColor: colors.amber, borderRadius: 12, paddingVertical: 13 },
-  pubText: { fontFamily: fonts.bold, fontSize: 14, color: "#171204" },
+  pubText: { fontFamily: fonts.bold, fontSize: 14, color: colors.onAccent },
   cancelBtn: { alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 20 },
   cancelText: { fontFamily: fonts.semibold, fontSize: 13.5, color: colors.cream },
 });

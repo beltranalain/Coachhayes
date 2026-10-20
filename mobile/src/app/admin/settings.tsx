@@ -4,7 +4,8 @@
 
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, RefreshControl, ActivityIndicator } from "react-native";
-import { colors, fonts, radii } from "../../lib/theme";
+import { colors, fonts, radii, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { fetchAdminHealth, type HealthResponse, type HealthStatus } from "../../lib/adminApi";
 import { AdminScaffold } from "../../components/AdminScaffold";
 import { Dot } from "../../components/ui";
@@ -30,6 +31,8 @@ function statusMeta(s: HealthStatus | undefined): { color: string; label: string
 }
 
 export default function AdminSettingsScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [data, setData] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -95,7 +98,7 @@ export default function AdminSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.lineSoft,

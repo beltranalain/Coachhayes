@@ -12,18 +12,11 @@
 // refuse a role that is not allowed (defense in depth).
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  type RefreshControlProps,
-} from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, type RefreshControlProps, } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, fonts, radii } from "../lib/theme";
+import { colors, fonts, radii, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 import { useAuth } from "../lib/auth";
 import { isAdminEmail } from "../lib/admin";
 import { fetchWhoami, canAccess, type Role, type AdminScreen } from "../lib/adminApi";
@@ -40,6 +33,8 @@ export function useAdminRole(): AdminRoleValue {
 }
 
 function BackChevron() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={{ width: 10, height: 10, transform: [{ rotate: "45deg" }] }}>
       <View style={styles.chevron} />
@@ -66,6 +61,8 @@ export function AdminScaffold({
   // (any resolved role may see it; the home lists only what the role can open).
   require?: AdminScreen;
 }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const { user, ready } = useAuth();
 
@@ -181,17 +178,21 @@ export function AdminScaffold({
 
 // Small labelled card wrapper used across the admin screens.
 export function AdminSectionTitle({ children }: { children: React.ReactNode }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 
 // A safe-area top spacer so admin routes (outside the tabs layout) clear the
 // status bar / notch.
 export function AdminTopInset() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   return <View style={{ height: insets.top }} />;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 40 },
   plain: { flex: 1, padding: 16 },
   topbar: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 18, marginTop: 4 },

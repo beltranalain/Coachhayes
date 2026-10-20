@@ -4,7 +4,8 @@
 
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, RefreshControl, ActivityIndicator } from "react-native";
-import { colors, fonts, radii } from "../../lib/theme";
+import { colors, fonts, radii, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { fetchAdminTips, type TipsResponse } from "../../lib/adminApi";
 import { AdminScaffold } from "../../components/AdminScaffold";
 
@@ -14,6 +15,8 @@ const money = (n: number) =>
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function AdminTipsScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [data, setData] = useState<TipsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -115,7 +118,7 @@ export default function AdminTipsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.lineSoft,

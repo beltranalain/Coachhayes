@@ -9,21 +9,11 @@
 // component, only when IS_EXPO_GO === false. In Expo Go we show a friendly note.
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  FlatList,
-} from "react-native";
+import { View, Text, TextInput, StyleSheet, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, FlatList, } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, fonts, radii } from "../lib/theme";
+import { colors, fonts, radii, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 import { IS_EXPO_GO } from "../lib/env";
 import { CHAT_WS_URL } from "../lib/config";
 import { useAuth } from "../lib/auth";
@@ -53,6 +43,8 @@ function makeId() {
 }
 
 export default function JoinScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
 
   // In Expo Go, WebRTC would crash — bail out to a friendly note before touching
@@ -65,6 +57,8 @@ export default function JoinScreen() {
 
 // ---- Expo Go fallback -------------------------------------------------------
 function ExpoGoNote() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   return (
@@ -88,6 +82,8 @@ function ExpoGoNote() {
 
 // ---- The real green room (dev / production build only) ----------------------
 function GuestJoin({ topInset }: { topInset: number }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const { user, displayName } = useAuth();
   const { messages, count, connected, send } = useChat();
@@ -474,7 +470,7 @@ function GuestJoin({ topInset }: { topInset: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: { flexGrow: 1, backgroundColor: colors.bg, padding: 24, paddingTop: 40 },
   headRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   sub: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 6, lineHeight: 20 },

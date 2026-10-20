@@ -6,7 +6,8 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal } from "react-native";
 import { usePathname, useRouter } from "expo-router";
-import { colors, fonts } from "../lib/theme";
+import { colors, fonts, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 import { useAuth } from "../lib/auth";
 import { isAdminEmail } from "../lib/admin";
 
@@ -14,6 +15,8 @@ type MenuContextValue = { open: boolean; setOpen: (v: boolean) => void; toggle: 
 const MenuContext = createContext<MenuContextValue>({ open: false, setOpen: () => {}, toggle: () => {} });
 
 export function MenuProvider({ children }: { children: React.ReactNode }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [open, setOpen] = useState(false);
   const value = useMemo<MenuContextValue>(() => ({ open, setOpen, toggle: () => setOpen((v) => !v) }), [open]);
   return <MenuContext.Provider value={value}>{children}</MenuContext.Provider>;
@@ -31,6 +34,8 @@ const SECTIONS = [
 ];
 
 export function FloatingMenuOverlay({ topInset }: { topInset: number }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const { open, setOpen } = useMenu();
   const router = useRouter();
   const pathname = usePathname();
@@ -87,7 +92,7 @@ export function FloatingMenuOverlay({ topInset }: { topInset: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   scrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
   panel: {
     position: "absolute", left: 12, right: 12,

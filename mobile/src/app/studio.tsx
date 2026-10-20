@@ -20,25 +20,21 @@
 //   - Screen-share (getDisplayMedia) is not available in a mobile WebView.
 
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  Platform,
-} from "react-native";
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Platform, } from "react-native";
 import { WebView } from "react-native-webview";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, fonts, radii } from "../lib/theme";
+import { colors, fonts, radii, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 import { API_BASE } from "../lib/config";
 import { IS_EXPO_GO } from "../lib/env";
 
 const STUDIO_URL = `${API_BASE}/admin/go-live`;
 
 export default function StudioScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
@@ -108,7 +104,7 @@ export default function StudioScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   topBar: {
     flexDirection: "row",

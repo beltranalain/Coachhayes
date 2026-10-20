@@ -4,7 +4,8 @@
 
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, RefreshControl, ActivityIndicator } from "react-native";
-import { colors, fonts, radii } from "../../lib/theme";
+import { colors, fonts, radii, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { fetchAdminUsage, type UsageResponse } from "../../lib/adminApi";
 import { AdminScaffold } from "../../components/AdminScaffold";
 
@@ -12,6 +13,8 @@ const money = (n: number | null | undefined) =>
   n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 export default function AdminCostsScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [data, setData] = useState<UsageResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -121,7 +124,7 @@ export default function AdminCostsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.lineSoft,

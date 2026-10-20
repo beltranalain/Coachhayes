@@ -8,7 +8,8 @@ import { WebView } from "react-native-webview";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { colors, fonts } from "../lib/theme";
+import { colors, fonts, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 
 function embedHtml(id: string): string {
   return `<!doctype html><html><head>
@@ -22,6 +23,8 @@ function embedHtml(id: string): string {
 }
 
 export default function WatchScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -57,7 +60,7 @@ export default function WatchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
   bar: { height: 48, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14 },
   close: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.12)" },

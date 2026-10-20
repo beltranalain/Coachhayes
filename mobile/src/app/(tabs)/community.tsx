@@ -9,7 +9,8 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 
-import { colors, fonts } from "../../lib/theme";
+import { colors, fonts, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import {
   fetchFeed, fetchSeries, likePost, savePost, votePost, fetchComments, addComment, createPost,
   timeAgo, youtubeId, type FeedPost, type Series, type Comment,
@@ -19,6 +20,8 @@ import { PlayTriangle, watchHref } from "../../components/PlayerCard";
 import PlayerBreakdownCard from "../../components/PlayerBreakdownCard";
 
 export default function CommunityScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const { user, displayName } = useAuth();
   const uid = user?.uid;
@@ -184,7 +187,7 @@ export default function CommunityScreen() {
 
       {/* Compose FAB */}
       <Pressable onPress={onCompose} style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9, transform: [{ scale: 0.96 }] }]} accessibilityLabel="New post">
-        <Feather name="plus" size={26} color="#171204" />
+        <Feather name="plus" size={26} color={colors.onAccent} />
       </Pressable>
     </>
   );
@@ -194,6 +197,8 @@ function PostCard({ post, uid, onLike, onSave, onVote, onPlay, requireAuth, onCo
   post: FeedPost; uid?: string; onLike: () => void; onSave: () => void; onVote: (i: number) => void;
   onPlay: (id: string, name: string) => void; requireAuth: () => void; onCount: (n: number) => void;
 }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const clipId = youtubeId(post.clip || undefined);
   const liked = !!uid && post.likedBy.includes(uid);
   const saved = !!uid && post.savedBy.includes(uid);
@@ -299,7 +304,7 @@ function PostCard({ post, uid, onLike, onSave, onVote, onPlay, requireAuth, onCo
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
   empty: { fontFamily: fonts.body, color: colors.muted, fontSize: 13.5, textAlign: "center", paddingVertical: 40 },
 
@@ -314,7 +319,7 @@ const styles = StyleSheet.create({
   composer: { borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 14, marginBottom: 14, backgroundColor: colors.surface },
   cTop: { flexDirection: "row", gap: 11, alignItems: "flex-start" },
   cAv: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.amber, alignItems: "center", justifyContent: "center" },
-  cAvText: { fontFamily: fonts.bold, fontSize: 13, color: "#171204" },
+  cAvText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onAccent },
   cInput: { flex: 1, fontFamily: fonts.body, fontSize: 14, color: colors.cream, paddingTop: 7, minHeight: 34, maxHeight: 120 },
   previewWrap: { marginTop: 10, position: "relative" },
   preview: { width: "100%", height: 160, borderRadius: 12, backgroundColor: colors.surface2 },
@@ -325,7 +330,7 @@ const styles = StyleSheet.create({
   cChipOn: { borderColor: colors.amber },
   cChipText: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.muted },
   postBtn: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.amber, borderWidth: 1, borderColor: colors.amber, borderRadius: 999, paddingVertical: 9 },
-  postBtnText: { fontFamily: fonts.bold, fontSize: 13, color: "#171204" },
+  postBtnText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onAccent },
 
   post: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 16, padding: 14, marginBottom: 14 },
   pHead: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },

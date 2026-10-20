@@ -6,7 +6,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Linki
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, fonts } from "../../lib/theme";
+import { colors, fonts, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { API_BASE } from "../../lib/config";
 import { fetchEvaluation, type Evaluation, type EvalResponse } from "../../lib/api";
 import { getFirebaseAuth } from "../../lib/firebase";
@@ -16,6 +17,8 @@ function paras(text: string): string[] {
 }
 
 export default function EvaluationScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { slug, name, meta, access, price } = useLocalSearchParams<{
@@ -69,6 +72,8 @@ export default function EvaluationScreen() {
 }
 
 function Report({ e }: { e: Evaluation }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={{ marginTop: 18 }}>
       {!!e.evaluatedOn && <Text style={styles.date}>Evaluated {e.evaluatedOn}</Text>}
@@ -90,6 +95,8 @@ function Report({ e }: { e: Evaluation }) {
 }
 
 function Section({ title, body }: { title: string; body: string }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   if (!body) return null;
   return (
     <View style={styles.sec}>
@@ -99,6 +106,8 @@ function Section({ title, body }: { title: string; body: string }) {
   );
 }
 function ListSection({ title, items, ordered }: { title: string; items: string[]; ordered?: boolean }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   if (!items || !items.length) return null;
   return (
     <View style={styles.sec}>
@@ -114,6 +123,8 @@ function ListSection({ title, items, ordered }: { title: string; items: string[]
 }
 
 function Locked({ teaser, price }: { teaser?: string; price: string }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const site = API_BASE.replace(/\/$/, "");
   return (
     <View style={{ marginTop: 18 }}>
@@ -136,7 +147,7 @@ function Locked({ teaser, price }: { teaser?: string; price: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   topbar: { height: 48, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
   back: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
   backChevron: { fontFamily: fonts.medium, fontSize: 24, color: colors.cream, marginTop: -3 },
@@ -168,7 +179,7 @@ const styles = StyleSheet.create({
   step: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 19, color: "#cfc8be" },
   lockBtns: { flexDirection: "row", gap: 8, marginTop: 16 },
   primaryBtn: { backgroundColor: colors.amber, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 16 },
-  primaryBtnText: { fontFamily: fonts.bold, fontSize: 12.5, color: "#171204" },
+  primaryBtnText: { fontFamily: fonts.bold, fontSize: 12.5, color: colors.onAccent },
   ghostBtn: { borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 16 },
   ghostBtnText: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.cream },
 });

@@ -4,7 +4,8 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
-import { colors, fonts, chipColors } from "../lib/theme";
+import { colors, fonts, chipColors, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 
 type Chip = "bronze" | "silver" | "gold" | "blue";
 export type PlayerPost = {
@@ -24,6 +25,8 @@ const CHIP_LABEL: Record<Chip, string> = { bronze: "Bronze chip", silver: "Silve
 const CHIP_WEIGHT: Record<Chip, number> = { bronze: 1, silver: 2, gold: 3, blue: 4 };
 
 export default function PlayerBreakdownCard({ p }: { p: PlayerPost }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   if (!p || !p.name) return null;
   const cats = p.categories || {};
   const overall: Chip = p.chip || "bronze";
@@ -74,7 +77,7 @@ export default function PlayerBreakdownCard({ p }: { p: PlayerPost }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   card: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 15, marginTop: 4, marginBottom: 2 },
   kick: { fontFamily: fonts.bold, fontSize: 10.5, letterSpacing: 1.6, textTransform: "uppercase" },
   title: { fontFamily: fonts.bold, fontSize: 16, color: colors.cream, marginTop: 8, letterSpacing: -0.3 },

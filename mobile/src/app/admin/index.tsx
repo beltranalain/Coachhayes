@@ -11,7 +11,8 @@
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { colors, fonts, radii } from "../../lib/theme";
+import { colors, fonts, radii, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { useAuth } from "../../lib/auth";
 import { AdminScaffold, useAdminRole } from "../../components/AdminScaffold";
 import { canAccess, type AdminScreen, type Role } from "../../lib/adminApi";
@@ -35,6 +36,8 @@ const ROLE_LABEL: Record<Role, string> = {
 };
 
 function AdminHomeInner() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const { user, logout } = useAuth();
   const { role } = useAdminRole();
@@ -96,6 +99,8 @@ function AdminHomeInner() {
 }
 
 export default function AdminHome() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <AdminScaffold eyebrow="Coach Hayes · Control Room" title="Admin">
       <AdminHomeInner />
@@ -103,7 +108,7 @@ export default function AdminHome() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   whoCard: {
     backgroundColor: colors.surface,
     borderColor: colors.lineSoft,

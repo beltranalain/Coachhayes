@@ -7,12 +7,14 @@ import React from "react";
 import { View } from "react-native";
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets, SafeAreaProvider } from "react-native-safe-area-context";
-import { colors } from "../../lib/theme";
+import { colors, type ThemeColors } from "../../lib/theme";
+import { useColors } from "../../lib/ThemeContext";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { MenuProvider, FloatingMenuOverlay } from "../../components/FloatingMenu";
 import { BrandingProvider } from "../../lib/branding";
 
 export default function TabsLayout() {
+  const colors = useColors();
   return (
     <SafeAreaProvider>
       <BrandingProvider>
@@ -25,6 +27,7 @@ export default function TabsLayout() {
 }
 
 function SafeAreaWrapper() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   // Header sits below the status bar; anchor the floating menu just under it.
   const headerBottom = insets.top + 56;

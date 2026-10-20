@@ -5,12 +5,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Linking, Pressable, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 
-import { colors, fonts } from "../../lib/theme";
+import { colors, fonts, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { fetchPlayers, youtubeId, type RankPlayer } from "../../lib/api";
 import { Eyebrow } from "../../components/ui";
 import { PlayerCard, watchHref, evalHref } from "../../components/PlayerCard";
 
 export default function RankingsScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const [players, setPlayers] = useState<RankPlayer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +89,8 @@ export default function RankingsScreen() {
 }
 
 function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} style={[styles.chip, on && styles.chipOn]}>
       <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
@@ -93,7 +98,7 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: colors.bg },
   dim: { fontFamily: fonts.body, color: colors.muted, fontSize: 12.5 },
   empty: { fontFamily: fonts.body, color: colors.muted, fontSize: 13.5, textAlign: "center", paddingHorizontal: 24, paddingVertical: 40 },

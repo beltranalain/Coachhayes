@@ -5,7 +5,8 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
-import { colors, fonts, chipColors } from "../lib/theme";
+import { colors, fonts, chipColors, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 import { youtubeId, type RankPlayer } from "../lib/api";
 import { ArtWell } from "./ui";
 
@@ -22,6 +23,8 @@ export function chipsFor(p: RankPlayer): string[] {
 }
 
 export function PlayerCard({ player, rank, onPlay, onEval }: { player: RankPlayer; rank: number; onPlay: () => void; onEval: () => void }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const id = youtubeId(player.videoUrl);
   const thumb = id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
   const dots = chipsFor(player);
@@ -65,9 +68,13 @@ export function PlayerCard({ player, rank, onPlay, onEval }: { player: RankPlaye
 }
 
 export function PlayTriangle() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return <View style={{ width: 0, height: 0, marginLeft: 3, borderTopWidth: 8, borderBottomWidth: 8, borderLeftWidth: 13, borderTopColor: "transparent", borderBottomColor: "transparent", borderLeftColor: "#fff" }} />;
 }
 function LockGlyph() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={{ width: 11, height: 12, alignItems: "center", justifyContent: "flex-end", marginRight: 1 }}>
       <View style={{ width: 11, height: 7, borderRadius: 2, backgroundColor: colors.cream }} />
@@ -76,7 +83,7 @@ function LockGlyph() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 18, padding: 11, marginBottom: 12 },
   fill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   thumbWrap: { aspectRatio: 16 / 9, borderRadius: 12, overflow: "hidden", alignItems: "center", justifyContent: "center", backgroundColor: "#0b0a09" },

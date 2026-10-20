@@ -1,23 +1,33 @@
 // Design tokens lifted from the web mockup (mockup/ios-app-mock.html) so the
 // native app matches the site's dark, cinematic look.
 
-// Aligned 1:1 with the website's dark theme tokens (hayes-ds.css [data-theme=dark]):
-// pure-black surface, muted-tan accent. `amber` is kept as the token NAME used
-// across components, but now holds the site's accent value so the app matches.
-export const colors = {
-  bg: "#000000",        // --app
-  bgDeep: "#000000",    // --deep
-  surface: "#131316",   // --card
-  surface2: "#0D0D10",  // --alt
-  cream: "#F5F5F7",     // --ink
-  muted: "#86868B",     // --sub
-  dim: "#5A5A60",       // --dim
-  amber: "#C8A96B",     // --acc (site accent)
-  highlight: "#D8BE86",
-  live: "#FF453A",      // --live
-  line: "rgba(245,245,247,0.13)",   // --hair
-  lineSoft: "rgba(245,245,247,0.07)", // --hair2
+// Light + dark palettes, aligned with the website's tokens (hayes-ds.css). Dark =
+// pure-black + tan accent; Light = white + blue accent (same as the site). The
+// token NAMES are shared so components read the same keys in both themes. Fonts
+// stay Plus Jakarta Sans in both modes. Consume via useColors()/useThemedStyles()
+// from ThemeContext; `colors` below is a static dark fallback for back-compat.
+export type ThemeColors = {
+  bg: string; bgDeep: string; surface: string; surface2: string; cream: string;
+  muted: string; dim: string; amber: string; highlight: string; live: string;
+  line: string; lineSoft: string; onAccent: string;
 };
+
+export const darkColors: ThemeColors = {
+  bg: "#000000", bgDeep: "#000000", surface: "#131316", surface2: "#0D0D10",
+  cream: "#F5F5F7", muted: "#86868B", dim: "#5A5A60", amber: "#C8A96B", highlight: "#D8BE86",
+  live: "#FF453A", line: "rgba(245,245,247,0.13)", lineSoft: "rgba(245,245,247,0.07)", onAccent: "#171204",
+};
+
+// Light stays on-brand gold (deeper so it reads on white) rather than the site's
+// blue — the app should feel like the brand in both modes.
+export const lightColors: ThemeColors = {
+  bg: "#FFFFFF", bgDeep: "#F2F2F5", surface: "#FFFFFF", surface2: "#F1F1F4",
+  cream: "#1D1D1F", muted: "#6E6E73", dim: "#A1A1A6", amber: "#9A7B33", highlight: "#B7963F",
+  live: "#E8342A", line: "rgba(0,0,0,0.10)", lineSoft: "rgba(0,0,0,0.055)", onAccent: "#FFFFFF",
+};
+
+// Back-compat default (dark). Prefer useColors() so the value is theme-aware.
+export const colors: ThemeColors = darkColors;
 
 export const radii = {
   sm: 8,

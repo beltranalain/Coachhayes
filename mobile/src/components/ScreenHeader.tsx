@@ -6,11 +6,16 @@ import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { colors, fonts } from "../lib/theme";
+import { Feather } from "@expo/vector-icons";
+import { colors, fonts, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles, useTheme } from "../lib/ThemeContext";
 import { useBranding } from "../lib/branding";
 import { useMenu } from "./FloatingMenu";
 
 export function ScreenHeader() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
+  const { mode, setMode } = useTheme();
   const { toggle } = useMenu();
   const { logo, siteName } = useBranding();
 
@@ -27,16 +32,30 @@ export function ScreenHeader() {
         <Text style={styles.wordmark} numberOfLines={1}>{siteName || "Coach Hayes Football"}</Text>
       </View>
 
-      <Pressable onPress={toggle} hitSlop={8} accessibilityLabel="Menu" style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.7 }]}>
-        <View style={styles.hbar} />
-        <View style={styles.hbar} />
-        <View style={styles.hbar} />
-      </Pressable>
+      <View style={styles.right}>
+        <View style={styles.themeSw}>
+          <Pressable onPress={() => setMode("light")} hitSlop={4} style={[styles.themeSeg, mode === "light" && styles.themeSegOn]} accessibilityLabel="Light mode">
+            <Feather name="sun" size={14} color={mode === "light" ? colors.onAccent : colors.muted} />
+          </Pressable>
+          <Pressable onPress={() => setMode("dark")} hitSlop={4} style={[styles.themeSeg, mode === "dark" && styles.themeSegOn]} accessibilityLabel="Dark mode">
+            <Feather name="moon" size={13} color={mode === "dark" ? colors.onAccent : colors.muted} />
+          </Pressable>
+          <Pressable onPress={() => setMode("system")} hitSlop={4} style={[styles.themeSeg, mode === "system" && styles.themeSegOn]} accessibilityLabel="System theme">
+            <Feather name="smartphone" size={13} color={mode === "system" ? colors.onAccent : colors.muted} />
+          </Pressable>
+        </View>
+
+        <Pressable onPress={toggle} hitSlop={8} accessibilityLabel="Menu" style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.7 }]}>
+          <View style={styles.hbar} />
+          <View style={styles.hbar} />
+          <View style={styles.hbar} />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   bar: {
     flexDirection: "row",
     alignItems: "center",
@@ -58,4 +77,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.lineSoft, backgroundColor: colors.surface, flexShrink: 0,
   },
   hbar: { width: 17, height: 2, borderRadius: 2, backgroundColor: colors.cream },
+  right: { flexDirection: "row", alignItems: "center", gap: 9, flexShrink: 0 },
+  themeSw: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: colors.line, borderRadius: 999, padding: 2, gap: 1 },
+  themeSeg: { paddingHorizontal: 7, paddingVertical: 5, borderRadius: 999 },
+  themeSegOn: { backgroundColor: colors.amber },
 });

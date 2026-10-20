@@ -5,16 +5,9 @@
 // the owner's Bearer token. Gated by <AdminScaffold require="team">.
 
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  RefreshControl,
-  ActivityIndicator,
-} from "react-native";
-import { colors, fonts, radii } from "../../lib/theme";
+import { View, Text, TextInput, Pressable, StyleSheet, RefreshControl, ActivityIndicator, } from "react-native";
+import { colors, fonts, radii, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import {
   fetchTeam,
   saveTeamMember,
@@ -39,6 +32,8 @@ const ROLE_LABEL: Record<Role, string> = {
 };
 
 function RoleBadge({ role }: { role: Role }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.badge}>
       <Text style={styles.badgeText}>{ROLE_LABEL[role]}</Text>
@@ -56,6 +51,8 @@ function RolePicker({
   onChange: (r: Role) => void;
   disabled?: boolean;
 }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.roleRow}>
       {ROLES.map((r) => {
@@ -81,6 +78,8 @@ function RolePicker({
 }
 
 function TeamInner() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -235,6 +234,8 @@ function TeamInner() {
 }
 
 export default function AdminTeamScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [refreshing] = useState(false);
   return (
     <AdminScaffold
@@ -248,7 +249,7 @@ export default function AdminTeamScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   msg: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.amber, marginBottom: 12 },
   card: {
     backgroundColor: colors.surface,

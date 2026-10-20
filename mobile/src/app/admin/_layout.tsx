@@ -8,9 +8,11 @@ import React from "react";
 import { View } from "react-native";
 import { Stack } from "expo-router";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../../lib/theme";
+import { colors, type ThemeColors } from "../../lib/theme";
+import { useColors } from "../../lib/ThemeContext";
 
 export default function AdminLayout() {
+  const colors = useColors();
   return (
     <SafeAreaProvider>
       <SafeAreaShell />
@@ -19,6 +21,7 @@ export default function AdminLayout() {
 }
 
 function SafeAreaShell() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>

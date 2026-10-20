@@ -4,23 +4,14 @@
 // a modal.
 
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from "react-native";
+import { View, Text, TextInput, StyleSheet, Pressable, ScrollView, KeyboardAvoidingView, Platform, Alert, } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FontAwesome } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
-import { colors, fonts } from "../lib/theme";
+import { colors, fonts, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 import { useAuth } from "../lib/auth";
 import { IS_EXPO_GO } from "../lib/env";
 import {
@@ -44,10 +35,14 @@ const GOOGLE_READY = !IS_EXPO_GO && GOOGLE_WEB_CLIENT_ID.length > 0;
 // Google "G" mark via @expo/vector-icons (bundled in Expo Go + dev builds; no
 // native/bundler issues). Rendered in Google blue on the white button.
 function GoogleG() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return <FontAwesome name="google" size={18} color="#4285F4" />;
 }
 
 export default function SignInScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, displayName, signIn, signUp, signInWithGoogleIdToken, logout } =
@@ -226,7 +221,7 @@ export default function SignInScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   wrap: { flexGrow: 1, backgroundColor: colors.bg, padding: 24, paddingTop: 40 },
   headRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   sub: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 6 },

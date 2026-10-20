@@ -7,7 +7,8 @@ import { WebView } from "react-native-webview";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, fonts } from "../../lib/theme";
+import { colors, fonts, type ThemeColors } from "../../lib/theme";
+import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { fetchBlogPost, timeAgo, type BlogArticle } from "../../lib/api";
 
 // Wrap the stored post HTML in a dark, readable document styled like the app.
@@ -33,6 +34,8 @@ function docHtml(a: BlogArticle): string {
 }
 
 export default function BlogArticleScreen() {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { slug, title: paramTitle } = useLocalSearchParams<{ slug: string; title?: string }>();
@@ -81,7 +84,7 @@ export default function BlogArticleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   topbar: { height: 48, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
   back: { flexDirection: "row", alignItems: "center", gap: 6 },
   chevron: { fontFamily: fonts.medium, fontSize: 24, color: colors.cream, marginTop: -3 },

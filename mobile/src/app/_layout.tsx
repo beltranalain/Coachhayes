@@ -15,7 +15,8 @@ import {
 
 import { AuthProvider } from "../lib/auth";
 import { STRIPE_PUBLISHABLE_KEY } from "../lib/config";
-import { colors } from "../lib/theme";
+import { darkColors } from "../lib/theme";
+import { ThemeProvider, useTheme } from "../lib/ThemeContext";
 import { IS_EXPO_GO } from "../lib/env";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -51,24 +52,35 @@ export default function RootLayout() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color={colors.amber} />
+      <View style={{ flex: 1, backgroundColor: darkColors.bg, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={darkColors.amber} />
       </View>
     );
   }
 
   return (
-    <StripeGate>
-      <AuthProvider>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="signin" options={{ presentation: "modal" }} />
-          <Stack.Screen name="join" options={{ presentation: "modal" }} />
-          <Stack.Screen name="studio" options={{ presentation: "modal" }} />
-          <Stack.Screen name="admin" />
-        </Stack>
-      </AuthProvider>
-    </StripeGate>
+    <ThemeProvider>
+      <StripeGate>
+        <AuthProvider>
+          <ThemedStack />
+        </AuthProvider>
+      </StripeGate>
+    </ThemeProvider>
+  );
+}
+
+function ThemedStack() {
+  const { scheme, colors } = useTheme();
+  return (
+    <>
+      <StatusBar style={scheme === "light" ? "dark" : "light"} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="signin" options={{ presentation: "modal" }} />
+        <Stack.Screen name="join" options={{ presentation: "modal" }} />
+        <Stack.Screen name="studio" options={{ presentation: "modal" }} />
+        <Stack.Screen name="admin" />
+      </Stack>
+    </>
   );
 }

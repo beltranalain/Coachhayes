@@ -2,17 +2,10 @@
 // gradient "art wells", pill buttons, cards, eyebrows and amber CTAs.
 
 import React from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  type ViewStyle,
-  type TextStyle,
-  type StyleProp,
-} from "react-native";
+import { View, Text, Pressable, StyleSheet, type ViewStyle, type TextStyle, type StyleProp, } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { colors, radii, fonts, wells, type WellName } from "../lib/theme";
+import { colors, radii, fonts, wells, type WellName, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 
 // ---- Art well ---------------------------------------------------------------
 // Emulates the web ::before radial gradients by layering two diagonal
@@ -28,6 +21,8 @@ export function ArtWell({
   children?: React.ReactNode;
   radius?: number;
 }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const w = wells[well];
   return (
     <View style={[{ backgroundColor: w.base, borderRadius: radius, overflow: "hidden" }, style]}>
@@ -59,19 +54,27 @@ export function ArtWell({
 
 // ---- Text helpers -----------------------------------------------------------
 export function Eyebrow({ children, dim, style }: { children: React.ReactNode; dim?: boolean; style?: StyleProp<TextStyle> }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return <Text style={[styles.eyebrow, dim && { color: colors.dim }, style]}>{children}</Text>;
 }
 
 export function Display({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return <Text style={[styles.display, style]}>{children}</Text>;
 }
 
 export function Body({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return <Text style={[styles.body, style]}>{children}</Text>;
 }
 
 // ---- Card -------------------------------------------------------------------
 export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
@@ -87,6 +90,8 @@ export function Pill({
   active?: boolean;
   icon?: React.ReactNode;
 }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable
       onPress={onPress}
@@ -111,6 +116,8 @@ export function AmberButton({
   onPress?: () => void;
   disabled?: boolean;
 }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [{ opacity: disabled ? 0.6 : 1 }, pressed && { transform: [{ scale: 0.98 }] }]}>
       <LinearGradient
@@ -134,6 +141,8 @@ export function OutlineAmberButton({
   onPress?: () => void;
   icon?: React.ReactNode;
 }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable
       onPress={onPress}
@@ -146,6 +155,8 @@ export function OutlineAmberButton({
 }
 
 export function Dot({ color = colors.dim, glow }: { color?: string; glow?: boolean }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View
       style={{
@@ -159,7 +170,7 @@ export function Dot({ color = colors.dim, glow }: { color?: string; glow?: boole
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   eyebrow: {
     fontFamily: fonts.bold,
     fontSize: 10.5,

@@ -3,17 +3,9 @@
 // amount + message up to the Live screen, which drives Stripe PaymentSheet.
 
 import React, { useState } from "react";
-import {
-  Modal,
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
-import { colors, fonts } from "../lib/theme";
+import { Modal, View, Text, Pressable, TextInput, StyleSheet, KeyboardAvoidingView, Platform, } from "react-native";
+import { colors, fonts, type ThemeColors } from "../lib/theme";
+import { useColors, useThemedStyles } from "../lib/ThemeContext";
 import { AmberButton } from "./ui";
 
 const PRESETS = [5, 10, 20, 50];
@@ -27,6 +19,8 @@ export function TipSheet({
   onClose: () => void;
   onSubmit: (amount: number, message: string) => void;
 }) {
+  const colors = useColors();
+  const styles = useThemedStyles(makeStyles);
   const [amount, setAmount] = useState(5);
   const [custom, setCustom] = useState(false);
   const [customVal, setCustomVal] = useState("");
@@ -107,7 +101,7 @@ export function TipSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(4,3,3,0.55)" },
   sheet: {
     backgroundColor: colors.surface,
