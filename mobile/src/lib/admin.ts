@@ -5,7 +5,13 @@
 // TEMPLATE: replace the placeholder below with your own admin email(s), or wire
 // this to your backend. These are the accounts allowed into the native Studio.
 
-export const ADMIN_EMAILS = ["you@example.com"];
+// Coach Hayes admins (mirrors the website's NEXT_PUBLIC_ADMIN_EMAILS). This only
+// decides who SEES the Control Room entry + the fast-path; the server (whoami +
+// the gated admin APIs) is the real enforcement. Override via EXPO_PUBLIC_ADMIN_EMAILS.
+const fromEnv = (process.env.EXPO_PUBLIC_ADMIN_EMAILS || "")
+  .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+export const ADMIN_EMAILS = fromEnv.length ? fromEnv : ["info@donkeyideas.com", "coachhayesfootball@gmail.com"];
 
 export function isAdminEmail(email?: string | null): boolean {
   return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
