@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
+import { Image } from "expo-image";
 import { WebView } from "react-native-webview";
 
 import { colors, fonts } from "../../lib/theme";
@@ -42,8 +43,11 @@ export default function LiveScreen() {
         </View>
       ) : (
         <View style={styles.well}>
-          {branding.logo ? null : null}
-          <View style={styles.mark}><Text style={styles.markText}>CH</Text></View>
+          {branding.logo ? (
+            <Image source={{ uri: branding.logo }} style={styles.markLogo} contentFit="contain" />
+          ) : (
+            <View style={styles.mark}><Text style={styles.markText}>CH</Text></View>
+          )}
           <View style={styles.offPill}><Text style={styles.offPillText}>Off air</Text></View>
           <Text style={styles.offLine}>The show appears here the moment it goes live.</Text>
           {!checked && <ActivityIndicator color={colors.amber} style={{ marginTop: 6 }} />}
@@ -86,6 +90,7 @@ const styles = StyleSheet.create({
   well: { aspectRatio: 9 / 10, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
   mark: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: colors.amber, alignItems: "center", justifyContent: "center", backgroundColor: "#15120f" },
   markText: { fontFamily: fonts.display, fontSize: 24, color: colors.amber },
+  markLogo: { width: 84, height: 84, borderRadius: 42 },
   offPill: { borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 14 },
   offPillText: { fontFamily: fonts.semibold, fontSize: 11, color: colors.muted },
   offLine: { fontFamily: fonts.semibold, fontSize: 14, color: colors.cream, textAlign: "center", maxWidth: 240 },
