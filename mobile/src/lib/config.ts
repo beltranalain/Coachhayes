@@ -37,6 +37,13 @@ export const HLS_URL = `https://customer-${CF_STREAM_CUSTOMER_CODE}.cloudflarest
 // WebView on the app. autoplay + muted so it starts without a user gesture.
 export const STREAM_IFRAME_URL = `https://customer-${CF_STREAM_CUSTOMER_CODE}.cloudflarestream.com/${CF_STREAM_LIVE_INPUT_UID}/iframe?autoplay=true&muted=true`;
 
+// Cloudflare Stream WHIP (WebRTC-HTTP Ingestion) publish endpoint for the live
+// input. The native Go Live screen posts its camera/mic SDP offer here to
+// broadcast straight from the phone — no browser, no WebView. Same input UID as
+// playback above, so what you publish here is exactly what the Live page plays.
+export const STREAM_WHIP_URL = `https://customer-${CF_STREAM_CUSTOMER_CODE}.cloudflarestream.com/${CF_STREAM_LIVE_INPUT_UID}/webRTC/publish`;
+export const STREAM_CONFIGURED = Boolean(CF_STREAM_CUSTOMER_CODE && CF_STREAM_LIVE_INPUT_UID);
+
 // Google OAuth client IDs from Firebase/Google console; required for Google
 // sign-in in the dev build. Leave empty to disable Google sign-in (the button
 // then shows a friendly Alert instead of attempting the OAuth flow).

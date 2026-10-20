@@ -1,191 +1,66 @@
-// GO LIVE (Studio) — the NATIVE host broadcast screen (Phase 3 of app/web parity).
-//
-// Rather than re-implementing the web studio natively, this screen embeds the
-// full web studio (`${API_BASE}/admin/go-live`) inside a <WebView>. The host
-// broadcasts straight from the app: the page runs getUserMedia in the WebView
-// and pushes to Cloudflare exactly as it does in a desktop browser. Firebase web
-// auth persists via DOM storage + cookies, so a sign-in inside the studio sticks.
-//
-// Reachability is admin-only via FloatingMenu (isAdminEmail). This screen itself
-// does not re-gate — the menu entry is the gate — but it shows the signed-in
-// admin nothing sensitive; the web page enforces its own admin auth.
-//
-// WEBVIEW MEDIA/PERMISSION NOTES (react-native-webview 13.16.1):
-//   - iOS  (WKWebView): getUserMedia is allowed by `mediaCapturePermissionGrantType="grant"`
-//     combined with the NSCamera/NSMicrophone usage strings (added in app.json Phase 2).
-//   - Android: this version has NO `onPermissionRequest` prop. The library's
-//     internal WebChromeClient auto-grants the page's camera/mic request once the
-//     app itself holds the OS CAMERA + RECORD_AUDIO permissions (declared in
-//     app.json Phase 2). `allowsProtectedMedia` + hardware layer keep video smooth.
-//   - Screen-share (getDisplayMedia) is not available in a mobile WebView.
+// GO LIVE (Studio) — NATIVE host broadcast. In a dev build / production app this
+// renders the native WebRTC broadcaster (camera -> Cloudflare WHIP, no browser,
+// no website). In Expo Go — which can't access the camera for live capture — it
+// shows a native "install the app" message instead of any web content.
 
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, Platform, } from "react-native";
-import { WebView } from "react-native-webview";
+import React from "react";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
 
-import { colors, fonts, radii, type ThemeColors } from "../lib/theme";
+import { fonts, radii, type ThemeColors } from "../lib/theme";
 import { useColors, useThemedStyles } from "../lib/ThemeContext";
-import { API_BASE } from "../lib/config";
 import { IS_EXPO_GO } from "../lib/env";
-import { getFirebaseAuth } from "../lib/firebase";
-
-const STUDIO_URL = `${API_BASE}/admin/go-live`;
 
 export default function StudioScreen() {
   const colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(true);
-  // The studio opens already signed in: mint a custom token from the app's
-  // session, then load the login bridge which consumes it and forwards to
-  // Go Live. Falls back to the plain studio (manual login) if the bridge fails.
-  const [sourceUri, setSourceUri] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const user = getFirebaseAuth().currentUser;
-        const idToken = user ? await user.getIdToken() : null;
-        if (!idToken) { if (alive) setSourceUri(STUDIO_URL); return; }
-        const res = await fetch(`${API_BASE}/api/admin/studio-token`, { method: "POST", headers: { Authorization: `Bearer ${idToken}` } });
-        const d = await res.json().catch(() => ({} as any));
-        if (!alive) return;
-        setSourceUri(d?.ok && d.token
-          ? `${API_BASE}/admin/login?t=${encodeURIComponent(d.token)}&next=${encodeURIComponent("/admin/go-live")}`
-          : STUDIO_URL);
-      } catch {
-        if (alive) setSourceUri(STUDIO_URL);
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
-
-  return (
-    <View style={styles.root}>
-      {/* Top bar — this is a modal, so a Done/close button + title. */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <Text style={styles.title}>Go Live</Text>
-        <Pressable
-          onPress={() => router.back()}
-          hitSlop={10}
-          accessibilityLabel="Close the studio"
-          style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.75 }]}
-        >
-          <Text style={styles.doneText}>Done</Text>
-        </Pressable>
-      </View>
-
-      {/* Expo Go can load the WebView, but live camera capture needs the dev
-          build (Expo Go lacks the camera usage config). Do NOT block — just note it. */}
-      {IS_EXPO_GO && (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>
-            Camera/mic in the studio needs the installed app (dev build).
+  // Expo Go can't capture the camera for live streaming — show a native notice,
+  // never web content. The real broadcaster runs in the installed dev build.
+  if (IS_EXPO_GO) {
+    return (
+      <View style={styles.root}>
+        <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+          <Text style={styles.title}>Go Live</Text>
+          <Pressable onPress={() => router.back()} hitSlop={10} style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.75 }]}>
+            <Text style={styles.doneText}>Done</Text>
+          </Pressable>
+        </View>
+        <View style={styles.center}>
+          <View style={styles.iconWrap}><Feather name="video" size={30} color={colors.amber} /></View>
+          <Text style={styles.h}>Go live from the installed app</Text>
+          <Text style={styles.p}>
+            Broadcasting uses your phone&apos;s camera, which the Expo Go sandbox can&apos;t open for live
+            streaming. Install the app (dev build) and open Go Live there to broadcast straight from your
+            phone — fully native, no website.
           </Text>
         </View>
-      )}
-
-      {/* On-brand UX note: signed in automatically + no screen-share on mobile. */}
-      <View style={styles.notes}>
-        <Text style={styles.noteText}>
-          You&apos;re signed in automatically with your app account. Screen-share
-          isn&apos;t available on mobile.
-        </Text>
       </View>
+    );
+  }
 
-      <View style={styles.webWrap}>
-        {sourceUri && (
-          <WebView
-            source={{ uri: sourceUri }}
-            style={styles.web}
-            // Core web app + Firebase web auth persistence.
-            javaScriptEnabled
-            domStorageEnabled
-            // Live camera/mic capture in-page, no user gesture required.
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            // iOS: grant getUserMedia (usage strings present in app.json).
-            mediaCapturePermissionGrantType="grant"
-            // Android: keep DRM/protected media working + smooth video.
-            allowsProtectedMedia
-            androidLayerType="hardware"
-            // Keep the Firebase session across launches.
-            thirdPartyCookiesEnabled
-            sharedCookiesEnabled={Platform.OS === "ios"}
-            allowsFullscreenVideo
-            onLoadEnd={() => setLoading(false)}
-          />
-        )}
-        {(loading || !sourceUri) && (
-          <View style={styles.loading} pointerEvents="none">
-            <ActivityIndicator color={colors.amber} />
-            <Text style={styles.loadingText}>Opening the studio…</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
+  // Dev build / production: load the native broadcaster lazily so Expo Go never
+  // evaluates the react-native-webrtc native module.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const LiveBroadcaster = require("../components/LiveBroadcaster").default as React.ComponentType<{ onClose: () => void }>;
+  return <LiveBroadcaster onClose={() => router.back()} />;
 }
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lineSoft,
-    backgroundColor: colors.bg,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.lineSoft, backgroundColor: colors.bg,
   },
-  title: {
-    fontFamily: fonts.display,
-    fontSize: 24,
-    color: colors.cream,
-    textTransform: "uppercase",
-  },
-  doneBtn: {
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
+  title: { fontFamily: fonts.display, fontSize: 24, color: colors.cream, textTransform: "uppercase" },
+  doneBtn: { borderRadius: radii.pill, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, paddingVertical: 8, paddingHorizontal: 16 },
   doneText: { fontFamily: fonts.bold, fontSize: 13, color: colors.cream },
-  banner: {
-    backgroundColor: "rgba(245,165,36,0.1)",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(245,165,36,0.35)",
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-  },
-  bannerText: { fontFamily: fonts.semibold, fontSize: 12, color: colors.amber },
-  notes: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lineSoft,
-    backgroundColor: colors.bg,
-  },
-  noteText: { fontFamily: fonts.body, fontSize: 11.5, color: colors.muted, lineHeight: 17 },
-  webWrap: { flex: 1, backgroundColor: colors.bgDeep },
-  web: { flex: 1, backgroundColor: colors.bgDeep },
-  loading: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    backgroundColor: colors.bgDeep,
-  },
-  loadingText: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 14 },
+  iconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.line },
+  h: { fontFamily: fonts.display, fontSize: 21, color: colors.cream, textAlign: "center", letterSpacing: -0.4 },
+  p: { fontFamily: fonts.body, fontSize: 13.5, color: colors.muted, textAlign: "center", lineHeight: 21 },
 });
