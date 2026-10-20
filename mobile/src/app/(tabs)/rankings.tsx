@@ -2,7 +2,7 @@
 // chip dots, and a Read / Unlock button that opens the Honest Evaluation.
 
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Linking, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 
 import { colors, fonts, type ThemeColors } from "../../lib/theme";
@@ -46,7 +46,7 @@ export default function RankingsScreen() {
   function openVideo(p: RankPlayer) {
     const id = youtubeId(p.videoUrl);
     if (id) router.push(watchHref(id, p.name) as never);
-    else if (p.videoUrl) Linking.openURL(p.videoUrl).catch(() => {});
+    else if (p.videoUrl) router.push(`/web?url=${encodeURIComponent(p.videoUrl)}&title=${encodeURIComponent(`${p.name} — Film`)}` as never);
   }
 
   const header = (

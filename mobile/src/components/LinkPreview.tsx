@@ -2,8 +2,9 @@
 // raw www address. Fetches Open Graph data via the shared /api/link-preview.
 
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Linking } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import { fonts, type ThemeColors } from "../lib/theme";
 import { useColors, useThemedStyles } from "../lib/ThemeContext";
 import { fetchLinkPreview, type LinkPreviewData } from "../lib/api";
@@ -15,6 +16,7 @@ function hostOf(u: string): string {
 export default function LinkPreview({ url }: { url: string }) {
   const colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const router = useRouter();
   const [p, setP] = useState<LinkPreviewData | null>(null);
   const [dead, setDead] = useState(false);
 
@@ -28,7 +30,7 @@ export default function LinkPreview({ url }: { url: string }) {
   const host = p?.site || hostOf(url);
 
   return (
-    <Pressable onPress={() => Linking.openURL(url).catch(() => {})} style={styles.card}>
+    <Pressable onPress={() => router.push(`/web?url=${encodeURIComponent(url)}&title=${encodeURIComponent(host)}` as never)} style={styles.card}>
       {p?.image ? (
         <Image source={{ uri: p.image }} style={styles.img} contentFit="cover" />
       ) : (
