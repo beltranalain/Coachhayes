@@ -106,22 +106,31 @@ export default function EvaluationsAdmin() {
   const [recording, setRecording] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  // Whisper hallucinates these on silence/empty audio — treat as "no speech".
+  const HALLUCINATIONS = new Set(["thank you", "thank you.", "thanks", "thanks.", "you", "you.", "bye", "bye.", "the end", "the end.", "thanks for watching", "thanks for watching."]);
   async function toggleRecord() {
     if (recording) { mediaRef.current?.stop(); setRecording(false); return; }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      // 16kHz mono + echo/noise suppression — what Whisper wants for clean speech.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      const mime = typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : (MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "");
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       chunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
-        await transcribe(blob);
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        if (blob.size > 0) await transcribe(blob);
+        else setMsg("No audio was captured — check your mic and try again.");
       };
       mr.start();
       mediaRef.current = mr;
       setRecording(true); setMsg("");
-    } catch { setMsg("Microphone access was blocked. Allow the mic to record Coach's read."); }
+    } catch (e: any) {
+      setMsg(e?.name === "NotAllowedError" ? "Microphone access denied — allow the mic and try again." : "Couldn't access the microphone.");
+    }
   }
   async function transcribe(blob: Blob) {
     setBusy("transcribe"); setMsg("");
@@ -129,8 +138,14 @@ export default function EvaluationsAdmin() {
       const fd = new FormData(); fd.append("audio", blob, "coach-eval.webm");
       const res = await fetch("/api/admin/transcribe", { method: "POST", headers: await tok(), body: fd });
       const d = await res.json();
-      if (d.ok) ed({ transcript: ((editor?.transcript || "") + (editor?.transcript ? "\n\n" : "") + d.text).trim() });
-      else setMsg(d.error || "Transcription failed.");
+      const text = String(d.text || "").trim();
+      if (d.ok && text && !HALLUCINATIONS.has(text.toLowerCase())) {
+        setEditor((e) => (e ? { ...e, transcript: (e.transcript ? e.transcript + "\n\n" : "") + text } : e));
+      } else if (d.ok) {
+        setMsg("No speech detected — check your mic (Windows: Sound Settings → Input) and talk a bit louder.");
+      } else {
+        setMsg(d.error || "Transcription failed.");
+      }
     } catch { setMsg("Transcription failed."); } finally { setBusy(""); }
   }
 

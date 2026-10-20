@@ -82,12 +82,17 @@ export async function transcribeClip(blob: Blob, filename = "audio.webm"): Promi
   if (!p) throw new Error("No transcription provider is connected. Add GROQ_API_KEY or OPENAI_API_KEY.");
   const cfg = p === "openai"
     ? { base: "https://api.openai.com/v1/audio/transcriptions", key: OPENAI_KEY!, model: process.env.OPENAI_TRANSCRIBE_MODEL || "whisper-1" }
-    : { base: "https://api.groq.com/openai/v1/audio/transcriptions", key: GROQ_KEY!, model: process.env.GROQ_TRANSCRIBE_MODEL || "whisper-large-v3" };
+    : { base: "https://api.groq.com/openai/v1/audio/transcriptions", key: GROQ_KEY!, model: process.env.GROQ_TRANSCRIBE_MODEL || "whisper-large-v3-turbo" };
 
   const form = new FormData();
   form.append("file", blob, filename);
   form.append("model", cfg.model);
   form.append("language", "en");
+  form.append("temperature", "0");
+  // verbose_json returns per-segment no_speech_prob so we can drop silent
+  // segments (that's what makes Whisper hallucinate "Thank you." on silence).
+  form.append("response_format", "verbose_json");
+  form.append("prompt", "Coach Hayes breaking down a high school football recruit's game film: position, technique, athleticism, strengths and areas to improve.");
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 120_000);
@@ -95,6 +100,13 @@ export async function transcribeClip(blob: Blob, filename = "audio.webm"): Promi
     const res = await fetch(cfg.base, { method: "POST", headers: { Authorization: `Bearer ${cfg.key}` }, body: form, signal: controller.signal });
     if (!res.ok) { const t = await res.text().catch(() => ""); throw new Error(`Transcription ${res.status}: ${t.slice(0, 220)}`); }
     const data = await res.json();
+    if (Array.isArray(data?.segments) && data.segments.length) {
+      const voiced = data.segments
+        .filter((s: any) => (s?.no_speech_prob ?? 0) < 0.7)
+        .map((s: any) => String(s?.text || "").trim())
+        .filter(Boolean);
+      return voiced.join(" ").trim();
+    }
     return String(data?.text || "").trim();
   } catch (e: any) {
     if (e?.name === "AbortError") throw new Error("Transcription timed out. Please try a shorter clip.");
