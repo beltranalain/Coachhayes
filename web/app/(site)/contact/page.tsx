@@ -1,11 +1,22 @@
 import type { Metadata } from "next";
 import ContactForm from "@/components/ContactForm";
-import { getSiteConfig } from "@/lib/siteConfig";
+import { getSiteConfig, getHayesContent } from "@/lib/siteConfig";
 
 export const metadata: Metadata = { title: "Contact" };
 
+// Show the address without the scheme/www so it reads as a handle, e.g.
+// "youtube.com/@CoachHayesFootball".
+const cleanUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "");
+
 export default async function ContactPage() {
-  const { content, channels } = await getSiteConfig();
+  const [{ content }, hayes] = await Promise.all([getSiteConfig(), getHayesContent()]);
+  // Real social channels come from the same admin-editable footer config
+  // (Follow + Community columns), so the contact page and footer never drift.
+  const socials = ["follow", "community"]
+    .map((k) => hayes.footer.columns.find((c) => c.key === k))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c))
+    .flatMap((c) => c.links)
+    .filter((l) => /^https?:\/\//.test(l.href));
   return (
     <>
       <section className="page-hero">
@@ -25,15 +36,11 @@ export default async function ContactPage() {
                   <div className="label">Email</div>
                   <div className="value"><a href={`mailto:${content.emailGeneral}`}>{content.emailGeneral}</a></div>
                 </li>
-                <li>
-                  <div className="label">Guest and booking</div>
-                  <div className="value"><a href={`mailto:${content.emailBooking}`}>{content.emailBooking}</a></div>
-                </li>
-                {channels.map((c) => (
-                  <li key={c.key}>
-                    <div className="label">{c.name}</div>
+                {socials.map((l) => (
+                  <li key={l.href}>
+                    <div className="label">{l.label}</div>
                     <div className="value">
-                      <a href={c.url} target="_blank" rel="noopener noreferrer">{c.handle ? `youtube.com/${c.handle}` : "YouTube"}</a>
+                      <a href={l.href} target="_blank" rel="noopener noreferrer">{cleanUrl(l.href)}</a>
                     </div>
                   </li>
                 ))}

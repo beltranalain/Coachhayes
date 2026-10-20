@@ -11,8 +11,9 @@ export const TAGLINE = "Football, read the way a coach reads it.";
 export const DOMAIN = "coachhayesfootball.com";
 
 // Contact addresses shown on the site + used as fallbacks for the contact form.
-export const EMAIL_GENERAL = `hello@${DOMAIN}`;
-export const EMAIL_BOOKING = `booking@${DOMAIN}`;
+// Coach runs a single real inbox, so both roles point at the same Gmail.
+export const EMAIL_GENERAL = "coachhayesfootball@gmail.com";
+export const EMAIL_BOOKING = "coachhayesfootball@gmail.com";
 
 // Design accent. The Hayes design system is dual-theme: blue accent in light,
 // gold accent in dark (see the CSS token layer in app/globals-hayes.css). This

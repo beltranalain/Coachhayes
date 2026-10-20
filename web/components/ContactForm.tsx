@@ -46,7 +46,7 @@ export default function ContactForm() {
         <label htmlFor="message">Message</label>
         <textarea id="message" name="message" placeholder="Tell us a little more" required />
       </div>
-      <button className="btn btn-primary" type="submit" disabled={status === "sending"}>
+      <button className="pill" type="submit" disabled={status === "sending"} style={{ marginTop: 4 }}>
         {status === "sending" ? "Sending..." : "Send Message"}
       </button>
       {status === "ok" && <p className="form-ok">Thanks - your message was sent.</p>}
