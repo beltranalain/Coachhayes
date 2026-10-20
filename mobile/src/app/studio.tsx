@@ -19,7 +19,7 @@
 //     app.json Phase 2). `allowsProtectedMedia` + hardware layer keep video smooth.
 //   - Screen-share (getDisplayMedia) is not available in a mobile WebView.
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Platform, } from "react-native";
 import { WebView } from "react-native-webview";
 import { useRouter } from "expo-router";
@@ -29,6 +29,7 @@ import { colors, fonts, radii, type ThemeColors } from "../lib/theme";
 import { useColors, useThemedStyles } from "../lib/ThemeContext";
 import { API_BASE } from "../lib/config";
 import { IS_EXPO_GO } from "../lib/env";
+import { getFirebaseAuth } from "../lib/firebase";
 
 const STUDIO_URL = `${API_BASE}/admin/go-live`;
 
@@ -38,6 +39,30 @@ export default function StudioScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
+  // The studio opens already signed in: mint a custom token from the app's
+  // session, then load the login bridge which consumes it and forwards to
+  // Go Live. Falls back to the plain studio (manual login) if the bridge fails.
+  const [sourceUri, setSourceUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const user = getFirebaseAuth().currentUser;
+        const idToken = user ? await user.getIdToken() : null;
+        if (!idToken) { if (alive) setSourceUri(STUDIO_URL); return; }
+        const res = await fetch(`${API_BASE}/api/admin/studio-token`, { method: "POST", headers: { Authorization: `Bearer ${idToken}` } });
+        const d = await res.json().catch(() => ({} as any));
+        if (!alive) return;
+        setSourceUri(d?.ok && d.token
+          ? `${API_BASE}/admin/login?t=${encodeURIComponent(d.token)}&next=${encodeURIComponent("/admin/go-live")}`
+          : STUDIO_URL);
+      } catch {
+        if (alive) setSourceUri(STUDIO_URL);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   return (
     <View style={styles.root}>
@@ -64,36 +89,38 @@ export default function StudioScreen() {
         </View>
       )}
 
-      {/* On-brand UX notes: first-time sign-in + no screen-share on mobile. */}
+      {/* On-brand UX note: signed in automatically + no screen-share on mobile. */}
       <View style={styles.notes}>
         <Text style={styles.noteText}>
-          First time here you may need to sign in inside the studio. Screen-share
+          You&apos;re signed in automatically with your app account. Screen-share
           isn&apos;t available on mobile.
         </Text>
       </View>
 
       <View style={styles.webWrap}>
-        <WebView
-          source={{ uri: STUDIO_URL }}
-          style={styles.web}
-          // Core web app + Firebase web auth persistence.
-          javaScriptEnabled
-          domStorageEnabled
-          // Live camera/mic capture in-page, no user gesture required.
-          allowsInlineMediaPlayback
-          mediaPlaybackRequiresUserAction={false}
-          // iOS: grant getUserMedia (usage strings present in app.json).
-          mediaCapturePermissionGrantType="grant"
-          // Android: keep DRM/protected media working + smooth video.
-          allowsProtectedMedia
-          androidLayerType="hardware"
-          // Keep the Firebase session across launches.
-          thirdPartyCookiesEnabled
-          sharedCookiesEnabled={Platform.OS === "ios"}
-          allowsFullscreenVideo
-          onLoadEnd={() => setLoading(false)}
-        />
-        {loading && (
+        {sourceUri && (
+          <WebView
+            source={{ uri: sourceUri }}
+            style={styles.web}
+            // Core web app + Firebase web auth persistence.
+            javaScriptEnabled
+            domStorageEnabled
+            // Live camera/mic capture in-page, no user gesture required.
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            // iOS: grant getUserMedia (usage strings present in app.json).
+            mediaCapturePermissionGrantType="grant"
+            // Android: keep DRM/protected media working + smooth video.
+            allowsProtectedMedia
+            androidLayerType="hardware"
+            // Keep the Firebase session across launches.
+            thirdPartyCookiesEnabled
+            sharedCookiesEnabled={Platform.OS === "ios"}
+            allowsFullscreenVideo
+            onLoadEnd={() => setLoading(false)}
+          />
+        )}
+        {(loading || !sourceUri) && (
           <View style={styles.loading} pointerEvents="none">
             <ActivityIndicator color={colors.amber} />
             <Text style={styles.loadingText}>Opening the studio…</Text>

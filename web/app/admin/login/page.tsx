@@ -6,7 +6,7 @@ import { BRAND } from "@/lib/siteData";
 import GoogleIcon from "@/components/hayes/GoogleIcon";
 import { firebaseConfigured, getFirebaseAuth } from "@/lib/firebase";
 import { isEnvOwner } from "@/lib/admin";
-import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signInWithCustomToken, GoogleAuthProvider, signOut } from "firebase/auth";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -14,6 +14,7 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [bridging, setBridging] = useState(false);
   const [logo, setLogo] = useState("");
 
   // Show the site's uploaded logo on the sign-in card (falls back to the chip).
@@ -33,6 +34,22 @@ export default function AdminLogin() {
       return "/admin/go-live";
     }
   };
+
+  // Mobile -> Studio bridge: the app opens this page with ?t=<customToken> so the
+  // embedded Studio signs in with the SAME account automatically — no second
+  // login. Consume the token once, then forward to the requested page.
+  useEffect(() => {
+    if (!firebaseConfigured) return;
+    let t = "";
+    try { t = new URLSearchParams(window.location.search).get("t") || ""; } catch {}
+    if (!t) return;
+    const auth = getFirebaseAuth();
+    if (!auth) return;
+    setBridging(true);
+    signInWithCustomToken(auth, t)
+      .then(() => router.replace(nextUrl()))
+      .catch(() => { setBridging(false); setError("Could not sign you in automatically. Please sign in."); });
+  }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -132,7 +149,8 @@ export default function AdminLogin() {
         </div>
         <h2>Studio sign in</h2>
         <p className="st">Private dashboard for the creator. Not part of the public site.</p>
-        {firebaseConfigured && (
+        {bridging && <p className="st" style={{ color: "var(--amber)" }}>Signing you in…</p>}
+        {firebaseConfigured && !bridging && (
           <>
             <button type="button" className="btn btn-ghost" style={{ width: "100%", justifyContent: "center", gap: 10 }} onClick={google} disabled={busy}>
               <GoogleIcon />
@@ -141,7 +159,7 @@ export default function AdminLogin() {
             <div style={{ textAlign: "center", color: "var(--mute)", fontSize: 12, margin: "12px 0" }}>or use email</div>
           </>
         )}
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} style={bridging ? { display: "none" } : undefined}>
           <div className="form-field">
             <label htmlFor="email">Email</label>
             <input
