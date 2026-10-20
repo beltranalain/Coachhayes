@@ -62,8 +62,11 @@ function Inner() {
     try {
       if (recState.isRecording) {
         await recorder.stop();
+        // expo-audio can leave recorder.uri null for a beat right after stop —
+        // don't silently no-op; surface it so recording never looks "dead".
         const uri = recorder.uri;
         if (uri) await runTranscribe(uri);
+        else setMsg("The recording didn't save. Try again and hold Record a moment before speaking.");
         return;
       }
       const perm = await AudioModule.requestRecordingPermissionsAsync();
@@ -72,16 +75,18 @@ function Inner() {
       await recorder.prepareToRecordAsync();
       recorder.record();
       setMsg("");
-    } catch { setMsg("Could not start recording."); }
+    } catch { setMsg(recState.isRecording ? "Could not save the recording — try again." : "Could not start recording — check mic permissions."); }
   }
 
   async function runTranscribe(uri: string) {
     setBusy("transcribe"); setMsg("");
     try {
       const r = await transcribeAudio(uri);
-      if (r.ok && r.text) setTranscript((t) => (t ? `${t}\n\n${r.text}` : r.text!).trim());
+      const text = (r.text || "").trim();
+      if (r.ok && text) setTranscript((t) => (t ? `${t}\n\n${text}` : text));
+      else if (r.ok) setMsg("No speech detected — move closer to the mic and talk a bit louder, then record again.");
       else setMsg(r.error || "Transcription failed.");
-    } catch { setMsg("Transcription failed."); } finally { setBusy(""); }
+    } catch { setMsg("Transcription failed — check your connection and try again."); } finally { setBusy(""); }
   }
 
   async function generate() {
