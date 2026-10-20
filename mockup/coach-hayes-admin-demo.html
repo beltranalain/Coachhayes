@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Coach Hayes Football — Control Room (live demo)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  .screen[data-theme="dark"]{
+    --app:#000; --alt:#0D0D10; --card:#131316; --ink:#F5F5F7; --sub:#86868B; --dim:#5A5A60;
+    --hair:rgba(245,245,247,.13); --hair2:rgba(245,245,247,.07); --acc:#C8A96B; --accInk:#171204; --live:#FF453A; --green:#30D158;
+  }
+  .screen[data-theme="light"]{
+    --app:#FFFFFF; --alt:#F1F1F4; --card:#FFFFFF; --ink:#1D1D1F; --sub:#6E6E73; --dim:#A1A1A6;
+    --hair:rgba(0,0,0,.10); --hair2:rgba(0,0,0,.055); --acc:#9A7B33; --accInk:#FFFFFF; --live:#E8342A; --green:#2FA96A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{background:radial-gradient(1100px 600px at 50% -5%,#1b1b1e,#060607) fixed,#060607;color:#d9d6d0;
+    font-family:"Plus Jakarta Sans",system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:34px 16px 60px}
+  .intro{text-align:center;max-width:560px;margin-bottom:22px}
+  .intro h1{font-size:22px;font-weight:700;letter-spacing:-.03em;color:#f3efe8}
+  .intro p{font-size:13.5px;color:#9a948b;margin-top:8px;line-height:1.5}
+  .hint{display:inline-flex;gap:7px;align-items:center;margin-top:12px;font-size:12px;color:#8a857c;border:1px solid #ffffff1f;border-radius:999px;padding:6px 14px}
+  .hint b{color:#c8a96b;font-weight:600}
+
+  .phone{position:relative;width:368px;height:772px;background:#0a0a0a;border-radius:52px;padding:11px;box-shadow:0 34px 80px rgba(0,0,0,.65),0 0 0 2px #26231f}
+  .screen{position:relative;width:100%;height:100%;background:var(--app);border-radius:42px;overflow:hidden;display:flex;flex-direction:column;
+    font-family:inherit;color:var(--ink);font-size:15px;line-height:1.5;letter-spacing:-.012em}
+  .notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:128px;height:27px;background:#0a0a0a;border-radius:0 0 17px 17px;z-index:60}
+  .statusbar{height:42px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 22px 5px;font-size:12.5px;font-weight:600;color:var(--ink)}
+
+  .top{height:50px;display:flex;align-items:center;gap:10px;padding:0 15px;border-bottom:1px solid var(--hair)}
+  .top .dot{width:7px;height:7px;border-radius:50%;background:var(--acc)}
+  .top .back{font-size:24px;color:var(--ink);cursor:pointer;margin-top:-3px;display:none}
+  .top b{font-size:15px;font-weight:700;letter-spacing:-.02em;flex:1}
+  .themeBtn{width:34px;height:34px;display:grid;place-items:center;cursor:pointer}
+  .themeBtn svg{width:17px;height:17px;stroke:var(--ink);fill:none}
+
+  .body{flex:1;overflow:hidden;position:relative}
+  .view{position:absolute;inset:0;overflow-y:auto;padding:16px 15px 24px;display:none}
+  .view.on{display:block}
+  .view::-webkit-scrollbar{width:0}
+
+  .kick{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);font-weight:700}
+  .who{background:var(--card);border:1px solid var(--hair);border-radius:16px;padding:14px;margin-bottom:16px}
+  .who .l{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:700}
+  .who .e{font-size:15px;font-weight:600;margin-top:5px}
+  .who .badge{display:inline-block;margin-top:9px;background:color-mix(in srgb,var(--acc) 18%,transparent);color:var(--acc);border-radius:999px;padding:3px 11px;font-size:11px;font-weight:700}
+
+  .hubrow{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--hair);border-radius:16px;padding:14px;margin-bottom:11px;cursor:pointer}
+  .hubrow .ic{width:40px;height:40px;border-radius:11px;background:var(--alt);display:grid;place-items:center}
+  .hubrow .ic svg{width:19px;height:19px;stroke:var(--acc);fill:none}
+  .hubrow.live .ic{background:color-mix(in srgb,var(--live) 16%,transparent)}.hubrow.live .ic svg{stroke:var(--live)}
+  .hubrow b{font-size:14.5px;font-weight:600;display:block;letter-spacing:-.01em}
+  .hubrow span{font-size:12px;color:var(--sub)}
+  .hubrow .chev{margin-left:auto;color:var(--dim);font-size:20px}
+
+  .preview{aspect-ratio:3/4;border-radius:18px;overflow:hidden;position:relative;background:radial-gradient(120% 90% at 50% 20%,#2a2a30,#0c0c0f);border:1px solid var(--hair)}
+  .preview .chip{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.5);border-radius:999px;padding:4px 11px;font-size:11px;font-weight:600;color:#fff}
+  .preview .silh{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:120px;height:160px;background:radial-gradient(60% 40% at 50% 22%,#43434d 0 60%,transparent 62%),linear-gradient(#3a3a44,#242430);border-radius:60px 60px 0 0;opacity:.55}
+  .liveBadge{position:absolute;top:10px;left:10px;display:flex;align-items:center;gap:5px;background:var(--live);border-radius:6px;padding:3px 9px}
+  .liveBadge i{width:6px;height:6px;border-radius:50%;background:#fff;display:block;animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .liveBadge b{font-size:10px;letter-spacing:1.2px;color:#fff;font-weight:700}
+  .viewers{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.5);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:600;color:#fff}
+
+  .field{margin-top:14px}
+  .field label{font-size:11px;color:var(--sub);font-weight:600;display:block;margin-bottom:6px}
+  .field .in{border:1px solid var(--hair);border-radius:10px;background:var(--alt);padding:11px 13px;font-size:13.5px;color:var(--ink)}
+  .dests{display:flex;gap:8px;margin-top:12px}
+  .dest{flex:1;display:flex;align-items:center;gap:8px;border:1px solid var(--hair);border-radius:12px;padding:10px 12px;background:var(--card);cursor:pointer}
+  .dest.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+  .dest .d{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+  .dest.on .d{background:var(--green)}
+  .dest b{font-size:12.5px;font-weight:600}
+  .golive{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--live);color:#fff;border-radius:14px;padding:15px;font-size:16px;font-weight:700;margin-top:16px;cursor:pointer}
+  .golive .r{width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.25)}
+  .endbtn{display:flex;align-items:center;justify-content:center;border:1.5px solid color-mix(in srgb,var(--live) 55%,transparent);color:var(--live);border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px;cursor:pointer}
+  .chat{margin-top:14px;display:flex;flex-direction:column;gap:9px}
+  .msg{font-size:12.5px;line-height:1.4}.msg b{font-weight:700;color:var(--ink)}.msg span{color:var(--sub)}
+
+  .rec{display:flex;align-items:center;gap:12px;background:var(--alt);border:1px solid var(--hair);border-radius:14px;padding:14px;margin-bottom:12px;cursor:pointer}
+  .rec .rdot{width:46px;height:46px;border-radius:50%;background:var(--live);display:grid;place-items:center;flex-shrink:0}
+  .rec .rdot svg{width:20px;height:20px;stroke:#fff;fill:none}
+  .rec .rt{font-size:13px;font-weight:600}
+  .rec.recording .rdot{box-shadow:0 0 0 6px color-mix(in srgb,var(--live) 16%,transparent)}
+  .wave{display:none;align-items:center;gap:3px;height:22px;margin-top:5px}
+  .rec.recording .wave{display:flex}
+  .wave i{width:3px;background:var(--acc);border-radius:2px;animation:w 1s ease-in-out infinite}
+  @keyframes w{0%,100%{height:5px}50%{height:20px}}
+  .flabel{font-size:11px;color:var(--sub);font-weight:600;margin:13px 0 6px}
+  .finput{border:1px solid var(--hair);border-radius:12px;background:var(--alt);padding:11px 13px;font-size:12.5px;color:var(--sub);line-height:1.55;min-height:40px}
+  .genbtn{display:flex;align-items:center;justify-content:center;gap:7px;background:var(--acc);color:var(--accInk);font-weight:700;border-radius:12px;padding:12px;font-size:13.5px;margin-top:14px;cursor:pointer}
+  .preview2{display:none;background:var(--card);border:1px solid var(--hair);border-radius:14px;padding:14px;margin-top:14px}
+  .preview2.show{display:block}
+  .preview2 .pl{font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--acc);font-weight:700;margin-bottom:8px}
+  .preview2 .pj{font-size:13px;font-weight:600;margin-bottom:6px}
+  .preview2 .pt{font-size:12.5px;line-height:1.6;color:var(--sub)}
+  .access{display:flex;gap:8px;margin-top:8px}
+  .seg{flex:1;text-align:center;border:1px solid var(--hair);border-radius:999px;padding:9px;font-size:12.5px;font-weight:600;color:var(--sub);cursor:pointer}
+  .seg.on{background:var(--acc);border-color:var(--acc);color:var(--accInk)}
+  .pub{display:flex;gap:10px;margin-top:16px}
+  .pubBtn{flex:1;text-align:center;background:var(--acc);color:var(--accInk);border-radius:12px;padding:13px;font-weight:700;font-size:14px;cursor:pointer}
+
+  .composer{border:1px solid var(--hair);border-radius:16px;background:var(--card);padding:14px}
+  .ctop{display:flex;gap:11px;align-items:center}
+  .ctop .av{width:36px;height:36px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font-weight:800;color:var(--accInk)}
+  .ctop .n b{font-size:13.5px;font-weight:700;display:block}
+  .ctop .n span{font-size:11px;color:var(--acc)}
+  .ctext{color:var(--ink);font-size:14px;padding:14px 2px;line-height:1.5;border-bottom:1px solid var(--hair);margin-bottom:12px}
+  .crow{display:flex;align-items:center;gap:8px}
+  .cchip{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--hair);border-radius:999px;padding:9px;font-size:12.5px;color:var(--sub);font-weight:600}
+  .cchip svg{width:14px;height:14px;stroke:var(--sub);fill:none}
+  .cpost{flex:1;text-align:center;background:var(--acc);color:var(--accInk);border-radius:999px;padding:9px;font-size:13px;font-weight:700}
+  .linkcard{display:flex;border:1px solid var(--hair);border-radius:12px;overflow:hidden;margin-top:12px;background:var(--alt)}
+  .linkcard .li{width:96px;background:linear-gradient(120deg,#0d7a3e,#d2691e)}
+  .linkcard .lb{padding:11px 12px}
+  .linkcard .lb small{font-size:11px;color:var(--sub)}
+  .linkcard .lb b{font-size:13px;font-weight:600;display:block;margin-top:2px;line-height:1.35}
+  .foot{margin-top:24px;font-size:12px;color:#55504a;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Control Room — live admin demo</h1>
+  <p>Tap around the coach's admin: go live, run an evaluation, post to the Locker Room. Switch Light/Dark with the header icon.</p>
+  <span class="hint">Try: <b>Go Live</b> → Go live ·&nbsp; <b>Evaluations</b> → Record → Generate</span>
+</div>
+
+<div class="phone"><div class="notch"></div>
+  <div class="screen" data-theme="dark" id="screen">
+    <div class="statusbar"><span>9:41</span><span>CH</span></div>
+    <div class="top">
+      <span class="back" id="back" onclick="go('hub')">‹</span>
+      <span class="dot" id="dot"></span>
+      <b id="title">Control Room</b>
+      <div class="themeBtn" onclick="toggleTheme()"><svg id="themeIcon" viewBox="0 0 24 24" stroke-width="2"></svg></div>
+    </div>
+
+    <div class="body">
+      <!-- HUB -->
+      <div class="view on" data-view="hub">
+        <div class="who"><div class="l">Signed in as</div><div class="e">coachhayesfootball@gmail.com</div><span class="badge">Owner</span></div>
+        <div class="hubrow live" onclick="go('golive')"><div class="ic"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg></div><div><b>Go Live</b><span>Broadcast from your phone</span></div><span class="chev">›</span></div>
+        <div class="hubrow" onclick="go('evals')"><div class="ic"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h6"/></svg></div><div><b>Evaluations</b><span>Record, AI writes it, publish</span></div><span class="chev">›</span></div>
+        <div class="hubrow" onclick="go('locker')"><div class="ic"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19c0-3 2.5-5 5-5M21 19c0-3-2.5-5-5-5"/></svg></div><div><b>Post to Locker Room</b><span>Share with the community</span></div><span class="chev">›</span></div>
+        <div class="hubrow"><div class="ic"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M3 8h14M7 2v4M13 2v4"/></svg></div><div><b>Schedule</b><span>Add or remove broadcasts</span></div><span class="chev">›</span></div>
+        <div class="hubrow"><div class="ic"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.5-6 8-6s8 2 8 6"/></svg></div><div><b>Members &amp; Team</b><span>Access, tips, costs</span></div><span class="chev">›</span></div>
+      </div>
+
+      <!-- GO LIVE -->
+      <div class="view" data-view="golive">
+        <div id="offair">
+          <div class="preview"><span class="chip">Front camera</span><div class="silh"></div></div>
+          <div class="field"><label>Show title</label><div class="in">Canes Talk Live — Week 9 reactions</div></div>
+          <div class="dests">
+            <div class="dest on" onclick="this.classList.toggle('on')"><span class="d"></span><b>Site</b></div>
+            <div class="dest on" onclick="this.classList.toggle('on')"><span class="d"></span><b>YouTube</b></div>
+            <div class="dest" onclick="this.classList.toggle('on')"><span class="d"></span><b>Facebook</b></div>
+          </div>
+          <div class="golive" onclick="setLive(true)"><span class="r"></span>Go live</div>
+        </div>
+        <div id="onair" style="display:none">
+          <div class="preview"><div class="liveBadge"><i></i><b>LIVE</b></div><span class="viewers">▲ 128 watching</span><div class="silh"></div></div>
+          <div class="chat">
+            <div class="msg"><b>Donkey Ideas</b> <span>Let's go coach!</span></div>
+            <div class="msg"><b>mike_27</b> <span>Breaking down the Miami tape?</span></div>
+            <div class="msg"><b>canefan</b> <span>Sound is perfect</span></div>
+          </div>
+          <div class="endbtn" onclick="setLive(false)">End broadcast</div>
+        </div>
+      </div>
+
+      <!-- EVALUATIONS -->
+      <div class="view" data-view="evals">
+        <p style="font-size:13px;font-weight:700">New evaluation — Ian Ellis, Jr.</p>
+        <p style="font-size:11.5px;color:var(--sub);margin:4px 0 14px">Talk through the film. We transcribe it, then AI writes the report.</p>
+        <div class="rec" id="rec" onclick="toggleRec()">
+          <div class="rdot"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" stroke="none"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg></div>
+          <div style="flex:1"><div class="rt" id="rt">Tap to record your read</div><div class="wave"><i style="animation-delay:0s"></i><i style="animation-delay:.1s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.3s"></i><i style="animation-delay:.15s"></i><i style="animation-delay:.25s"></i><i style="animation-delay:.05s"></i><i style="animation-delay:.35s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.1s"></i></div></div>
+        </div>
+        <div class="flabel">Coach's read (transcribed)</div>
+        <div class="finput" id="transcript">Tap record and talk — your words appear here.</div>
+        <div class="genbtn" onclick="generate()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z"/></svg>Generate with AI</div>
+        <div class="preview2" id="report">
+          <div class="pl">Generated evaluation</div>
+          <div class="pj">Projection: Division II or below · select HBCU</div>
+          <div class="pt">Developing center with a promising frame and a willingness to finish blocks. Next step: translate the physical tools into consistent technique and leverage…</div>
+          <div class="flabel">Access</div>
+          <div class="access"><div class="seg" onclick="pick(this)">Free</div><div class="seg on" onclick="pick(this)">Locked · $49</div></div>
+          <div class="pub"><div class="pubBtn">Save &amp; publish</div></div>
+        </div>
+      </div>
+
+      <!-- LOCKER ROOM POST -->
+      <div class="view" data-view="locker">
+        <div class="composer">
+          <div class="ctop"><div class="av">C</div><div class="n"><b>Coach Hayes Football</b><span>Posting as the brand</span></div></div>
+          <div class="ctext">Full breakdown on Amir Sears is up — tracks the deep ball over either shoulder. Read it here:</div>
+          <div class="linkcard"><div class="li"></div><div class="lb"><small>coachhayesfootball.com</small><b>Amir Sears — WR, class of 2027 · Honest Evaluation</b></div></div>
+          <div class="crow" style="margin-top:12px">
+            <div class="cchip"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>Photo</div>
+            <div class="cchip"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M4 18V8M10 18V4M16 18v-7M22 18H2"/></svg>Poll</div>
+            <div class="cpost">Post</div>
+          </div>
+        </div>
+        <p style="font-size:11.5px;color:var(--sub);margin-top:12px;text-align:center">Paste a link and it shows the site's thumbnail — no raw address.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="foot">Live admin prototype · Coach Hayes Football · Control Room</p>
+
+<script>
+  var TITLES = { hub:"Control Room", golive:"Go Live", evals:"Evaluations", locker:"Post to Locker Room" };
+  function go(v){
+    document.querySelectorAll('.view').forEach(function(el){ el.classList.toggle('on', el.dataset.view===v); });
+    document.getElementById('title').textContent = TITLES[v];
+    document.getElementById('back').style.display = v==='hub' ? 'none' : 'block';
+    document.getElementById('dot').style.display = v==='hub' ? 'inline-block' : 'none';
+    if(v!=='golive') setLive(false);
+    if(v==='evals'){ document.getElementById('report').classList.remove('show'); document.getElementById('rec').classList.remove('recording'); document.getElementById('rt').textContent='Tap to record your read'; document.getElementById('transcript').textContent='Tap record and talk — your words appear here.'; }
+  }
+  function setLive(on){
+    document.getElementById('offair').style.display = on ? 'none':'block';
+    document.getElementById('onair').style.display = on ? 'block':'none';
+    document.getElementById('title').textContent = on ? 'On air' : 'Go Live';
+  }
+  var recording=false;
+  function toggleRec(){
+    recording=!recording;
+    var rec=document.getElementById('rec');
+    rec.classList.toggle('recording',recording);
+    document.getElementById('rt').textContent = recording ? 'Recording… 0:12 — tap to stop' : 'Transcribed — review below';
+    if(!recording){ document.getElementById('transcript').textContent='Big frame, moves well in tight spaces. Needs to sink his hips against bigger D-linemen. Finishes blocks, plays through the whistle. Second-level work needs refining.'; }
+  }
+  function generate(){ document.getElementById('report').classList.add('show'); }
+  function pick(el){ el.parentElement.querySelectorAll('.seg').forEach(function(s){s.classList.remove('on');}); el.classList.add('on'); }
+  var SUN='<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>';
+  var MOON='<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>';
+  function setIcon(){ document.getElementById('themeIcon').innerHTML = document.getElementById('screen').dataset.theme==='dark' ? MOON : SUN; }
+  function toggleTheme(){ var s=document.getElementById('screen'); s.dataset.theme = s.dataset.theme==='dark'?'light':'dark'; setIcon(); }
+  setIcon();
+</script>
+</body>
+</html>

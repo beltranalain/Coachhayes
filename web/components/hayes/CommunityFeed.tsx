@@ -8,6 +8,17 @@ import { useLiveStatus } from "@/components/hayes/useLiveStatus";
 import { ROOMS } from "@/lib/communityRooms";
 import ProfileView from "@/components/hayes/ProfileView";
 import PlayerPostCard, { type PlayerPost } from "@/components/hayes/PlayerPostCard";
+import LinkPreview from "@/components/hayes/LinkPreview";
+
+// First http(s) URL in a string (for the link-preview card). YouTube links are
+// handled as video clips elsewhere, so skip them here.
+const URL_RE = /(https?:\/\/[^\s]+)/i;
+function firstLink(text?: string): string | null {
+  const m = String(text || "").match(URL_RE);
+  if (!m) return null;
+  const u = m[1].replace(/[),.]+$/, "");
+  return /(?:youtube\.com|youtu\.be)/i.test(u) ? null : u;
+}
 
 type Poll = { options: string[]; votedBy: Record<string, number> };
 type Post = { id: string; uid: string; author: string; picture?: string | null; text: string; ts: number; likes: number; likedBy: string[]; commentCount: number; room: string; savedBy: string[]; image?: string | null; clip?: string | null; poll?: Poll | null; kind?: string | null; player?: PlayerPost | null; show?: string | null };
@@ -334,9 +345,16 @@ export default function CommunityFeed({ content: c, shows = [], playerSrc, liveI
                   </div>
                   {p.kind === "player" && p.player ? (
                     <PlayerPostCard p={p.player} />
-                  ) : (
-                    p.text && <p className="post-text">{p.text}</p>
-                  )}
+                  ) : (() => {
+                    const link = firstLink(p.text);
+                    const shown = link ? p.text.replace(link, "").replace(/\s{2,}/g, " ").trim() : p.text;
+                    return (
+                      <>
+                        {shown && <p className="post-text">{shown}</p>}
+                        {link && <LinkPreview url={link} />}
+                      </>
+                    );
+                  })()}
                   {p.image && <img className="post-img" src={p.image} alt="" />}
                   {p.clip && (vid ? <div className="post-clip"><iframe src={`https://www.youtube.com/embed/${vid}`} title="clip" allow="encrypted-media; picture-in-picture" allowFullScreen /></div> : <a className="link" href={p.clip} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 8 }}>Watch clip ↗</a>)}
                   {p.poll && (() => {

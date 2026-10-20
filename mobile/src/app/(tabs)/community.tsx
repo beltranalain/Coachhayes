@@ -13,11 +13,12 @@ import { colors, fonts, type ThemeColors } from "../../lib/theme";
 import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import {
   fetchFeed, fetchSeries, likePost, savePost, votePost, fetchComments, addComment, createPost,
-  timeAgo, youtubeId, type FeedPost, type Series, type Comment,
+  timeAgo, youtubeId, firstLink, type FeedPost, type Series, type Comment,
 } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { PlayTriangle, watchHref } from "../../components/PlayerCard";
 import PlayerBreakdownCard from "../../components/PlayerBreakdownCard";
+import LinkPreview from "../../components/LinkPreview";
 
 export default function CommunityScreen() {
   const colors = useColors();
@@ -238,9 +239,16 @@ function PostCard({ post, uid, onLike, onSave, onVote, onPlay, requireAuth, onCo
 
       {post.kind === "player" && post.player ? (
         <PlayerBreakdownCard p={post.player} />
-      ) : (
-        !!post.text && <Text style={styles.pText}>{post.text}</Text>
-      )}
+      ) : (() => {
+        const link = firstLink(post.text);
+        const shown = link ? post.text.replace(link, "").replace(/\s{2,}/g, " ").trim() : post.text;
+        return (
+          <>
+            {!!shown && <Text style={styles.pText}>{shown}</Text>}
+            {link ? <LinkPreview url={link} /> : null}
+          </>
+        );
+      })()}
 
       {post.image ? (
         <Image source={{ uri: post.image }} style={styles.pImage} contentFit="cover" />

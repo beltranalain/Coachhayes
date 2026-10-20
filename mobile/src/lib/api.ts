@@ -157,6 +157,20 @@ export async function fetchBlogPost(slug: string): Promise<{ post?: BlogArticle 
   catch { return {}; }
 }
 
+// ---- Link preview (Open Graph) ---------------------------------------------
+export type LinkPreviewData = { url: string; host: string; site: string; title: string; image: string; description: string };
+export async function fetchLinkPreview(url: string): Promise<LinkPreviewData | null> {
+  try { const r = await getJSON<any>(`/api/link-preview?url=${encodeURIComponent(url)}`); return r?.error ? null : (r as LinkPreviewData); }
+  catch { return null; }
+}
+// First non-YouTube http(s) URL in a string (YouTube links render as clips).
+export function firstLink(text?: string): string | null {
+  const m = String(text || "").match(/(https?:\/\/[^\s]+)/i);
+  if (!m) return null;
+  const u = m[1].replace(/[),.]+$/, "");
+  return /(?:youtube\.com|youtu\.be)/i.test(u) ? null : u;
+}
+
 // "3d" / "4h" / "now" style short relative time.
 export function timeAgo(ts?: number): string {
   if (!ts) return "";
