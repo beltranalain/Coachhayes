@@ -8,7 +8,7 @@ import { EMPTY_EVALUATION, type Evaluation } from "@/lib/evaluation";
 
 // Admin Evaluations — the "Honest Evaluations" workflow, moved out of Rankings:
 // film submissions arrive here; Coach records his read of the film (voice →
-// Whisper), ChatGPT structures it into the long-form report, Coach edits and
+// Whisper), AI structures it into the long-form report, Coach edits and
 // publishes, and sets whether the breakdown is free or a paid (manual) unlock.
 type Sub = { id: string; playerName: string; position: string; school: string; city?: string; state?: string; classYear: string; videoUrl: string; heightIn?: number; weightLb?: number; notes?: string; status: string; submitterEmail?: string; submitterRelation?: string };
 type Player = { id: string; slug?: string; name: string; position: string; school: string; classYear: string; videoUrl?: string; city?: string; state?: string; heightIn?: number; weightLb?: number; notes?: string; evaluation?: Evaluation | null; evalAccess?: string; evalPrice?: string; evalUnlockEmails?: string[] };
@@ -134,7 +134,7 @@ export default function EvaluationsAdmin() {
     } catch { setMsg("Transcription failed."); } finally { setBusy(""); }
   }
 
-  // ---- ChatGPT: generate the long-form evaluation ----
+  // ---- AI: generate the long-form evaluation ----
   async function generate() {
     if (!editor) return;
     setBusy("gen"); setMsg("");
@@ -149,7 +149,7 @@ export default function EvaluationsAdmin() {
         }),
       });
       const d = await res.json();
-      if (d.ok && d.evaluation) { ed(evalToForm(d.evaluation)); setMsg("Draft written by ChatGPT. Review and edit, then publish."); }
+      if (d.ok && d.evaluation) { ed(evalToForm(d.evaluation)); setMsg("Draft written by AI. Review and edit, then publish."); }
       else setMsg(d.error || "Could not generate the evaluation.");
     } catch { setMsg("Could not generate the evaluation."); } finally { setBusy(""); }
   }
@@ -192,7 +192,7 @@ export default function EvaluationsAdmin() {
       {/* Film submissions queue */}
       <div className="card">
         <h3>Film submissions</h3>
-        <p className="cs">A new submission emails you here. Record your read of the film, let ChatGPT write it up, edit, then publish.</p>
+        <p className="cs">A new submission emails you here. Record your read of the film, let AI write it up, edit, then publish.</p>
         {pending.length === 0 && <div className="note" style={{ margin: 0 }}>No submissions waiting. They arrive from the public Rankings page.</div>}
         {pending.map((s) => (
           <div key={s.id} className="r" style={{ borderTop: "1px solid var(--hair)", paddingTop: 14, marginTop: 14 }}>
@@ -261,18 +261,18 @@ export default function EvaluationsAdmin() {
               </div>
               <div className="fld"><label>Highlight film URL</label><input value={editor.videoUrl} onChange={(e) => ed({ videoUrl: e.target.value })} placeholder="https://hudl.com/… or youtube.com/…" /></div>
 
-              {/* Voice → transcript → ChatGPT */}
+              {/* Voice → transcript → AI */}
               <div className="evgen">
                 <div className="evgen-top">
-                  <div><b>Coach&apos;s read of the film</b><p className="cs" style={{ margin: "2px 0 0" }}>Hit record and talk through the tape. We transcribe it, then ChatGPT writes the full report from your words.</p></div>
+                  <div><b>Coach&apos;s read of the film</b><p className="cs" style={{ margin: "2px 0 0" }}>Hit record and talk through the tape. We transcribe it, then AI writes the full report from your words.</p></div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <button type="button" className={`btn sm${recording ? " btn-danger" : ""}`} onClick={toggleRecord} disabled={busy === "transcribe"}>
                       {recording ? "■ Stop" : busy === "transcribe" ? "Transcribing…" : "● Record"}
                     </button>
-                    <button type="button" className="btn acc sm" onClick={generate} disabled={busy === "gen"}>{busy === "gen" ? "Writing…" : "Generate with ChatGPT"}</button>
+                    <button type="button" className="btn acc sm" onClick={generate} disabled={busy === "gen"}>{busy === "gen" ? "Writing…" : "Generate"}</button>
                   </div>
                 </div>
-                <textarea rows={4} value={editor.transcript} onChange={(e) => ed({ transcript: e.target.value })} placeholder="Record your read, or type/paste notes here. ChatGPT builds the evaluation from this (plus the profile above). Leave blank to let it draft conservatively from the film metadata." />
+                <textarea rows={4} value={editor.transcript} onChange={(e) => ed({ transcript: e.target.value })} placeholder="Record your read, or type/paste notes here. AI builds the evaluation from this (plus the profile above). Leave blank to let it draft conservatively from the film metadata." />
               </div>
 
               {/* Long-form sections */}

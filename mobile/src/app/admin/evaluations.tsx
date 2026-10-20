@@ -153,7 +153,7 @@ function Inner() {
           <Text style={styles.recText}>{recState.isRecording ? `Stop · ${fmtDur(recState.durationMillis || 0)}` : busy === "transcribe" ? "Transcribing…" : "Record"}</Text>
         </Pressable>
         <Pressable onPress={generate} disabled={busy === "gen"} style={({ pressed }) => [styles.genBtn, pressed && { opacity: 0.9 }]}>
-          <Text style={styles.genText}>{busy === "gen" ? "Writing…" : "Generate with AI"}</Text>
+          <Text style={styles.genText}>{busy === "gen" ? "Writing…" : "Generate"}</Text>
         </Pressable>
       </View>
 
