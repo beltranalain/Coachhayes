@@ -109,7 +109,9 @@ export type BrandChannel = {
 };
 
 export const CHANNELS: BrandChannel[] = [
-  { key: "live-show", name: "The Live Show", handle: "", channelId: "" },
+  // Coach's real channel anchors Live + YouTube features (live-detect, chat,
+  // uploads). The client runs one channel; the other rows stay empty.
+  { key: "live-show", name: "The Live Show", handle: "@CoachHayesFootball", channelId: "UCiU3F0NPnqqpovm7fHxtvtA" },
   { key: "long-play", name: "Long Play", handle: "", channelId: "" },
   { key: "quick-takes", name: "Quick Takes", handle: "", channelId: "" },
 ];
