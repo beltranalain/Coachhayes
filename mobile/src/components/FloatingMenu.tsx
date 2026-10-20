@@ -93,7 +93,7 @@ export function FloatingMenuOverlay({ topInset }: { topInset: number }) {
 }
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
+  scrim: { flex: 1, backgroundColor: "transparent" },
   panel: {
     position: "absolute", left: 12, right: 12,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 20,
