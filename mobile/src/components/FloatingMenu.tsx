@@ -26,7 +26,7 @@ export function useMenu(): MenuContextValue {
 }
 
 const SECTIONS = [
-  { label: "Community", route: "/community", match: ["/community", "/", "/index"] },
+  { label: "The Locker Room", route: "/community", match: ["/community", "/", "/index"] },
   { label: "Rankings", route: "/rankings", match: ["/rankings", "/evaluation"] },
   { label: "Live", route: "/live", match: ["/live"] },
   { label: "Blog", route: "/blog", match: ["/blog"] },
