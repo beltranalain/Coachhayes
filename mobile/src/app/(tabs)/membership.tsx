@@ -2,7 +2,7 @@
 // the buttons route a signed-out user to sign-in, then open the web membership page.
 
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { colors, fonts, type ThemeColors } from "../../lib/theme";
 import { useColors, useThemedStyles } from "../../lib/ThemeContext";
@@ -23,7 +23,9 @@ export default function MembershipScreen() {
 
   function choose() {
     if (!user) { router.push("/signin"); return; }
-    if (site) Linking.openURL(`${site}/membership`).catch(() => {});
+    // Checkout still runs on the web, but open it INSIDE the app (in-app web
+    // screen) rather than kicking the user out to the phone's browser.
+    if (site) router.push(`/web?url=${encodeURIComponent(`${site}/membership`)}&title=Membership` as never);
   }
 
   return (

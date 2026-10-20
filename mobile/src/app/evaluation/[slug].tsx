@@ -2,7 +2,7 @@
 // locked ones show a teaser + the manual-unlock paywall (same gate as the site).
 
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Linking } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -125,6 +125,7 @@ function ListSection({ title, items, ordered }: { title: string; items: string[]
 function Locked({ teaser, price }: { teaser?: string; price: string }) {
   const colors = useColors();
   const styles = useThemedStyles(makeStyles);
+  const router = useRouter();
   const site = API_BASE.replace(/\/$/, "");
   return (
     <View style={{ marginTop: 18 }}>
@@ -139,8 +140,8 @@ function Locked({ teaser, price }: { teaser?: string; price: string }) {
           <Text style={styles.step}>3. Coach unlocks it to your account.</Text>
         </View>
         <View style={styles.lockBtns}>
-          <Pressable onPress={() => site && Linking.openURL(`${site}/membership`)} style={styles.primaryBtn}><Text style={styles.primaryBtnText}>Payment options</Text></Pressable>
-          <Pressable onPress={() => site && Linking.openURL(`${site}/contact`)} style={styles.ghostBtn}><Text style={styles.ghostBtnText}>Contact Coach</Text></Pressable>
+          <Pressable onPress={() => router.push("/membership" as never)} style={styles.primaryBtn}><Text style={styles.primaryBtnText}>Payment options</Text></Pressable>
+          <Pressable onPress={() => site && router.push(`/web?url=${encodeURIComponent(`${site}/contact`)}&title=Contact` as never)} style={styles.ghostBtn}><Text style={styles.ghostBtnText}>Contact Coach</Text></Pressable>
         </View>
       </View>
     </View>
