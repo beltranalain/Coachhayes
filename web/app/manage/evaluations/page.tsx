@@ -260,6 +260,13 @@ export default function EvaluationsAdmin() {
               <button className="modalx" onClick={() => setEditor(null)} aria-label="Close">✕</button>
             </div>
             <div className="modalbody">
+              {/* Status / errors — shown INSIDE the modal so recording feedback
+                  is visible (the page-level banner sits behind this overlay). */}
+              {(msg || busy === "transcribe") && (
+                <div className="note" style={{ marginTop: 0, marginBottom: 12 }}>
+                  {busy === "transcribe" ? "Transcribing your recording…" : msg}
+                </div>
+              )}
               {/* Identity */}
               <div className="row2e" style={{ margin: 0 }}>
                 <div className="fld"><label>Name *</label><input value={editor.name} onChange={(e) => ed({ name: e.target.value })} /></div>
