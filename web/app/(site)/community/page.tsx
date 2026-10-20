@@ -6,7 +6,7 @@ import { getLiveInfo } from "@/lib/youtube";
 import CommunityFeed from "@/components/hayes/CommunityFeed";
 
 export const metadata: Metadata = {
-  title: "The Locker Room",
+  title: "Locker Room",
   description: "The Locker Room — talk football with people who actually watch the tape.",
 };
 

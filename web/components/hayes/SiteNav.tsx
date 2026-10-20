@@ -10,7 +10,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 const LINKS = [
   { href: "/", label: "Home" },
   { href: "/live", label: "Live" },
-  { href: "/community", label: "The Locker Room" },
+  { href: "/community", label: "Locker Room" },
   { href: "/rankings", label: "Rankings" },
   { href: "/blog", label: "Blog" },
   // Hidden for now (pages kept — just not in the nav). Re-add to show again.
