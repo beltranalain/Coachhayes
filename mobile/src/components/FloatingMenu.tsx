@@ -23,10 +23,9 @@ export function useMenu(): MenuContextValue {
 }
 
 const SECTIONS = [
-  { label: "Home", route: "/", match: ["/", "/index"] },
-  { label: "Live", route: "/live", match: ["/live"] },
-  { label: "Community", route: "/community", match: ["/community"] },
+  { label: "Community", route: "/community", match: ["/community", "/", "/index"] },
   { label: "Rankings", route: "/rankings", match: ["/rankings", "/evaluation"] },
+  { label: "Live", route: "/live", match: ["/live"] },
   { label: "Blog", route: "/blog", match: ["/blog"] },
   { label: "Membership", route: "/membership", match: ["/membership"] },
 ];

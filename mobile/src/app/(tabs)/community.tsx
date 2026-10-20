@@ -2,7 +2,7 @@
 // clip / poll), and posts with like / reply / save that call the live API. All
 // icons are vector icons (no emojis).
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, TextInput, Image as RNImage, ScrollView, Alert } from "react-native";
 import { Image } from "expo-image";
 import { Feather, Ionicons } from "@expo/vector-icons";
@@ -11,11 +11,11 @@ import * as ImagePicker from "expo-image-picker";
 
 import { colors, fonts } from "../../lib/theme";
 import {
-  fetchFeed, fetchSeries, likePost, savePost, votePost, fetchComments, addComment, createPost,
-  timeAgo, youtubeId, type FeedPost, type Series, type Comment,
+  fetchFeed, fetchSeries, fetchPlayers, likePost, savePost, votePost, fetchComments, addComment, createPost,
+  timeAgo, youtubeId, type FeedPost, type Series, type Comment, type RankPlayer,
 } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { PlayTriangle, watchHref } from "../../components/PlayerCard";
+import { PlayTriangle, watchHref, evalHref } from "../../components/PlayerCard";
 import PlayerBreakdownCard from "../../components/PlayerBreakdownCard";
 
 export default function CommunityScreen() {
@@ -24,8 +24,11 @@ export default function CommunityScreen() {
   const uid = user?.uid;
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [series, setSeries] = useState<Series[]>([]);
+  const [board, setBoard] = useState<RankPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilter, setShowFilter] = useState<string | null>(null);
+  const listRef = useRef<FlatList>(null);
+  const composerRef = useRef<TextInput>(null);
 
   // Composer
   const [text, setText] = useState("");
@@ -39,11 +42,17 @@ export default function CommunityScreen() {
 
   async function load() {
     try {
-      const [f, s] = await Promise.all([fetchFeed("general"), fetchSeries()]);
-      setPosts(f.posts || []); setSeries(s || []);
+      const [f, s, pl] = await Promise.all([fetchFeed("general"), fetchSeries(), fetchPlayers()]);
+      setPosts(f.posts || []); setSeries(s || []); setBoard((pl.players || []).slice(0, 8));
     } catch {} finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);
+
+  function onCompose() {
+    if (!user) return requireAuth();
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    setTimeout(() => composerRef.current?.focus(), 350);
+  }
 
   function updatePost(id: string, patch: Partial<FeedPost>) {
     setPosts((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -100,6 +109,30 @@ export default function CommunityScreen() {
 
   const header = (
     <View>
+      {board.length > 0 && (
+        <View style={{ marginBottom: 2 }}>
+          <Text style={styles.stripLabel}>Top of the board</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+            {board.map((p, i) => {
+              const vid = youtubeId(p.videoUrl);
+              return (
+                <View key={p.slug} style={styles.stripCard}>
+                  <Pressable onPress={() => (vid ? router.push(watchHref(vid, p.name) as never) : router.push(evalHref(p) as never))} style={styles.stripThumb}>
+                    {vid ? <Image source={{ uri: `https://i.ytimg.com/vi/${vid}/mqdefault.jpg` }} style={styles.stripThumbImg} contentFit="cover" /> : <View style={styles.stripThumbImg} />}
+                    <View style={styles.stripRank}><Text style={styles.stripRankText}>{i + 1}</Text></View>
+                    {p.videoUrl ? <View style={styles.stripPlay}><PlayTriangle /></View> : null}
+                  </Pressable>
+                  <Pressable onPress={() => router.push(evalHref(p) as never)}>
+                    <Text style={styles.stripName} numberOfLines={1}>{p.name}</Text>
+                    <Text style={styles.stripMeta} numberOfLines={1}>{[p.position, p.chipLabel].filter(Boolean).join(" · ")}</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       {series.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stories}>
           {series.map((s) => {
@@ -121,6 +154,7 @@ export default function CommunityScreen() {
         <View style={styles.cTop}>
           <View style={styles.cAv}><Text style={styles.cAvText}>{(user ? displayName : "?").slice(0, 1).toUpperCase()}</Text></View>
           <TextInput
+            ref={composerRef}
             value={text} onChangeText={setText}
             placeholder={user ? "Say something…" : "Sign in to post…"}
             placeholderTextColor={colors.dim} style={styles.cInput} multiline
@@ -161,16 +195,22 @@ export default function CommunityScreen() {
   return (
     <>
       <FlatList
+        ref={listRef}
         data={visible}
         keyExtractor={(p) => p.id}
         ListHeaderComponent={header}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 28, paddingTop: 14 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 90, paddingTop: 14 }}
         renderItem={({ item }) => (
           <PostCard post={item} uid={uid} onLike={() => onLike(item)} onSave={() => onSave(item)} onVote={(i) => onVote(item, i)}
             onPlay={(id, name) => router.push(watchHref(id, name) as never)} requireAuth={requireAuth} onCount={(n) => updatePost(item.id, { commentCount: n })} />
         )}
         ListEmptyComponent={<Text style={styles.empty}>No posts yet.</Text>}
       />
+
+      {/* Compose FAB */}
+      <Pressable onPress={onCompose} style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9, transform: [{ scale: 0.96 }] }]} accessibilityLabel="New post">
+        <Feather name="plus" size={26} color="#171204" />
+      </Pressable>
     </>
   );
 }
@@ -287,6 +327,19 @@ function PostCard({ post, uid, onLike, onSave, onVote, onPlay, requireAuth, onCo
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
   empty: { fontFamily: fonts.body, color: colors.muted, fontSize: 13.5, textAlign: "center", paddingVertical: 40 },
+
+  stripLabel: { fontFamily: fonts.bold, fontSize: 10.5, letterSpacing: 1.6, textTransform: "uppercase", color: colors.amber, marginBottom: 10 },
+  strip: { gap: 11, paddingBottom: 16, paddingRight: 4 },
+  stripCard: { width: 150 },
+  stripThumb: { width: 150, aspectRatio: 16 / 9, borderRadius: 12, overflow: "hidden", backgroundColor: "#0b0a09", alignItems: "center", justifyContent: "center" },
+  stripThumbImg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.surface2 },
+  stripRank: { position: "absolute", top: 6, left: 7, backgroundColor: "rgba(0,0,0,0.6)", borderRadius: 6, minWidth: 20, paddingHorizontal: 5, paddingVertical: 1, alignItems: "center" },
+  stripRankText: { fontFamily: fonts.bold, fontSize: 11, color: "#fff" },
+  stripPlay: { width: 38, height: 27, borderRadius: 7, backgroundColor: "#e21f1f", alignItems: "center", justifyContent: "center" },
+  stripName: { fontFamily: fonts.bold, fontSize: 13, color: colors.cream, marginTop: 7 },
+  stripMeta: { fontFamily: fonts.body, fontSize: 11, color: colors.muted, marginTop: 2 },
+
+  fab: { position: "absolute", right: 18, bottom: 22, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.amber, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 8 },
 
   stories: { gap: 14, paddingBottom: 14, paddingRight: 4 },
   story: { alignItems: "center", width: 62 },
