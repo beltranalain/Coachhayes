@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAdminDb } from "./firebaseAdmin";
-import { getPlaylists, getPlaylistLatestVideo, getPlaylistVideoIds, getUploadsPage, type YtPlaylist } from "./youtube";
+import { getPlaylists, getPlaylistLatestVideo, getPlaylistVideoIds, getUploadsPage, classifyVideos, type YtPlaylist } from "./youtube";
 import { getSiteConfig } from "./siteConfig";
 import { PRIMARY_CHANNEL } from "./channels";
 import { visibleSeries, type Series } from "./siteData";
@@ -42,14 +42,19 @@ async function playlistsByRecency(): Promise<(YtPlaylist & { latestTs: number })
   return withTs.sort((a, b) => b.latestTs - a.latestTs);
 }
 
-// The channel's N most recent uploads — used for the Locker Room strip (each
-// circle is a recent video, newest first), matching the Library.
+// The channel's N most recent uploads, Shorts excluded (full videos + live
+// replays only) — used for the Locker Room strip and the feed auto-posts.
 export async function getRecentVideos(n = 7): Promise<{ id: string; title: string; thumbnail: string; ts: number }[]> {
   const { channels } = await getSiteConfig();
   const uploads = channels[0]?.uploadsPlaylist || PRIMARY_CHANNEL.uploadsPlaylist;
   try {
     const page = await getUploadsPage(uploads);
-    return page.items.slice(0, n).map((v) => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, ts: Date.parse(v.publishedAt) || 0 }));
+    const items = page.items.slice(0, 45); // over-fetch so enough survive the Shorts filter
+    const kinds = await classifyVideos(items.map((v) => v.id));
+    return items
+      .filter((v) => (kinds[v.id]?.kind ?? "video") !== "short")
+      .slice(0, n)
+      .map((v) => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, ts: Date.parse(v.publishedAt) || 0 }));
   } catch {
     return [];
   }
@@ -113,10 +118,9 @@ const RECENT_UPLOADS = 14;
 export async function syncShowPosts(): Promise<{ created: number; removed: number }> {
   const db = getAdminDb();
   if (!db) return { created: 0, removed: 0 };
-  const [{ branding, channels }, shows] = await Promise.all([getSiteConfig(), getShows()]);
+  const [{ branding }, shows] = await Promise.all([getSiteConfig(), getShows()]);
   const brandName = branding.siteName || "Coach Hayes Football";
   const brandLogo = branding.logo || null;
-  const uploads = channels[0]?.uploadsPlaylist || PRIMARY_CHANNEL.uploadsPlaylist;
   const now = Date.now();
 
   // Map every video in each active series back to its show, so recent uploads can
@@ -130,12 +134,14 @@ export async function syncShowPosts(): Promise<{ created: number; removed: numbe
   // Candidates = the newest uploads + each active show's latest (deduped by video).
   type Cand = { id: string; title: string; ts: number; show: string | null };
   const cands = new Map<string, Cand>();
-  try {
-    const recent = (await getUploadsPage(uploads)).items.slice(0, RECENT_UPLOADS);
-    for (const v of recent) cands.set(v.id, { id: v.id, title: v.title, ts: Date.parse(v.publishedAt) || now, show: vidToShow[v.id] || null });
-  } catch { /* ignore */ }
+  for (const v of await getRecentVideos(RECENT_UPLOADS)) cands.set(v.id, { id: v.id, title: v.title, ts: v.ts || now, show: vidToShow[v.id] || null });
   const latests = await Promise.all(shows.map((s) => getPlaylistLatestVideo(s.key).catch(() => null)));
   shows.forEach((s, i) => { const v = latests[i]; if (v && !cands.has(v.id)) cands.set(v.id, { id: v.id, title: v.title, ts: v.ts || now, show: s.key }); });
+  // Drop any Shorts that slipped in via a series' latest.
+  try {
+    const kinds = await classifyVideos([...cands.keys()]);
+    for (const id of [...cands.keys()]) if (kinds[id]?.kind === "short") cands.delete(id);
+  } catch { /* ignore */ }
 
   const keep = new Set<string>();
   let created = 0;
