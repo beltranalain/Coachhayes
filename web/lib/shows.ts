@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAdminDb } from "./firebaseAdmin";
-import { getPlaylists, getUploadsPage, type YtPlaylist } from "./youtube";
+import { getPlaylists, getPlaylistLatestVideo, type YtPlaylist } from "./youtube";
 import { getSiteConfig } from "./siteConfig";
 import { PRIMARY_CHANNEL } from "./channels";
 import { visibleSeries, type Series } from "./siteData";
@@ -28,10 +28,7 @@ async function channelId(): Promise<string> {
 // per-playlist "latest video" fetch is cached, so repeat calls are cheap.
 async function playlistsByRecency(): Promise<(YtPlaylist & { latestTs: number })[]> {
   const pls = await getPlaylists(await channelId(), 50);
-  const withTs = await Promise.all(pls.map(async (pl) => {
-    try { const page = await getUploadsPage(pl.id); const v = page.items[0]; return { ...pl, latestTs: v ? (Date.parse(v.publishedAt) || 0) : 0 }; }
-    catch { return { ...pl, latestTs: 0 }; }
-  }));
+  const withTs = await Promise.all(pls.map(async (pl) => ({ ...pl, latestTs: (await getPlaylistLatestVideo(pl.id))?.ts ?? 0 })));
   return withTs.sort((a, b) => b.latestTs - a.latestTs);
 }
 
@@ -98,9 +95,8 @@ export async function syncShowPosts(): Promise<{ created: number; removed: numbe
   const resolved = await Promise.all(shows.map(async (s) => {
     if (s.video && /^https?:\/\//.test(s.video)) return { s, clip: s.video, text: s.blurb || s.title, ts: now };
     try {
-      const page = await getUploadsPage(s.key);
-      const v = page.items[0];
-      if (v) return { s, clip: `https://www.youtube.com/watch?v=${v.id}`, text: v.title, ts: Date.parse(v.publishedAt) || now };
+      const v = await getPlaylistLatestVideo(s.key);
+      if (v) return { s, clip: `https://www.youtube.com/watch?v=${v.id}`, text: v.title, ts: v.ts || now };
     } catch { /* ignore */ }
     return { s, clip: "", text: s.blurb || s.title, ts: now };
   }));

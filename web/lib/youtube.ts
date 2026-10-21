@@ -99,6 +99,34 @@ export async function getUploadsPage(
   }
 }
 
+export type YtLatest = { id: string; title: string; ts: number };
+
+// The genuinely-latest video in a playlist = the item with the MAX video-publish
+// date (playlists have inconsistent ordering, so items[0] is unreliable). Pages
+// with part=snippet,contentDetails (1 unit/page), cached; capped so huge
+// playlists stay cheap. Returns null if the playlist is empty / unreadable.
+export async function getPlaylistLatestVideo(playlistId: string, maxPages = 7): Promise<YtLatest | null> {
+  if (!KEY || !playlistId) return null;
+  let token = "", pages = 0;
+  let best: YtLatest | null = null;
+  try {
+    while (pages < maxPages) {
+      const url = `${API}/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${playlistId}&key=${KEY}${token ? `&pageToken=${token}` : ""}`;
+      const res = await fetch(url, { next: { revalidate: 1800 } });
+      if (!res.ok) break;
+      const data = await res.json();
+      for (const it of data.items ?? []) {
+        const ts = Date.parse(it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt || "") || 0;
+        const id = it.snippet?.resourceId?.videoId || it.contentDetails?.videoId || "";
+        if (id && ts > (best?.ts ?? -1)) best = { id, title: it.snippet?.title || "", ts };
+      }
+      token = data.nextPageToken ?? ""; pages++;
+      if (!token) break;
+    }
+  } catch { /* ignore */ }
+  return best;
+}
+
 function parseDuration(iso: string): number {
   const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(iso || "");
   if (!m) return 0;
