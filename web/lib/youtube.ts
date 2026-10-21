@@ -49,6 +49,57 @@ export async function getUploads(
   }
 }
 
+// One page (up to 50) of a channel's uploads + the token for the next page.
+// Used by the Library's "load more" so we page lazily instead of pulling it all.
+export async function getUploadsPage(
+  uploadsPlaylistId: string,
+  pageToken?: string
+): Promise<{ items: YtVideo[]; nextPageToken: string | null }> {
+  if (!KEY) return { items: [], nextPageToken: null };
+  try {
+    const url = `${API}/playlistItems?part=snippet&maxResults=50&playlistId=${uploadsPlaylistId}&key=${KEY}${pageToken ? `&pageToken=${pageToken}` : ""}`;
+    const res = await fetch(url, { next: { revalidate: 1800 } });
+    if (!res.ok) return { items: [], nextPageToken: null };
+    const data = await res.json();
+    const items: YtVideo[] = (data.items ?? [])
+      .map((item: any) => {
+        const s = item.snippet ?? {}; const t = s.thumbnails ?? {};
+        return { id: s.resourceId?.videoId ?? "", title: s.title ?? "", publishedAt: s.publishedAt ?? "", thumbnail: (t.medium ?? t.high ?? t.default ?? {}).url ?? "" };
+      })
+      .filter((v: YtVideo) => v.id);
+    return { items, nextPageToken: data.nextPageToken ?? null };
+  } catch {
+    return { items: [], nextPageToken: null };
+  }
+}
+
+function parseDuration(iso: string): number {
+  const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(iso || "");
+  if (!m) return 0;
+  return (+(m[1] || 0)) * 3600 + (+(m[2] || 0)) * 60 + (+(m[3] || 0));
+}
+
+export type VideoKind = "short" | "video" | "live";
+
+// Classify videos by duration + whether they were a livestream, so the Library
+// can filter Videos / Shorts / Live replays. videos.list is 1 unit per 50 ids.
+export async function classifyVideos(ids: string[]): Promise<Record<string, { durationSec: number; kind: VideoKind }>> {
+  const out: Record<string, { durationSec: number; kind: VideoKind }> = {};
+  if (!KEY || !ids.length) return out;
+  try {
+    const res = await fetch(`${API}/videos?part=contentDetails,liveStreamingDetails&id=${ids.slice(0, 50).join(",")}&key=${KEY}`, { next: { revalidate: 1800 } });
+    if (!res.ok) return out;
+    const data = await res.json();
+    for (const it of data.items ?? []) {
+      const durationSec = parseDuration(it.contentDetails?.duration || "");
+      const wasLive = Boolean(it.liveStreamingDetails?.actualStartTime);
+      const kind: VideoKind = wasLive ? "live" : durationSec > 0 && durationSec <= 60 ? "short" : "video";
+      out[it.id] = { durationSec, kind };
+    }
+  } catch { /* ignore */ }
+  return out;
+}
+
 // Returns the videoId of an active live broadcast for a channel, or null.
 // search.list costs 100 quota units, so the result is cached (revalidate) and
 // shared across all callers — one real call per window regardless of traffic.

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSiteConfig } from "@/lib/siteConfig";
 import {
   getUploads,
+  getUploadsPage,
+  classifyVideos,
   getLiveInfo,
   getAllStats,
   youtubeConfigured,
@@ -37,6 +39,15 @@ export async function GET(request: Request) {
   if (!channel) {
     return NextResponse.json({ error: "Unknown channel." }, { status: 400 });
   }
+  // Paged mode (Library "load more"): one page + the next token + per-video
+  // kind (Video / Short / Live replay).
+  if (searchParams.get("paged") === "1" || searchParams.has("pageToken")) {
+    const { items, nextPageToken } = await getUploadsPage(channel.uploadsPlaylist, searchParams.get("pageToken") || undefined);
+    const kinds = await classifyVideos(items.map((i) => i.id));
+    const enriched = items.map((i) => ({ ...i, ...(kinds[i.id] || { durationSec: 0, kind: "video" as const }) }));
+    return NextResponse.json({ configured: true, channel: channel.key, items: enriched, nextPageToken });
+  }
+
   const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 12));
   const items = await getUploads(channel.uploadsPlaylist, limit);
   return NextResponse.json({ configured: true, channel: channel.key, items });
