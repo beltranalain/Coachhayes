@@ -24,6 +24,7 @@ export default function SiteNav({ brandName, live, logo }: { brandName: string; 
   const { theme, setTheme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!firebaseConfigured) { setReady(true); return; }
@@ -32,6 +33,9 @@ export default function SiteNav({ brandName, live, logo }: { brandName: string; 
     const unsub = onAuthStateChanged(auth, (u) => { setUser(u); setReady(true); });
     return () => unsub();
   }, []);
+
+  // Close the mobile menu whenever the route changes.
+  useEffect(() => { setMenuOpen(false); }, [path]);
 
   const firstName = user ? (user.displayName?.split(" ")[0] || user.email?.split("@")[0] || "Account") : "";
   const initial = (firstName || "?").charAt(0).toUpperCase();
@@ -76,8 +80,46 @@ export default function SiteNav({ brandName, live, logo }: { brandName: string; 
               <Link className="pill sm dark" href="/account">Join free</Link>
             </>
           )}
+          <button
+            className="navToggle"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            <span className={`navToggle-i${menuOpen ? " open" : ""}`}><i /><i /><i /></span>
+          </button>
         </div>
       </div>
+
+      {/* Mobile menu — shown when the hamburger is tapped (links are hidden on
+          small screens). */}
+      {menuOpen && (
+        <div className="navMenu">
+          {LINKS.map((l) => (
+            <Link key={l.href} href={l.href} className={path === l.href ? "on" : undefined} onClick={() => setMenuOpen(false)}>
+              {l.label}
+            </Link>
+          ))}
+          <div className="navMenu-sep" />
+          <div className="navMenu-row">
+            <span className="navMenu-lbl">Theme</span>
+            <div className="themeSw">
+              <button className={theme === "light" ? "on" : undefined} onClick={() => setTheme("light")}>Light</button>
+              <button className={theme === "dark" ? "on" : undefined} onClick={() => setTheme("dark")}>Dark</button>
+            </div>
+          </div>
+          {ready && user ? (
+            <Link className="navMenu-acct" href="/account" onClick={() => setMenuOpen(false)}>
+              <span className="navacct-av">{initial}</span>{firstName} · Your account
+            </Link>
+          ) : (
+            <div className="navMenu-auth">
+              <Link className="pill sm soft" href="/account" onClick={() => setMenuOpen(false)}>Sign in</Link>
+              <Link className="pill sm" href="/account" onClick={() => setMenuOpen(false)}>Join free</Link>
+            </div>
+          )}
+        </div>
+      )}
     </nav>
   );
 }
