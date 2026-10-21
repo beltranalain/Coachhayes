@@ -67,6 +67,7 @@ export default function LiveChat({ hostName = "Coach Hayes" }: { hostName?: stri
   const requireAuth = firebaseConfigured;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [ytMessages, setYtMessages] = useState<ChatMessage[]>([]);
   const [count, setCount] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
   const [draft, setDraft] = useState("");
@@ -140,7 +141,26 @@ export default function LiveChat({ hostName = "Coach Hayes" }: { hostName?: stri
     return () => { closedByUnmount = true; if (retryRef.current) clearTimeout(retryRef.current); wsRef.current?.close(); };
   }, [enabled]);
 
-  useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [messages]);
+  // Pull the coach's YouTube live chat (read-only) and merge it in. The endpoint
+  // is server-cached, so this is one shared poll regardless of viewer count.
+  useEffect(() => {
+    let stop = false;
+    const poll = async () => {
+      try {
+        const r = await fetch("/api/live/chat", { cache: "no-store" });
+        const d = await r.json();
+        if (!stop) setYtMessages(Array.isArray(d.messages) ? d.messages.map((m: any) => ({ id: `yt_${m.id}`, name: m.name, text: m.text, ts: m.ts, source: "youtube" as const })) : []);
+      } catch { /* keep last */ }
+    };
+    poll();
+    const id = setInterval(poll, 6000);
+    return () => { stop = true; clearInterval(id); };
+  }, []);
+
+  // Site chat (WebSocket) + YouTube mirror, interleaved by time.
+  const allMessages = [...messages, ...ytMessages].sort((a, b) => a.ts - b.ts);
+
+  useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [messages, ytMessages]);
 
   const isMuted = Boolean(muted && (muted.banned || muted.until > Date.now()));
 
@@ -204,7 +224,8 @@ export default function LiveChat({ hostName = "Coach Hayes" }: { hostName?: stri
   }
 
   const showAuth = enabled && requireAuth && authReady && !viewer;
-  const shown = messages.filter((m) => (tab === "tips" ? m.tip : true));
+  // Tips tab: only tips (always site). Members: hide the YouTube mirror. All: everything.
+  const shown = allMessages.filter((m) => (tab === "tips" ? m.tip : tab === "members" ? m.source !== "youtube" : true));
 
   return (
     <aside className="lchat">

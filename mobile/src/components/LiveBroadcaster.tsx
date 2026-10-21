@@ -63,9 +63,14 @@ function waitForIce(pc: RTCPeerConnection): Promise<void> {
 async function notifyBackend(action: "start" | "stop") {
   try {
     const token = await getFirebaseAuth().currentUser?.getIdToken();
-    await fetch(`${API_BASE}/api/simulcast/${action}`, {
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    await fetch(`${API_BASE}/api/simulcast/${action}`, { method: "POST", headers });
+    // Auto-switch the site's live source so a YouTube stream can't take over the
+    // phone broadcast: "studio" (platform only) while live, back to "auto" after.
+    await fetch(`${API_BASE}/api/site-config`, {
       method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ section: "content", data: { liveSource: action === "start" ? "studio" : "auto" } }),
     });
   } catch {
     /* relay not configured / offline — the direct publish still works */
