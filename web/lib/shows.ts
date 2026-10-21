@@ -42,6 +42,19 @@ async function playlistsByRecency(): Promise<(YtPlaylist & { latestTs: number })
   return withTs.sort((a, b) => b.latestTs - a.latestTs);
 }
 
+// The channel's N most recent uploads — used for the Locker Room strip (each
+// circle is a recent video, newest first), matching the Library.
+export async function getRecentVideos(n = 7): Promise<{ id: string; title: string; thumbnail: string; ts: number }[]> {
+  const { channels } = await getSiteConfig();
+  const uploads = channels[0]?.uploadsPlaylist || PRIMARY_CHANNEL.uploadsPlaylist;
+  try {
+    const page = await getUploadsPage(uploads);
+    return page.items.slice(0, n).map((v) => ({ id: v.id, title: v.title, thumbnail: v.thumbnail, ts: Date.parse(v.publishedAt) || 0 }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getShowsConfig(): Promise<ShowsConfig> {
   const db = getAdminDb();
   if (!db) return { overrides: {}, manual: [] };
@@ -135,7 +148,9 @@ export async function syncShowPosts(): Promise<{ created: number; removed: numbe
       text: c.title || "", ts: existing.ts || c.ts,
       likes: existing.likes || 0, likedBy: existing.likedBy || [], commentCount: existing.commentCount || 0,
       room: "general", savedBy: existing.savedBy || [],
-      image: null, clip: `https://www.youtube.com/watch?v=${c.id}`, poll: null, kind: "show", player: null, show: c.show,
+      // Tag each video post with its OWN video id so the recent-videos strip can
+      // filter straight to it (the strip is videos, not series).
+      image: null, clip: `https://www.youtube.com/watch?v=${c.id}`, poll: null, kind: "show", player: null, show: c.id,
     });
     created++;
   }

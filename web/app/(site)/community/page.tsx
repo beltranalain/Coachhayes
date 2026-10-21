@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PRIMARY_CHANNEL } from "@/lib/channels";
 import { getSiteConfig, getHayesContent } from "@/lib/siteConfig";
-import { getShows } from "@/lib/shows";
+import { getRecentVideos } from "@/lib/shows";
 import { resolveYouTubeLive } from "@/lib/liveState";
 import CommunityFeed from "@/components/hayes/CommunityFeed";
 
@@ -15,7 +15,8 @@ export const metadata: Metadata = {
 export default async function CommunityPage() {
   const [{ branding, content: siteContent }, content] = await Promise.all([getSiteConfig(), getHayesContent()]);
   const c = content.community;
-  const shows = (await getShows()).map((s) => ({ key: s.key, title: s.title, href: s.href || "/live", art: s.art, image: s.image || "" }));
+  // The strip is the 7 most recent videos (newest first) — clicking one shows it.
+  const shows = (await getRecentVideos(7)).map((v) => ({ key: v.id, title: v.title, href: `/shows/${v.id}`, art: "a2", image: v.thumbnail }));
   const live = await resolveYouTubeLive(branding.youtubeChannelId || PRIMARY_CHANNEL.channelId, Date.now());
   const cfCode = process.env.NEXT_PUBLIC_CF_STREAM_CUSTOMER_CODE;
   const cfInput = process.env.NEXT_PUBLIC_CF_STREAM_LIVE_INPUT_UID;
