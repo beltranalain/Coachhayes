@@ -9,38 +9,55 @@ import { WebView } from "react-native-webview";
 import { colors, fonts, type ThemeColors } from "../../lib/theme";
 import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { STREAM_IFRAME_URL } from "../../lib/config";
-import { fetchStreamStatus, fetchSiteConfig, upcoming, formatWhen, countdownLabel, type ScheduleItem } from "../../lib/api";
+import { fetchLiveStatus, fetchSiteConfig, upcoming, formatWhen, countdownLabel, type LiveStatus, type ScheduleItem } from "../../lib/api";
 import { useBranding } from "../../lib/branding";
 import { Eyebrow } from "../../components/ui";
+
+// YouTube live embed as self-hosted HTML with a youtube.com baseUrl, so the
+// iframe has a valid origin (loading /embed directly triggers Error 153).
+function ytLiveHtml(id: string): string {
+  return `<!doctype html><html><head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <style>html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden}
+  .wrap{position:absolute;inset:0}iframe{width:100%;height:100%;border:0;display:block}</style></head>
+  <body><div class="wrap">
+    <iframe src="https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=https://www.youtube.com"
+      allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+  </div></body></html>`;
+}
 
 export default function LiveScreen() {
   const colors = useColors();
   const styles = useThemedStyles(makeStyles);
   const branding = useBranding();
-  const [live, setLive] = useState(false);
+  const [status, setStatus] = useState<LiveStatus | null>(null);
   const [checked, setChecked] = useState(false);
   const [sched, setSched] = useState<ScheduleItem[]>([]);
 
   useEffect(() => {
     let alive = true;
     async function poll() {
-      try { const s = await fetchStreamStatus(); if (alive) setLive(Boolean(s.live)); }
+      try { const s = await fetchLiveStatus(); if (alive) setStatus(s); }
       catch {} finally { if (alive) setChecked(true); }
     }
     poll();
-    const id = setInterval(poll, 8000);
+    const id = setInterval(poll, 10000);
     (async () => { try { const cfg = await fetchSiteConfig(); if (alive) setSched(upcoming(cfg.schedule || [])); } catch {} })();
     return () => { alive = false; clearInterval(id); };
   }, []);
 
+  const ytLive = status?.source === "youtube" && status.videoId;
+  const cfLive = status?.source === "cloudflare";
+
   return (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
-      {live ? (
+      {ytLive || cfLive ? (
         <View style={styles.player}>
           <WebView
-            source={{ uri: STREAM_IFRAME_URL }}
+            source={ytLive ? { html: ytLiveHtml(status!.videoId!), baseUrl: "https://www.youtube.com" } : { uri: STREAM_IFRAME_URL }}
             style={{ flex: 1, backgroundColor: "#000" }}
-            allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} javaScriptEnabled allowsFullscreenVideo scrollEnabled={false}
+            originWhitelist={["*"]}
+            allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} javaScriptEnabled domStorageEnabled allowsFullscreenVideo scrollEnabled={false}
           />
           <View style={styles.liveBadge}><View style={styles.liveBadgeDot} /><Text style={styles.liveBadgeText}>LIVE</Text></View>
         </View>

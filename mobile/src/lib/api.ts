@@ -188,6 +188,14 @@ export function fetchStreamStatus(): Promise<StreamStatus> {
   return getJSON<StreamStatus>("/api/stream/status");
 }
 
+// Combined "is the show on?" — tells us WHICH source is live (the coach's
+// YouTube stream, his usual way, or the native phone/studio broadcast) so the
+// app plays the right one. Heavily cached server-side to protect API quota.
+export type LiveStatus = { live: boolean; source: "youtube" | "cloudflare" | "off"; videoId: string | null; viewers: number | null };
+export function fetchLiveStatus(): Promise<LiveStatus> {
+  return getJSON<LiveStatus>("/api/live/status");
+}
+
 // Editable site config incl. the broadcast schedule (Firestore over defaults).
 export function fetchSiteConfig(): Promise<SiteConfig> {
   return getJSON<SiteConfig>("/api/site-config");

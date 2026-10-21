@@ -19,9 +19,9 @@ export default async function LivePage() {
   const cfCode = process.env.NEXT_PUBLIC_CF_STREAM_CUSTOMER_CODE;
   const cfInput = process.env.NEXT_PUBLIC_CF_STREAM_LIVE_INPUT_UID;
   const onOwnPlatform = Boolean(cfCode && cfInput);
-  const playerSrc = onOwnPlatform
-    ? `https://customer-${cfCode}.cloudflarestream.com/${cfInput}/iframe`
-    : `https://www.youtube.com/embed/live_stream?channel=${channelId}`;
+  // The player picks the live source itself (YouTube when the coach is live on
+  // YouTube, else the Cloudflare phone/studio broadcast). Hand it the CF base.
+  const cfSrc = onOwnPlatform ? `https://customer-${cfCode}.cloudflarestream.com/${cfInput}/iframe` : "";
 
   const upcoming = [...schedule]
     .sort((a, b) => (a.startsAt ?? 0) - (b.startsAt ?? 0))
@@ -33,7 +33,7 @@ export default async function LivePage() {
       <div className="liveGrid">
         <div className="lmain">
           <div className="lstage">
-            <LivePlayer src={playerSrc} logo={branding.logo} />
+            <LivePlayer cfSrc={cfSrc} logo={branding.logo} />
             <LivePinnedOverlay />
           </div>
 

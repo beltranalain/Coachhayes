@@ -50,11 +50,13 @@ export async function getUploads(
 }
 
 // Returns the videoId of an active live broadcast for a channel, or null.
+// search.list costs 100 quota units, so the result is cached (revalidate) and
+// shared across all callers — one real call per window regardless of traffic.
 export async function getLiveVideoId(channelId: string): Promise<string | null> {
   if (!KEY) return null;
   const url = `${API}/search?part=id&channelId=${channelId}&eventType=live&type=video&key=${KEY}`;
   try {
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await fetch(url, { next: { revalidate: 90 } });
     if (!res.ok) return null;
     const data = await res.json();
     return data.items?.[0]?.id?.videoId ?? null;
