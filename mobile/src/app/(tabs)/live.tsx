@@ -8,20 +8,22 @@ import { WebView } from "react-native-webview";
 
 import { colors, fonts, type ThemeColors } from "../../lib/theme";
 import { useColors, useThemedStyles } from "../../lib/ThemeContext";
-import { STREAM_IFRAME_URL } from "../../lib/config";
+import { STREAM_IFRAME_URL, API_BASE } from "../../lib/config";
 import { fetchLiveStatus, fetchSiteConfig, upcoming, formatWhen, countdownLabel, type LiveStatus, type ScheduleItem } from "../../lib/api";
 import { useBranding } from "../../lib/branding";
 import { Eyebrow } from "../../components/ui";
 
-// YouTube live embed as self-hosted HTML with a youtube.com baseUrl, so the
-// iframe has a valid origin (loading /embed directly triggers Error 153).
+// Serve the embed from the SITE's origin (the same origin that successfully plays
+// it on the website). Embedding from youtube.com's own origin trips Error 152 on
+// some live streams; using the allowed site origin fixes it.
+const EMBED_ORIGIN = (API_BASE || "https://coachhayes.vercel.app").replace(/\/$/, "");
 function ytLiveHtml(id: string): string {
   return `<!doctype html><html><head>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <style>html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden}
   .wrap{position:absolute;inset:0}iframe{width:100%;height:100%;border:0;display:block}</style></head>
   <body><div class="wrap">
-    <iframe src="https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=https://www.youtube.com"
+    <iframe src="https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${EMBED_ORIGIN}"
       allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
   </div></body></html>`;
 }
@@ -54,7 +56,7 @@ export default function LiveScreen() {
       {ytLive || cfLive ? (
         <View style={styles.player}>
           <WebView
-            source={ytLive ? { html: ytLiveHtml(status!.videoId!), baseUrl: "https://www.youtube.com" } : { uri: STREAM_IFRAME_URL }}
+            source={ytLive ? { html: ytLiveHtml(status!.videoId!), baseUrl: EMBED_ORIGIN } : { uri: STREAM_IFRAME_URL }}
             style={{ flex: 1, backgroundColor: "#000" }}
             originWhitelist={["*"]}
             allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} javaScriptEnabled domStorageEnabled allowsFullscreenVideo scrollEnabled={false}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PRIMARY_CHANNEL } from "@/lib/channels";
 import { getSiteConfig, getHayesContent } from "@/lib/siteConfig";
-import { getLiveInfo } from "@/lib/youtube";
+import { resolveYouTubeLive } from "@/lib/liveState";
 import LivePlayer from "@/components/LivePlayer";
 import LiveHeadline from "@/components/hayes/LiveHeadline";
 import LivePinnedOverlay from "@/components/LivePinnedOverlay";
@@ -14,7 +14,7 @@ export default async function LivePage() {
   const [{ schedule, branding }, content] = await Promise.all([getSiteConfig(), getHayesContent()]);
   const c = content.live;
   const channelId = branding.youtubeChannelId || PRIMARY_CHANNEL.channelId;
-  const live = await getLiveInfo(channelId);
+  const live = await resolveYouTubeLive(channelId, Date.now());
 
   const cfCode = process.env.NEXT_PUBLIC_CF_STREAM_CUSTOMER_CODE;
   const cfInput = process.env.NEXT_PUBLIC_CF_STREAM_LIVE_INPUT_UID;

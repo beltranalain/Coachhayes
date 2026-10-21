@@ -1,5 +1,5 @@
 import { PRIMARY_CHANNEL } from "@/lib/channels";
-import { getLiveInfo } from "@/lib/youtube";
+import { resolveYouTubeLive } from "@/lib/liveState";
 import { getSiteConfig, getHayesContent } from "@/lib/siteConfig";
 import { getPublishedPlayers, CHIP_META } from "@/lib/rankings";
 import { getPublishedPosts, readingMinutes } from "@/lib/blog";
@@ -7,7 +7,7 @@ import Home from "@/components/hayes/Home";
 
 export default async function HomePage() {
   const [{ schedule, branding }, content, players, posts] = await Promise.all([getSiteConfig(), getHayesContent(), getPublishedPlayers(), getPublishedPosts(3)]);
-  const live = await getLiveInfo(branding.youtubeChannelId || PRIMARY_CHANNEL.channelId);
+  const live = await resolveYouTubeLive(branding.youtubeChannelId || PRIMARY_CHANNEL.channelId, Date.now());
 
   // Latest blog posts for the home-page strip.
   const latestPosts = posts.map((p) => ({

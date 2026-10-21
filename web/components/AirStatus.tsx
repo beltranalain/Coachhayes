@@ -11,7 +11,7 @@ export default function AirStatus({ initial = false }: { initial?: boolean }) {
     let stop = false;
     const check = async () => {
       try {
-        const r = await fetch("/api/stream/status", { cache: "no-store" });
+        const r = await fetch("/api/live/status", { cache: "no-store" });
         const d = await r.json();
         if (!stop) setLive(Boolean(d.live));
       } catch {

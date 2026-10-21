@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { firebaseConfigured, getFirebaseAuth, getIdToken } from "@/lib/firebase";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { useLiveStatus } from "@/components/hayes/useLiveStatus";
+import { useLiveNow } from "@/components/hayes/useLiveStatus";
 import { ROOMS } from "@/lib/communityRooms";
 import ProfileView from "@/components/hayes/ProfileView";
 import PlayerPostCard, { type PlayerPost } from "@/components/hayes/PlayerPostCard";
@@ -83,7 +83,15 @@ export default function CommunityFeed({ content: c, shows = [], playerSrc, liveI
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [cText, setCText] = useState("");
   const [myAvatar, setMyAvatar] = useState<string | null>(null);
-  const live = useLiveStatus(liveInitial);
+  const liveNow = useLiveNow(liveInitial);
+  const live = liveNow.live;
+  // YouTube embed when he's live on YouTube, else the Cloudflare studio feed.
+  const liveEmbed =
+    liveNow.source === "youtube" && liveNow.videoId
+      ? `https://www.youtube.com/embed/${liveNow.videoId}?autoplay=1&mute=1&rel=0&modestbranding=1`
+      : liveNow.source === "cloudflare" && playerSrc
+        ? `${playerSrc}${playerSrc.includes("?") ? "&" : "?"}autoplay=true&muted=true`
+        : null;
   const latestTs = useRef(0);
 
   useEffect(() => {
@@ -411,8 +419,8 @@ export default function CommunityFeed({ content: c, shows = [], playerSrc, liveI
         <div className="rcard">
           <h4>{c.watchTitle}</h4>
           <div style={{ position: "relative", aspectRatio: "16/9", borderRadius: 12, overflow: "hidden", background: "#000", margin: "10px 0 12px" }}>
-            {live && playerSrc ? (
-              <iframe src={`${playerSrc}${playerSrc.includes("?") ? "&" : "?"}autoplay=true&muted=true`} title="Live" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} />
+            {live && liveEmbed ? (
+              <iframe src={liveEmbed} title="Live" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} />
             ) : (
               <div className="stage-soon rail">
                 <span className={`soon-mark${logo ? " has-logo" : ""}`}>{logo ? <img src={logo} alt="" /> : null}</span>

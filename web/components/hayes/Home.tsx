@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { HomeContent } from "@/lib/hayesContent";
-import { useLiveStatus } from "@/components/hayes/useLiveStatus";
+import { useLiveNow } from "@/components/hayes/useLiveStatus";
 import CategoryChips from "@/components/hayes/CategoryChips";
 import type { Chip, Categories } from "@/lib/chips";
 
@@ -46,8 +46,18 @@ export default function Home({
   posts: PostCard[];
 }) {
   const week = schedule.slice(0, 5);
-  // Reflect the Studio going live automatically (polls Cloudflare status).
-  const isLive = useLiveStatus(live.live);
+  // Reflect going live automatically — YouTube (his usual way) or the studio.
+  const liveNow = useLiveNow(live.live);
+  const isLive = liveNow.live;
+  // Build the inline player: YouTube embed when he's live on YouTube, else the
+  // Cloudflare studio feed (playerSrc).
+  const embedSrc =
+    liveNow.source === "youtube" && liveNow.videoId
+      ? `https://www.youtube.com/embed/${liveNow.videoId}?autoplay=1&rel=0&modestbranding=1`
+      : liveNow.source === "cloudflare" && playerSrc
+        ? `${playerSrc}${playerSrc.includes("?") ? "&" : "?"}autoplay=true&muted=true`
+        : null;
+  const liveViewers = liveNow.viewers ?? live.viewers;
   // Film highlight playing in the rankings-preview modal.
   const [playing, setPlaying] = useState<{ id: string; name: string } | null>(null);
   return (
@@ -64,15 +74,15 @@ export default function Home({
         </div>
 
         <div className="wide">
-          {isLive && playerSrc ? (
+          {isLive && embedSrc ? (
             // Live: play the real stream inline (same feed as the Live page).
             <div className="stage" style={{ background: "#000" }}>
               <span className="lv" style={{ zIndex: 4 }}>
                 <i />
-                {`Live now${typeof live.viewers === "number" ? ` · ${live.viewers.toLocaleString()} watching` : ""}`}
+                {`Live now${typeof liveViewers === "number" ? ` · ${liveViewers.toLocaleString()} watching` : ""}`}
               </span>
               <iframe
-                src={`${playerSrc}${playerSrc.includes("?") ? "&" : "?"}autoplay=true&muted=true`}
+                src={embedSrc}
                 title="Coach Hayes Football live"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
