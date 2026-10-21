@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAdminDb } from "./firebaseAdmin";
-import { getPlaylists, getPlaylistLatestVideo, type YtPlaylist } from "./youtube";
+import { getPlaylists, getPlaylistLatestVideo, getPlaylistVideoIds, getUploadsPage, type YtPlaylist } from "./youtube";
 import { getSiteConfig } from "./siteConfig";
 import { PRIMARY_CHANNEL } from "./channels";
 import { visibleSeries, type Series } from "./siteData";
@@ -87,52 +87,61 @@ export async function getShows(): Promise<Series[]> {
   return [...manual, ...auto];
 }
 
-// Keep one community "show" post per VISIBLE show, tagged with the show so the
-// Locker Room strip filter is populated and the show's latest video embeds as a
-// playable clip in the feed. Posts for shows that are no longer visible are
-// removed. Runs after the admin saves Shows (and can be re-run to refresh).
+// Auto-post the channel's RECENT uploads to the feed (embedded, playable), tagged
+// with the series they belong to so the Locker Room strip filter works. This is
+// what keeps the feed showing his latest videos — the same ones in the Library —
+// instead of a stale per-playlist latest. Each active show's latest is also
+// ensured so the strip never shows an empty series. Removes outdated auto-posts.
+const RECENT_UPLOADS = 14;
+
 export async function syncShowPosts(): Promise<{ created: number; removed: number }> {
   const db = getAdminDb();
   if (!db) return { created: 0, removed: 0 };
-  const [{ branding }, shows] = await Promise.all([getSiteConfig(), getShows()]);
+  const [{ branding, channels }, shows] = await Promise.all([getSiteConfig(), getShows()]);
   const brandName = branding.siteName || "Coach Hayes Football";
   const brandLogo = branding.logo || null;
+  const uploads = channels[0]?.uploadsPlaylist || PRIMARY_CHANNEL.uploadsPlaylist;
   const now = Date.now();
 
-  // Resolve each show's latest video (playlists) in parallel.
-  const resolved = await Promise.all(shows.map(async (s) => {
-    if (s.video && /^https?:\/\//.test(s.video)) return { s, clip: s.video, text: s.blurb || s.title, ts: now };
-    try {
-      const v = await getPlaylistLatestVideo(s.key);
-      if (v) return { s, clip: `https://www.youtube.com/watch?v=${v.id}`, text: v.title, ts: v.ts || now };
-    } catch { /* ignore */ }
-    return { s, clip: "", text: s.blurb || s.title, ts: now };
+  // Map every video in each active series back to its show, so recent uploads can
+  // be tagged with the right series.
+  const vidToShow: Record<string, string> = {};
+  await Promise.all(shows.map(async (s) => {
+    if (!/^(PL|UU|FL|OL|RD)/.test(s.key)) return; // playlist shows only
+    for (const id of await getPlaylistVideoIds(s.key)) if (!vidToShow[id]) vidToShow[id] = s.key;
   }));
+
+  // Candidates = the newest uploads + each active show's latest (deduped by video).
+  type Cand = { id: string; title: string; ts: number; show: string | null };
+  const cands = new Map<string, Cand>();
+  try {
+    const recent = (await getUploadsPage(uploads)).items.slice(0, RECENT_UPLOADS);
+    for (const v of recent) cands.set(v.id, { id: v.id, title: v.title, ts: Date.parse(v.publishedAt) || now, show: vidToShow[v.id] || null });
+  } catch { /* ignore */ }
+  const latests = await Promise.all(shows.map((s) => getPlaylistLatestVideo(s.key).catch(() => null)));
+  shows.forEach((s, i) => { const v = latests[i]; if (v && !cands.has(v.id)) cands.set(v.id, { id: v.id, title: v.title, ts: v.ts || now, show: s.key }); });
 
   const keep = new Set<string>();
   let created = 0;
-  for (const { s, clip, text, ts } of resolved) {
-    keep.add(s.key);
-    const ref = db.collection("posts").doc(`show-${s.key}`);
+  for (const c of cands.values()) {
+    const docId = `vid-${c.id}`; keep.add(docId);
+    const ref = db.collection("posts").doc(docId);
     const existing = (await ref.get()).data() || {};
     await ref.set({
       uid: existing.uid || "system", author: brandName, picture: brandLogo,
-      text: text || "", ts: existing.ts || ts,
+      text: c.title || "", ts: existing.ts || c.ts,
       likes: existing.likes || 0, likedBy: existing.likedBy || [], commentCount: existing.commentCount || 0,
       room: "general", savedBy: existing.savedBy || [],
-      image: clip ? null : (s.image || null), clip: clip || null, poll: null, kind: "show", player: null, show: s.key,
+      image: null, clip: `https://www.youtube.com/watch?v=${c.id}`, poll: null, kind: "show", player: null, show: c.show,
     });
     created++;
   }
 
-  // Remove show posts whose show is no longer visible.
+  // Remove auto-posts that are no longer current (old per-show + dropped videos).
   let removed = 0;
   try {
     const snap = await db.collection("posts").where("kind", "==", "show").get();
-    for (const d of snap.docs) {
-      const key = (d.data().show as string) || d.id.replace(/^show-/, "");
-      if (!keep.has(key)) { await d.ref.delete(); removed++; }
-    }
+    for (const d of snap.docs) { if (!keep.has(d.id)) { await d.ref.delete(); removed++; } }
   } catch { /* ignore */ }
 
   return { created, removed };

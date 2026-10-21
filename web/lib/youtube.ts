@@ -127,6 +127,25 @@ export async function getPlaylistLatestVideo(playlistId: string, maxPages = 7): 
   return best;
 }
 
+// All video ids in a playlist (paged, cached, capped). Used to map a recent
+// upload back to the series/playlist it belongs to.
+export async function getPlaylistVideoIds(playlistId: string, maxPages = 7): Promise<string[]> {
+  if (!KEY || !playlistId) return [];
+  const ids: string[] = []; let token = "", pages = 0;
+  try {
+    while (pages < maxPages) {
+      const url = `${API}/playlistItems?part=contentDetails&maxResults=50&playlistId=${playlistId}&key=${KEY}${token ? `&pageToken=${token}` : ""}`;
+      const res = await fetch(url, { next: { revalidate: 1800 } });
+      if (!res.ok) break;
+      const data = await res.json();
+      for (const it of data.items ?? []) { const id = it.contentDetails?.videoId; if (id) ids.push(id); }
+      token = data.nextPageToken ?? ""; pages++;
+      if (!token) break;
+    }
+  } catch { /* ignore */ }
+  return ids;
+}
+
 function parseDuration(iso: string): number {
   const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(iso || "");
   if (!m) return 0;
