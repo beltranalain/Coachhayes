@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAdminDb } from "./firebaseAdmin";
-import { getPlaylists, type YtPlaylist } from "./youtube";
+import { getPlaylists, getUploadsPage, type YtPlaylist } from "./youtube";
 import { getSiteConfig } from "./siteConfig";
 import { PRIMARY_CHANNEL } from "./channels";
 import { visibleSeries, type Series } from "./siteData";
@@ -69,6 +69,58 @@ export async function getShows(): Promise<Series[]> {
     .sort((a, b) => a.order - b.order);
   const manual = (cfg.manual || []).filter((s) => s.visible !== false);
   return [...manual, ...auto];
+}
+
+// Keep one community "show" post per VISIBLE show, tagged with the show so the
+// Locker Room strip filter is populated and the show's latest video embeds as a
+// playable clip in the feed. Posts for shows that are no longer visible are
+// removed. Runs after the admin saves Shows (and can be re-run to refresh).
+export async function syncShowPosts(): Promise<{ created: number; removed: number }> {
+  const db = getAdminDb();
+  if (!db) return { created: 0, removed: 0 };
+  const [{ branding }, shows] = await Promise.all([getSiteConfig(), getShows()]);
+  const brandName = branding.siteName || "Coach Hayes Football";
+  const brandLogo = branding.logo || null;
+  const now = Date.now();
+
+  // Resolve each show's latest video (playlists) in parallel.
+  const resolved = await Promise.all(shows.map(async (s) => {
+    if (s.video && /^https?:\/\//.test(s.video)) return { s, clip: s.video, text: s.blurb || s.title, ts: now };
+    try {
+      const page = await getUploadsPage(s.key);
+      const v = page.items[0];
+      if (v) return { s, clip: `https://www.youtube.com/watch?v=${v.id}`, text: v.title, ts: Date.parse(v.publishedAt) || now };
+    } catch { /* ignore */ }
+    return { s, clip: "", text: s.blurb || s.title, ts: now };
+  }));
+
+  const keep = new Set<string>();
+  let created = 0;
+  for (const { s, clip, text, ts } of resolved) {
+    keep.add(s.key);
+    const ref = db.collection("posts").doc(`show-${s.key}`);
+    const existing = (await ref.get()).data() || {};
+    await ref.set({
+      uid: existing.uid || "system", author: brandName, picture: brandLogo,
+      text: text || "", ts: existing.ts || ts,
+      likes: existing.likes || 0, likedBy: existing.likedBy || [], commentCount: existing.commentCount || 0,
+      room: "general", savedBy: existing.savedBy || [],
+      image: clip ? null : (s.image || null), clip: clip || null, poll: null, kind: "show", player: null, show: s.key,
+    });
+    created++;
+  }
+
+  // Remove show posts whose show is no longer visible.
+  let removed = 0;
+  try {
+    const snap = await db.collection("posts").where("kind", "==", "show").get();
+    for (const d of snap.docs) {
+      const key = (d.data().show as string) || d.id.replace(/^show-/, "");
+      if (!keep.has(key)) { await d.ref.delete(); removed++; }
+    }
+  } catch { /* ignore */ }
+
+  return { created, removed };
 }
 
 // Admin view: every playlist (with its current override) + the manual shows, so

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, adminConfigured } from "@/lib/firebaseAdmin";
 import { requireRole } from "@/lib/requireAdmin";
-import { getAdminShows, type ShowOverride } from "@/lib/shows";
+import { getAdminShows, syncShowPosts, type ShowOverride } from "@/lib/shows";
 import type { Series } from "@/lib/siteData";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,10 @@ export async function POST(request: Request) {
   if (!db) return NextResponse.json({ error: "No database." }, { status: 500 });
   try {
     await db.collection("site").doc("shows").set({ overrides, manual }, { merge: false });
-    return NextResponse.json({ saved: true });
+    // Refresh the per-show feed posts (latest video embeds, strip filters).
+    let sync = { created: 0, removed: 0 };
+    try { sync = await syncShowPosts(); } catch { /* non-fatal */ }
+    return NextResponse.json({ saved: true, ...sync });
   } catch {
     return NextResponse.json({ error: "Save failed." }, { status: 500 });
   }
