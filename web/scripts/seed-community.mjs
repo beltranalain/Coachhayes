@@ -32,6 +32,8 @@ const users = [
   U(1, "Marcus Johnson"), U(2, "Deja Williams"), U(3, "Coach Tony"), U(4, "Ray Ray"),
   U(5, "Gridiron Guru"), U(6, "Simone Carter"), U(7, "Tae from Tampa"), U(8, "Film Room Fanatic"),
   U(9, "Nana B"), U(10, "QB1 Dreams"),
+  U(11, "Padre Mike"), U(12, "Canes4Life"), U(13, "Reek"), U(14, "Coach Dee"), U(15, "Southside Scout"),
+  U(16, "Mo the Film Guy"), U(17, "Trench Truther"), U(18, "Jaylen's Mom"),
 ];
 
 const DAY = 86400000, HR = 3600000;
@@ -64,6 +66,22 @@ const posts = [
   { by: 1, t: ago(5, 16), likes: 7, text: "new here — this place actually talks ball instead of just yelling. love it so far." },
   { by: 10, t: ago(6, 7), likes: 16, text: "Malachi Toney really does deserve a statue lol what a game that was" },
   { by: 3, t: ago(6, 18), likes: 21, text: "That 2OT win over FSU might be the game of the year. Canes refused to lose." },
+  // More random chatter, spread across the week.
+  { by: 11, t: ago(0, 10), likes: 5, text: "First time catching the show live tonight. way better than the big networks ngl." },
+  { by: 12, t: ago(0, 19), likes: 28, text: "CANES UP. that's the whole post." },
+  { by: 13, t: ago(1, 8), likes: 7, text: "anybody got the link to the fantasy league? trying to get my squad in before the deadline" },
+  { by: 14, t: ago(1, 23), likes: 17, text: "As a youth coach, the pad level breakdown changed how I teach my D-line. thank you Coach." },
+  { by: 15, t: ago(2, 9), likes: 11, text: "Scouting note: watch #7 on the Northwestern tape. kid is a problem off the edge." },
+  { by: 16, t: ago(2, 20), likes: 24, text: "The film room content is worth the membership by itself. it's not even close." },
+  { by: 17, t: ago(3, 9), likes: 9, text: "Hot take: the trenches win titles, not the QB stats everyone cries about." },
+  { by: 18, t: ago(3, 19), likes: 33, text: "My son got his first offer today after y'all put his tape in front of the right people 🥹🙏" },
+  { by: 12, t: ago(4, 7), likes: 6, text: "who's doing the call-in show this week? got a question about the Miami secondary" },
+  { by: 1, t: ago(4, 18), likes: 13, text: "The 'Good Bad & Ugly' breakdowns hit different. Coach doesn't sugarcoat anything." },
+  { by: 5, t: ago(5, 8), likes: 10, text: "poll was fun, we need more of those in here", poll: { options: ["More polls", "More film breakdowns", "More call-ins", "All of it"], votedBy: {} } },
+  { by: 13, t: ago(5, 20), likes: 8, text: "lurked for months, finally joined. this is the only football community that actually watches the tape." },
+  { by: 7, t: ago(6, 2), likes: 19, text: "Tailgate pics from Saturday 🔥 what a scene at Hard Rock", img: "https://picsum.photos/seed/chftailgate/1080/700" },
+  { by: 16, t: ago(6, 13), likes: 14, text: "Rewatching the Clemson game breakdown. the detail on the pull reads is elite coaching." },
+  { by: 14, t: ago(6, 21), likes: 12, text: "If you coach youth ball and you're not in here, you're missing free clinics every week." },
 ];
 
 // --- comment threads (flat; reads as a back-and-forth) -----------------------
