@@ -1068,10 +1068,11 @@ a.pstat:hover{border-color:var(--acc)}
 .evlock-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 
 /* Link preview card (community posts): show the site's thumbnail, hide the URL */
-.linkcard{display:flex;flex-direction:column;border:1px solid var(--hair);border-radius:14px;overflow:hidden;margin-top:10px;background:var(--card);text-decoration:none;color:inherit;max-width:520px}
+.linkcard{display:flex;flex-direction:column;border:1px solid var(--hair);border-radius:14px;overflow:hidden;margin-top:10px;background:var(--card);text-decoration:none;color:inherit;width:100%}
 .linkcard:hover{border-color:var(--acc)}
-/* Full-width banner on top (Open Graph images are ~1.91:1), centered. */
-.linkcard-img{width:100%;aspect-ratio:1.91/1;background-size:cover;background-position:center;background-color:var(--alt)}
+/* Full-width banner on top (Open Graph images are ~1.91:1), centered. Height is
+   capped so it stays reasonable on wide posts. */
+.linkcard-img{width:100%;aspect-ratio:1.91/1;max-height:300px;background-size:cover;background-position:center;background-color:var(--alt)}
 .linkcard-img-none{display:grid;place-items:center;aspect-ratio:2.6/1}
 .linkcard-img-none span{font-family:var(--fdisp);font-size:34px;color:var(--sub)}
 .linkcard-body{padding:12px 14px;display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0}
