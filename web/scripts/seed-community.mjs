@@ -38,25 +38,32 @@ const DAY = 86400000, HR = 3600000;
 const base = Date.now();
 const ago = (d, h = 0) => base - d * DAY - h * HR;
 
-// --- posts (text, some with links for thumbnails, one poll) ------------------
+// --- posts (text, some with links for thumbnails, one poll). Timestamps are
+// spread across the last week so they scramble in among the video posts.
 const posts = [
-  { by: 1, t: ago(0, 1), likes: 14, text: "Miami's O-line looked completely different in the second half. Hayes called it on the stream last week." },
-  { by: 2, t: ago(0, 3), likes: 9, text: "Who y'all got this weekend — Colorado or the field? 👀 no wrong answers (there's a wrong answer)." },
-  { by: 3, t: ago(0, 5), likes: 31, text: "Film don't lie. This kid's footwork at center is cleaner than half the guys getting P4 offers. https://www.espn.com/college-football/" },
-  { by: 4, t: ago(1, 2), likes: 6, text: "Call-in queue was crazy tonight lol. Coach stayed on for an extra hour, respect." },
-  { by: 5, t: ago(1, 4), likes: 22, text: "Breaking down the 24-team playoff math and honestly it kind of works? read this then argue with me https://www.cbssports.com/college-football/" },
-  { by: 6, t: ago(1, 7), likes: 11, text: "The Locker Room > every other football chat on the internet. it's not close." },
-  { by: 7, t: ago(2, 1), likes: 4, text: "somebody clip the part where Coach roasted the participation trophy take 😭" },
-  { by: 8, t: ago(2, 3), likes: 18, text: "If you're not watching the postgame room after the show you're missing the best part. That's where the real tape talk happens." },
-  { by: 9, t: ago(2, 6), likes: 27, text: "My grandson's highlight finally got evaluated and the breakdown was so detailed. Thank you Coach 🙏 Good read on recruiting too https://sports.yahoo.com/college-football/" },
-  { by: 10, t: ago(3, 2), likes: 8, text: "Hot take: a 3-star with a motor beats a 5-star who takes plays off every single time." },
-  { by: 2, t: ago(3, 5), likes: 15, text: "Bleacher Report actually got one right for once lol https://bleacherreport.com/college-football" },
-  { by: 5, t: ago(4, 1), likes: 12, text: "", poll: { options: ["Colorado", "Miami", "UCF", "The upset nobody sees"], votedBy: {} } },
-  { by: 3, t: ago(4, 4), likes: 19, text: "PSA for the young coaches in here: leverage and pad level win more reps than any scheme. Watch the hips, not the arms." },
+  { by: 1, t: ago(0, 7), likes: 14, text: "Miami's O-line looked completely different in the second half. Hayes called it on the stream last week." },
+  { by: 2, t: ago(0, 13), likes: 9, text: "Who y'all got this weekend — Colorado or the field? 👀 no wrong answers (there's a wrong answer)." },
+  { by: 3, t: ago(0, 21), likes: 31, text: "Film don't lie. This kid's footwork at center is cleaner than half the guys getting P4 offers. https://www.espn.com/college-football/" },
+  { by: 4, t: ago(1, 5), likes: 6, text: "Call-in queue was crazy tonight lol. Coach stayed on for an extra hour, respect." },
+  { by: 5, t: ago(1, 12), likes: 22, text: "Breaking down the 24-team playoff math and honestly it kind of works? read this then argue with me https://www.cbssports.com/college-football/" },
+  { by: 6, t: ago(1, 20), likes: 11, text: "The Locker Room > every other football chat on the internet. it's not close." },
+  { by: 7, t: ago(2, 4), likes: 4, text: "somebody clip the part where Coach roasted the participation trophy take 😭" },
+  { by: 8, t: ago(2, 14), likes: 18, text: "If you're not watching the postgame room after the show you're missing the best part. That's where the real tape talk happens." },
+  { by: 9, t: ago(2, 22), likes: 27, text: "My grandson's highlight finally got evaluated and the breakdown was so detailed. Thank you Coach 🙏 Good read on recruiting too https://sports.yahoo.com/college-football/" },
+  { by: 10, t: ago(3, 6), likes: 8, text: "Hot take: a 3-star with a motor beats a 5-star who takes plays off every single time." },
+  { by: 2, t: ago(3, 16), likes: 15, text: "Bleacher Report actually got one right for once lol https://bleacherreport.com/college-football" },
+  { by: 5, t: ago(4, 3), likes: 12, text: "", poll: { options: ["Colorado", "Miami", "UCF", "The upset nobody sees"], votedBy: {} } },
+  { by: 3, t: ago(4, 15), likes: 19, text: "PSA for the young coaches in here: leverage and pad level win more reps than any scheme. Watch the hips, not the arms." },
   // Image posts (various aspect ratios) to see how photos render in the feed.
-  { by: 7, t: ago(0, 2), likes: 24, text: "Game day 🔥 who else is at the stadium tonight", img: "https://picsum.photos/seed/chfgame/1100/620" },
-  { by: 9, t: ago(1, 3), likes: 33, text: "My grandson after the win. Proud nana moment 🥹", img: "https://picsum.photos/seed/chfnana/760/940" },
-  { by: 4, t: ago(2, 5), likes: 17, text: "New film study setup is ready. Coach's breakdowns hit different on the big screen.", img: "https://picsum.photos/seed/chffilm/900/900" },
+  { by: 7, t: ago(0, 17), likes: 24, text: "Game day 🔥 who else is at the stadium tonight", img: "https://picsum.photos/seed/chfgame/1100/620" },
+  { by: 9, t: ago(1, 16), likes: 33, text: "My grandson after the win. Proud nana moment 🥹", img: "https://picsum.photos/seed/chfnana/760/940" },
+  { by: 4, t: ago(2, 18), likes: 17, text: "New film study setup is ready. Coach's breakdowns hit different on the big screen.", img: "https://picsum.photos/seed/chffilm/900/900" },
+  // A few more, spread deeper into the week.
+  { by: 6, t: ago(3, 22), likes: 9, text: "Coach's read on the Kalen DeBoer situation was spot on. called it before anyone else did." },
+  { by: 8, t: ago(5, 4), likes: 13, text: "Rewatched the FSU breakdown twice. the detail on the O-line stunts is nuts." },
+  { by: 1, t: ago(5, 16), likes: 7, text: "new here — this place actually talks ball instead of just yelling. love it so far." },
+  { by: 10, t: ago(6, 7), likes: 16, text: "Malachi Toney really does deserve a statue lol what a game that was" },
+  { by: 3, t: ago(6, 18), likes: 21, text: "That 2OT win over FSU might be the game of the year. Canes refused to lose." },
 ];
 
 // --- comment threads (flat; reads as a back-and-forth) -----------------------

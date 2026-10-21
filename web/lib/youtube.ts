@@ -166,7 +166,9 @@ export async function classifyVideos(ids: string[]): Promise<Record<string, { du
     for (const it of data.items ?? []) {
       const durationSec = parseDuration(it.contentDetails?.duration || "");
       const wasLive = Boolean(it.liveStreamingDetails?.actualStartTime);
-      const kind: VideoKind = wasLive ? "live" : durationSec > 0 && durationSec <= 60 ? "short" : "video";
+      // YouTube Shorts can be up to ~3 minutes, so treat anything <=180s (that
+      // isn't a livestream) as a Short.
+      const kind: VideoKind = wasLive ? "live" : durationSec > 0 && durationSec <= 180 ? "short" : "video";
       out[it.id] = { durationSec, kind };
     }
   } catch { /* ignore */ }
