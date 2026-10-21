@@ -85,6 +85,30 @@ export async function getLiveInfo(channelId: string): Promise<LiveInfo> {
   }
 }
 
+// Cheap (1-unit videos.list) check of whether a KNOWN video is still live, plus
+// its viewer count. Used to keep a show "on air" without re-running the 100-unit
+// search every poll — the single biggest quota saver for long broadcasts.
+export async function checkVideoLive(videoId: string): Promise<{ live: boolean; viewers: number | null }> {
+  if (!KEY || !videoId) return { live: false, viewers: null };
+  try {
+    const res = await fetch(
+      `${API}/videos?part=snippet,liveStreamingDetails&id=${videoId}&key=${KEY}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return { live: false, viewers: null };
+    const data = await res.json();
+    const item = data.items?.[0];
+    if (!item) return { live: false, viewers: null };
+    const details = item.liveStreamingDetails || {};
+    // Still live only if YouTube says "live" and it hasn't actually ended.
+    const live = item.snippet?.liveBroadcastContent === "live" && !details.actualEndTime;
+    const c = details.concurrentViewers;
+    return { live, viewers: c ? Number(c) : null };
+  } catch {
+    return { live: false, viewers: null };
+  }
+}
+
 // ---- Live chat: read messages from an active broadcast (public, API key) ----
 
 // Resolve the active live broadcast's chat id for a channel, or null if the

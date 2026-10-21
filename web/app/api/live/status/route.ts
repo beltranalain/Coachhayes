@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getLiveInfo } from "@/lib/youtube";
 import { getLiveInputStatus } from "@/lib/stream";
 import { PRIMARY_CHANNEL } from "@/lib/channels";
 import { getSiteConfig } from "@/lib/siteConfig";
+import { resolveYouTubeLive } from "@/lib/liveState";
 
 export const dynamic = "force-dynamic";
 
@@ -20,15 +20,15 @@ export async function GET() {
   const now = Date.now();
   if (cache && now - cache.t < TTL) return NextResponse.json(cache.data);
 
-  // YouTube first — it's how the coach normally goes live.
+  // YouTube first — it's how the coach normally goes live. The resolver keeps the
+  // 100-unit search off during a show (confirms the known video with a 1-unit
+  // call), so a 3-4h broadcast barely touches the quota.
   let youtubeLive = false, videoId: string | null = null, viewers: number | null = null;
   try {
     const { channels } = await getSiteConfig();
     const channelId = channels[0]?.channelId || PRIMARY_CHANNEL.channelId;
-    if (channelId) {
-      const info = await getLiveInfo(channelId);
-      youtubeLive = info.live; videoId = info.videoId; viewers = info.viewers;
-    }
+    const yt = await resolveYouTubeLive(channelId, now);
+    youtubeLive = yt.live; videoId = yt.videoId; viewers = yt.viewers;
   } catch { /* ignore — fall through to Cloudflare / off */ }
 
   // Cloudflare native broadcast (the phone studio) as the other source.
