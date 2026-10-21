@@ -1,13 +1,16 @@
-// MEMBERSHIP — the tiers (matches the mock). Checkout runs on the web for now;
-// the buttons route a signed-out user to sign-in, then open the web membership page.
+// MEMBERSHIP — YouTube-first. New members join on Coach's YouTube channel (his
+// tiers + billing live there), then link their account for site/app/Discord
+// perks. Joining + Google linking must open EXTERNALLY (YouTube membership and
+// Google OAuth don't work inside an in-app WebView, and this keeps the app clear
+// of in-app-purchase store rules).
 
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
-import { useRouter } from "expo-router";
+import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from "react-native";
 import { colors, fonts, type ThemeColors } from "../../lib/theme";
 import { useColors, useThemedStyles } from "../../lib/ThemeContext";
 import { API_BASE } from "../../lib/config";
-import { useAuth } from "../../lib/auth";
+
+const YT_JOIN_URL = "https://www.youtube.com/@CoachHayesFootball/join";
 
 const TIERS = [
   { name: "Po' Lil Timmy", price: "$5", per: "/mo", hot: false, perks: ["Members' rooms", "Priority film review", "Supporter badge"] },
@@ -17,21 +20,21 @@ const TIERS = [
 export default function MembershipScreen() {
   const colors = useColors();
   const styles = useThemedStyles(makeStyles);
-  const router = useRouter();
-  const { user } = useAuth();
   const site = API_BASE.replace(/\/$/, "");
 
-  function choose() {
-    if (!user) { router.push("/signin"); return; }
-    // Checkout still runs on the web, but open it INSIDE the app (in-app web
-    // screen) rather than kicking the user out to the phone's browser.
-    if (site) router.push(`/web?url=${encodeURIComponent(`${site}/membership`)}&title=Membership` as never);
+  function joinOnYouTube() {
+    Linking.openURL(YT_JOIN_URL).catch(() => {});
+  }
+  function linkMembership() {
+    // Linking uses Google sign-in, which only works in a real browser — open the
+    // website's membership page externally to complete it.
+    if (site) Linking.openURL(`${site}/membership`).catch(() => {});
   }
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
       <Text style={styles.h1}>Join the locker room.</Text>
-      <Text style={styles.sub}>One login across the site, the community and the live chat.</Text>
+      <Text style={styles.sub}>Become a member on YouTube, then link your account so your perks carry over here and on Discord.</Text>
 
       {TIERS.map((t) => (
         <View key={t.name} style={[styles.tier, t.hot && styles.tierHot]}>
@@ -45,13 +48,16 @@ export default function MembershipScreen() {
               </View>
             ))}
           </View>
-          <Pressable onPress={choose} style={({ pressed }) => [t.hot ? styles.btnHot : styles.btn, pressed && { opacity: 0.9 }]}>
-            <Text style={[t.hot ? styles.btnHotText : styles.btnText]}>Choose {t.name.split(" ").slice(-1)[0]}</Text>
+          <Pressable onPress={joinOnYouTube} style={({ pressed }) => [t.hot ? styles.btnHot : styles.btn, pressed && { opacity: 0.9 }]}>
+            <Text style={[t.hot ? styles.btnHotText : styles.btnText]}>Join on YouTube</Text>
           </Pressable>
         </View>
       ))}
 
-      <Text style={styles.note}>Payment is handled securely on the web. You&apos;ll be signed in with the same account.</Text>
+      <Pressable onPress={linkMembership} style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.85 }]}>
+        <Text style={styles.linkText}>Already a YouTube member? Link it ›</Text>
+      </Pressable>
+      <Text style={styles.note}>Membership is handled by YouTube. Linking carries your perks to the site, app and Discord at no extra cost.</Text>
     </ScrollView>
   );
 }
@@ -73,5 +79,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   btnText: { fontFamily: fonts.bold, fontSize: 13.5, color: colors.cream },
   btnHot: { backgroundColor: colors.amber, borderRadius: 999, paddingVertical: 12, alignItems: "center" },
   btnHotText: { fontFamily: fonts.bold, fontSize: 13.5, color: colors.onAccent },
+  linkRow: { alignItems: "center", paddingVertical: 12, marginTop: 2 },
+  linkText: { fontFamily: fonts.bold, fontSize: 13.5, color: colors.amber },
   note: { fontFamily: fonts.body, fontSize: 11.5, color: colors.dim, marginTop: 8, textAlign: "center" },
 });

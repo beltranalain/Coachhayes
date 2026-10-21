@@ -40,8 +40,14 @@ Create/transfer a Firebase project on the client's account, then set:
   live detect, chat mirror, past episodes). **See the quota form in section 0.**
 - Channel is already wired to Coach's real channel ID in `lib/brand.ts` — confirm
   it's his.
-- **YouTube membership linking (optional):** `YOUTUBE_OAUTH_CLIENT_ID`,
-  `YOUTUBE_OAUTH_CLIENT_SECRET`, `NEXT_PUBLIC_YOUTUBE_OAUTH_CLIENT_ID`.
+- **Membership is YouTube-first:** new members join on Coach's YouTube channel;
+  the site/app "Link my YouTube membership" then mirrors their tier to the site +
+  Discord. For linking to work: set `YOUTUBE_OAUTH_CLIENT_ID`,
+  `YOUTUBE_OAUTH_CLIENT_SECRET`, `NEXT_PUBLIC_YOUTUBE_OAUTH_CLIENT_ID`, **and the
+  channel owner must connect YouTube once** in the admin (stores a refresh token
+  so the site can read the member list). The channel also needs YouTube's
+  memberships API access (Partner Program). On-site Stripe memberships are a
+  FUTURE option (section 7) — not required for launch.
 - **Mobile Google sign-in:** `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`,
   `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`.
 

@@ -185,7 +185,7 @@ export const DEFAULT_HAYES: HayesContent = {
 
   membership: {
     heading: "Join the team.",
-    intro: "Same two tiers Coach has always run, on this site instead of through a platform that takes a cut. One login covers the site, the apps, the community and Discord.",
+    intro: "Become a member on YouTube to support the show — then link your account here so your perks carry across the site, the app, the community and Discord.",
     tiers: [
       {
         key: "free", name: "Free", who: "Everything public.", price: "$0", priceSuffix: "", feeline: "No card needed",
@@ -193,18 +193,18 @@ export const DEFAULT_HAYES: HayesContent = {
         cta: "Create an account", highlight: false, disabled: false,
       },
       {
-        key: "timmy", name: "Po’ Lil Timmy", who: "For the regulars.", price: "$4.99", priceSuffix: "/ month", feeline: "Price to be confirmed",
+        key: "timmy", name: "Po’ Lil Timmy", who: "For the regulars.", price: "$4.99", priceSuffix: "/ month", feeline: "Billed securely on YouTube",
         features: ["Loyalty badge next to your name", "Custom emojis", "Member shout-outs on air", "Priority replies from Coach", "Members-only community rooms", "10% off everything in the shop"],
-        cta: "Join", highlight: false, disabled: true,
+        cta: "Join on YouTube", highlight: false, disabled: true,
       },
       {
-        key: "coordinator", name: "The Coordinator", who: "Everything, plus the film.", price: "$9.99", priceSuffix: "/ month", feeline: "Price to be confirmed",
+        key: "coordinator", name: "The Coordinator", who: "Everything, plus the film.", price: "$9.99", priceSuffix: "/ month", feeline: "Billed securely on YouTube",
         features: ["Everything in Po’ Lil Timmy", "Members-only videos", "The Locker Room, here and on Discord", "Early video drops", "The postgame room after every show", "Priority in the call-in queue", "Front of the line on film submissions"],
-        cta: "Join", highlight: true, disabled: true,
+        cta: "Join on YouTube", highlight: true, disabled: true,
       },
     ],
     ytCardTitle: "Already a YouTube member?",
-    ytCardText: "Nothing breaks. Link your account and your roles carry over here and in Discord. New members joining on this site keep more of their money with Coach.",
+    ytCardText: "Already support Coach on YouTube? Link your account and your membership carries over to the site, the app and Discord — at no extra cost.",
     ytCardCta: "Link my YouTube membership",
   },
 

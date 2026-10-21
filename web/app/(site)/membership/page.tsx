@@ -1,19 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getHayesContent } from "@/lib/siteConfig";
-import { stripeConfigured, MEMBERSHIP_PRICES } from "@/lib/stripe";
-import MembershipJoin from "@/components/MembershipJoin";
+import { getHayesContent, getSiteConfig } from "@/lib/siteConfig";
+import { PRIMARY_CHANNEL } from "@/lib/channels";
+import LinkYouTube from "@/components/LinkYouTube";
 
 export const metadata: Metadata = {
   title: "Membership",
-  description: "Membership tiers on Coach Hayes Football — support the show and keep more of it with Coach.",
+  description: "Membership tiers on Coach Hayes Football — become a member on YouTube and your perks carry over to the site, app and Discord.",
 };
 
-// All copy, prices and features come from content.membership (admin-editable).
-// Prices are unconfirmed in the brief; the tier `disabled` flag keeps checkout
-// off until the membership phase wires Stripe subscriptions.
+// Membership is YouTube-first: new members join on Coach's YouTube channel (where
+// his tiers + billing already live), then link their account here so the perks
+// carry over to the site, app, community and Discord. Copy/prices come from
+// content.membership (admin-editable).
 export default async function MembershipPage() {
-  const { membership: c } = await getHayesContent();
+  const [{ membership: c }, { channels }] = await Promise.all([getHayesContent(), getSiteConfig()]);
+  const ch = channels[0] || PRIMARY_CHANNEL;
+  const youtubeJoinUrl = `${(ch.url || "https://www.youtube.com/@CoachHayesFootball").replace(/\/$/, "")}/join`;
   return (
     <div className="wide" style={{ paddingTop: 34, paddingBottom: 40 }}>
       <div className="hd center">
@@ -38,9 +41,9 @@ export default async function MembershipPage() {
             {tier.key === "free" ? (
               <Link className="link" href="/account">{tier.cta}</Link>
             ) : (
-              // Paid tiers: on-site Stripe Payment Element checkout (no redirect).
-              // `enabled` only when Stripe + this tier's price are configured.
-              <MembershipJoin tier={tier.key} tierName={tier.name} price={`${tier.price}${tier.priceSuffix ? " " + tier.priceSuffix : ""}`} cta={tier.cta} highlight={tier.highlight} enabled={stripeConfigured && !!MEMBERSHIP_PRICES[tier.key]} />
+              // Paid tiers: become a member on YouTube (his tiers + billing live
+              // there), then link back here for site/app/Discord perks.
+              <a className={`pill${tier.highlight ? "" : " dark"}`} href={youtubeJoinUrl} target="_blank" rel="noopener noreferrer">{tier.cta}</a>
             )}
           </div>
         ))}
@@ -49,7 +52,7 @@ export default async function MembershipPage() {
       <div className="card" style={{ marginTop: 22 }}>
         <h3 style={{ fontSize: 18, marginBottom: 8 }}>{c.ytCardTitle}</h3>
         <p style={{ fontSize: 14.5, color: "var(--sub)", marginBottom: 16 }}>{c.ytCardText}</p>
-        <span className="pill sm soft" aria-disabled title="Coming in the membership phase">{c.ytCardCta}</span>
+        <LinkYouTube label={c.ytCardCta} />
       </div>
     </div>
   );
