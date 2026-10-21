@@ -15,9 +15,10 @@ export type ShowOverride = { visible?: boolean; order?: number; title?: string; 
 export type ShowsConfig = { overrides: Record<string, ShowOverride>; manual: Series[] };
 
 const ART = ["a2", "a5", "a3", "a4", "a6", "a1"];
-// A playlist is shown by default when it's a real series (enough episodes);
-// tiny lists (1-2 videos) stay hidden until the admin turns them on.
-const DEFAULT_VISIBLE_MIN = 8;
+// A playlist is shown by default when it's a substantial series; smaller lists
+// (team-commit lists, one-offs) stay hidden until the admin turns them on. Keeps
+// the default Shows page clean; the admin curates the rest with one toggle.
+const DEFAULT_VISIBLE_MIN = 20;
 
 async function channelId(): Promise<string> {
   try { const { channels } = await getSiteConfig(); return channels[0]?.channelId || PRIMARY_CHANNEL.channelId; }
