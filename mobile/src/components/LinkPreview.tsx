@@ -45,11 +45,12 @@ export default function LinkPreview({ url }: { url: string }) {
 }
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
-  card: { flexDirection: "row", borderWidth: 1, borderColor: colors.line, borderRadius: 12, overflow: "hidden", marginTop: 11, backgroundColor: colors.surface2 },
-  img: { width: 96, height: 84, backgroundColor: colors.surface },
-  imgNone: { alignItems: "center", justifyContent: "center" },
-  imgNoneText: { fontFamily: fonts.display, fontSize: 24, color: colors.muted },
-  body: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, justifyContent: "center", minWidth: 0 },
+  // Full-width banner on top (centered), text below — matches the website card.
+  card: { borderWidth: 1, borderColor: colors.line, borderRadius: 12, overflow: "hidden", marginTop: 11, backgroundColor: colors.surface2 },
+  img: { width: "100%", aspectRatio: 1.91, backgroundColor: colors.surface },
+  imgNone: { alignItems: "center", justifyContent: "center", aspectRatio: 2.6 },
+  imgNoneText: { fontFamily: fonts.display, fontSize: 30, color: colors.muted },
+  body: { padding: 12, minWidth: 0 },
   site: { fontFamily: fonts.body, fontSize: 11, color: colors.muted },
-  title: { fontFamily: fonts.semibold, fontSize: 13, color: colors.cream, marginTop: 2, lineHeight: 17 },
+  title: { fontFamily: fonts.semibold, fontSize: 13.5, color: colors.cream, marginTop: 2, lineHeight: 18 },
 });
