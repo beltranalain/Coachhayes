@@ -53,6 +53,10 @@ const posts = [
   { by: 2, t: ago(3, 5), likes: 15, text: "Bleacher Report actually got one right for once lol https://bleacherreport.com/college-football" },
   { by: 5, t: ago(4, 1), likes: 12, text: "", poll: { options: ["Colorado", "Miami", "UCF", "The upset nobody sees"], votedBy: {} } },
   { by: 3, t: ago(4, 4), likes: 19, text: "PSA for the young coaches in here: leverage and pad level win more reps than any scheme. Watch the hips, not the arms." },
+  // Image posts (various aspect ratios) to see how photos render in the feed.
+  { by: 7, t: ago(0, 2), likes: 24, text: "Game day 🔥 who else is at the stadium tonight", img: "https://picsum.photos/seed/chfgame/1100/620" },
+  { by: 9, t: ago(1, 3), likes: 33, text: "My grandson after the win. Proud nana moment 🥹", img: "https://picsum.photos/seed/chfnana/760/940" },
+  { by: 4, t: ago(2, 5), likes: 17, text: "New film study setup is ready. Coach's breakdowns hit different on the big screen.", img: "https://picsum.photos/seed/chffilm/900/900" },
 ];
 
 // --- comment threads (flat; reads as a back-and-forth) -----------------------
@@ -77,7 +81,7 @@ async function run() {
       uid: u.uid, author: u.author, picture: u.picture,
       text: p.text || "", ts: p.t, likes: p.likes || 0, likedBy: [],
       commentCount: comments.length, room: "general", savedBy: [],
-      image: null, clip: null, poll: p.poll || null, kind: null, player: null, show: null,
+      image: p.img || null, clip: null, poll: p.poll || null, kind: null, player: null, show: null,
     });
     np++;
     for (let j = 0; j < comments.length; j++) {
