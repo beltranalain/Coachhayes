@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { visibleSeries, normalizeHref } from "@/lib/siteData";
+import { normalizeHref } from "@/lib/siteData";
 import { getSiteConfig } from "@/lib/siteConfig";
+import { getShows } from "@/lib/shows";
 import Countdown from "@/components/Countdown";
 
 export const metadata: Metadata = { title: "Shows" };
 
 export default async function ShowsPage() {
-  const { schedule, content } = await getSiteConfig();
-  const series = visibleSeries(content.series);
+  const [{ schedule, content }, series] = await Promise.all([getSiteConfig(), getShows()]);
   // Only broadcasts still in the future, soonest first.
   const upcoming = [...schedule]
     .sort((a, b) => (a.startsAt ?? 0) - (b.startsAt ?? 0))

@@ -49,6 +49,32 @@ export async function getUploads(
   }
 }
 
+export type YtPlaylist = { id: string; title: string; description: string; thumbnail: string; itemCount: number };
+
+// A channel's playlists — each is a "series" (show). 1 unit per 50, cached.
+export async function getPlaylists(channelId: string, max = 50): Promise<YtPlaylist[]> {
+  if (!KEY || !channelId) return [];
+  const out: YtPlaylist[] = [];
+  let pageToken = "";
+  try {
+    while (out.length < max) {
+      const url = `${API}/playlists?part=snippet,contentDetails&maxResults=50&channelId=${channelId}&key=${KEY}${pageToken ? `&pageToken=${pageToken}` : ""}`;
+      const res = await fetch(url, { next: { revalidate: 1800 } });
+      if (!res.ok) break;
+      const data = await res.json();
+      for (const it of data.items ?? []) {
+        const s = it.snippet ?? {}; const t = s.thumbnails ?? {};
+        out.push({ id: it.id, title: s.title ?? "", description: s.description ?? "", thumbnail: (t.medium ?? t.high ?? t.default ?? {}).url ?? "", itemCount: Number(it.contentDetails?.itemCount) || 0 });
+      }
+      pageToken = data.nextPageToken ?? "";
+      if (!pageToken) break;
+    }
+    return out.slice(0, max);
+  } catch {
+    return out;
+  }
+}
+
 // One page (up to 50) of a channel's uploads + the token for the next page.
 // Used by the Library's "load more" so we page lazily instead of pulling it all.
 export async function getUploadsPage(
