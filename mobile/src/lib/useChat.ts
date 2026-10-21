@@ -11,8 +11,8 @@
 // A "tip" chat message is a normal chat entry with a numeric `tip` field, which
 // we render as an amber pill (matching the site's LiveChat).
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { CHAT_ROOM_WS } from "./config";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { CHAT_ROOM_WS, API_BASE } from "./config";
 
 export type ChatMessage = {
   id: string;
@@ -20,15 +20,18 @@ export type ChatMessage = {
   text: string;
   ts: number;
   tip?: number;
+  source?: "site" | "youtube";
 };
 
 export function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [siteMessages, setSiteMessages] = useState<ChatMessage[]>([]);
+  const [ytMessages, setYtMessages] = useState<ChatMessage[]>([]);
   const [count, setCount] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Site chat over the shared Durable Object WebSocket.
   useEffect(() => {
     let unmounted = false;
 
@@ -49,9 +52,9 @@ export function useChat() {
           return;
         }
         if (data.type === "history" && Array.isArray(data.messages)) {
-          setMessages(data.messages);
+          setSiteMessages(data.messages);
         } else if (data.type === "chat") {
-          setMessages((prev) => [...prev.slice(-199), data]);
+          setSiteMessages((prev) => [...prev.slice(-199), data]);
         } else if (data.type === "count") {
           setCount(data.count);
         }
@@ -67,6 +70,29 @@ export function useChat() {
       wsRef.current?.close();
     };
   }, []);
+
+  // Read-only mirror of the coach's YouTube live chat (server-cached endpoint).
+  useEffect(() => {
+    let stop = false;
+    const poll = async () => {
+      try {
+        const r = await fetch(`${API_BASE}/api/live/chat`);
+        const d = await r.json();
+        if (!stop && Array.isArray(d.messages)) {
+          setYtMessages(d.messages.map((m: any) => ({ id: `yt_${m.id}`, name: m.name, text: m.text, ts: m.ts, source: "youtube" as const })));
+        }
+      } catch { /* keep last */ }
+    };
+    poll();
+    const id = setInterval(poll, 6000);
+    return () => { stop = true; clearInterval(id); };
+  }, []);
+
+  // Site + YouTube, interleaved by time.
+  const messages = useMemo(
+    () => [...siteMessages.map((m) => ({ ...m, source: m.source || ("site" as const) })), ...ytMessages].sort((a, b) => a.ts - b.ts),
+    [siteMessages, ytMessages]
+  );
 
   const send = useCallback((name: string, text: string, uid: string) => {
     const t = text.trim();

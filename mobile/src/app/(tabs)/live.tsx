@@ -12,6 +12,7 @@ import { STREAM_IFRAME_URL, API_BASE } from "../../lib/config";
 import { fetchLiveStatus, fetchSiteConfig, upcoming, formatWhen, countdownLabel, type LiveStatus, type ScheduleItem } from "../../lib/api";
 import { useBranding } from "../../lib/branding";
 import { Eyebrow } from "../../components/ui";
+import LiveChatPanel from "../../components/LiveChatPanel";
 
 // Serve the embed from the SITE's origin (the same origin that successfully plays
 // it on the website). Embedding from youtube.com's own origin trips Error 152 on
@@ -75,6 +76,8 @@ export default function LiveScreen() {
           {!checked && <ActivityIndicator color={colors.amber} style={{ marginTop: 6 }} />}
         </View>
       )}
+
+      {(ytLive || cfLive) && <LiveChatPanel />}
 
       <View style={{ marginTop: 20 }}>
         <Eyebrow>Up next</Eyebrow>
