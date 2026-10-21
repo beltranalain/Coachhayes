@@ -19,7 +19,10 @@ const ART = ["a2", "a5", "a3", "a4", "a6", "a1"];
 // and only if their latest video is within MAX_AGE_DAYS. This avoids padding the
 // strip with stale, long-dormant playlists; the admin can still toggle any on.
 const DEFAULT_VISIBLE_COUNT = 7;
-const MAX_AGE_DAYS = 300;
+// Generous cap so the 7 most-recent series all show (excludes only truly ancient,
+// long-dead playlists). The FEED is driven by recent uploads, so showing a
+// less-active series here only affects its filter, not feed freshness.
+const MAX_AGE_DAYS = 730;
 
 function defaultVisibleIds(ranked: { id: string; latestTs: number }[]): Set<string> {
   const cutoff = Date.now() - MAX_AGE_DAYS * 86400000;
