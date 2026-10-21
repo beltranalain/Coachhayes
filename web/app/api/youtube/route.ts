@@ -37,6 +37,7 @@ export async function GET(request: Request) {
   if (!channel) {
     return NextResponse.json({ error: "Unknown channel." }, { status: 400 });
   }
-  const items = await getUploads(channel.uploadsPlaylist);
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 12));
+  const items = await getUploads(channel.uploadsPlaylist, limit);
   return NextResponse.json({ configured: true, channel: channel.key, items });
 }
