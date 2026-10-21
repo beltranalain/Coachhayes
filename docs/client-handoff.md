@@ -34,6 +34,10 @@ Create/transfer a Firebase project on the client's account, then set:
 - **Mobile (.env):** the `EXPO_PUBLIC_FIREBASE_*` mirror of the web config.
 - Enable **Email/Password + Google** sign-in; add the client's domain to Firebase
   Auth → authorized domains.
+- **MUST: put the project on the Blaze (pay-as-you-go) plan.** The free Spark plan
+  has a low daily Firestore read/write cap — real traffic (or heavy testing) hits
+  it and every read starts failing ("Quota exceeded"), so posts/players/blog go
+  blank until midnight PT. Blaze keeps a free allowance then bills pennies.
 
 ## 2. YouTube — live + chat + membership (MUST for live)
 - `YOUTUBE_API_KEY` — Data API key on the client's Google Cloud project (powers

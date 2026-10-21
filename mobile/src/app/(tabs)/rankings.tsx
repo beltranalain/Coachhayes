@@ -52,7 +52,7 @@ export default function RankingsScreen() {
   const header = (
     <View style={styles.head}>
       <Eyebrow>Coach Hayes · Player Rankings</Eyebrow>
-      <Text style={styles.h1}>Four chips. One grade.</Text>
+      <Text style={styles.h1} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>Four chips. One grade.</Text>
       <View style={styles.statRow}>
         <View><Text style={styles.statN}>{players.length}</Text><Text style={styles.statL}>Players graded</Text></View>
         <View><Text style={styles.statN}>4</Text><Text style={styles.statL}>Chip tiers</Text></View>
