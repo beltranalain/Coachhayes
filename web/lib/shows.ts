@@ -15,14 +15,24 @@ export type ShowOverride = { visible?: boolean; order?: number; title?: string; 
 export type ShowsConfig = { overrides: Record<string, ShowOverride>; manual: Series[] };
 
 const ART = ["a2", "a5", "a3", "a4", "a6", "a1"];
-// A playlist is shown by default when it's a substantial series; smaller lists
-// (team-commit lists, one-offs) stay hidden until the admin turns them on. Keeps
-// the default Shows page clean; the admin curates the rest with one toggle.
-const DEFAULT_VISIBLE_MIN = 20;
+// By default we show the N most-recently-active series (by their latest video);
+// the admin can toggle any on/off to override.
+const DEFAULT_VISIBLE_COUNT = 7;
 
 async function channelId(): Promise<string> {
   try { const { channels } = await getSiteConfig(); return channels[0]?.channelId || PRIMARY_CHANNEL.channelId; }
   catch { return PRIMARY_CHANNEL.channelId; }
+}
+
+// Playlists ordered by their latest video's date (most recent series first). The
+// per-playlist "latest video" fetch is cached, so repeat calls are cheap.
+async function playlistsByRecency(): Promise<(YtPlaylist & { latestTs: number })[]> {
+  const pls = await getPlaylists(await channelId(), 50);
+  const withTs = await Promise.all(pls.map(async (pl) => {
+    try { const page = await getUploadsPage(pl.id); const v = page.items[0]; return { ...pl, latestTs: v ? (Date.parse(v.publishedAt) || 0) : 0 }; }
+    catch { return { ...pl, latestTs: 0 }; }
+  }));
+  return withTs.sort((a, b) => b.latestTs - a.latestTs);
 }
 
 export async function getShowsConfig(): Promise<ShowsConfig> {
@@ -37,7 +47,8 @@ export async function getShowsConfig(): Promise<ShowsConfig> {
 }
 
 // Map a playlist (+ its override) to the Series shape the site already renders.
-function toSeries(pl: YtPlaylist, o: ShowOverride, i: number): Series & { order: number } {
+// `i` is the recency rank (0 = most recent); defaultVisible marks the top N.
+function toSeries(pl: YtPlaylist, o: ShowOverride, i: number, defaultVisible: boolean): Series & { order: number } {
   const blurb = (o.blurb || pl.description || "").trim().slice(0, 240) || `${pl.itemCount} episodes`;
   return {
     key: pl.id,
@@ -50,21 +61,21 @@ function toSeries(pl: YtPlaylist, o: ShowOverride, i: number): Series & { order:
     category: "",
     art: ART[i % ART.length],
     image: o.image || pl.thumbnail || "",
-    visible: o.visible !== undefined ? o.visible : pl.itemCount >= DEFAULT_VISIBLE_MIN,
+    visible: o.visible !== undefined ? o.visible : defaultVisible,
     order: o.order ?? i,
   };
 }
 
 // Public shows list (manual custom shows first, then visible playlists in order).
 export async function getShows(): Promise<Series[]> {
-  const [playlists, cfg] = await Promise.all([getPlaylists(await channelId(), 50), getShowsConfig()]);
-  if (!playlists.length) {
+  const [ranked, cfg] = await Promise.all([playlistsByRecency(), getShowsConfig()]);
+  if (!ranked.length) {
     // YouTube not connected / no playlists — keep the old manual behavior.
     const { content } = await getSiteConfig();
     return visibleSeries(content.series);
   }
-  const auto = playlists
-    .map((pl, i) => toSeries(pl, cfg.overrides[pl.id] || {}, i))
+  const auto = ranked
+    .map((pl, i) => toSeries(pl, cfg.overrides[pl.id] || {}, i, i < DEFAULT_VISIBLE_COUNT))
     .filter((s) => s.visible !== false)
     .sort((a, b) => a.order - b.order);
   const manual = (cfg.manual || []).filter((s) => s.visible !== false);
@@ -123,13 +134,13 @@ export async function syncShowPosts(): Promise<{ created: number; removed: numbe
   return { created, removed };
 }
 
-// Admin view: every playlist (with its current override) + the manual shows, so
-// the Shows page can curate visibility / order / titles.
+// Admin view: every playlist (recency-ordered, with its current override) + the
+// manual shows, so the Shows page can curate visibility / order / titles.
 export async function getAdminShows(): Promise<{ configured: boolean; playlists: (YtPlaylist & { override: ShowOverride; defaultVisible: boolean })[]; manual: Series[] }> {
-  const [playlists, cfg] = await Promise.all([getPlaylists(await channelId(), 50), getShowsConfig()]);
+  const [ranked, cfg] = await Promise.all([playlistsByRecency(), getShowsConfig()]);
   return {
-    configured: playlists.length > 0,
-    playlists: playlists.map((pl) => ({ ...pl, override: cfg.overrides[pl.id] || {}, defaultVisible: pl.itemCount >= DEFAULT_VISIBLE_MIN })),
+    configured: ranked.length > 0,
+    playlists: ranked.map((pl, i) => ({ ...pl, override: cfg.overrides[pl.id] || {}, defaultVisible: i < DEFAULT_VISIBLE_COUNT })),
     manual: cfg.manual || [],
   };
 }
