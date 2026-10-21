@@ -1,0 +1,95 @@
+// One-off: seed the Locker Room (posts + comments) with demo users so we can see
+// the feed, link thumbnails, and comment threads. Every doc id is prefixed
+// "seed_" so it's trivial to remove later (see seed-community-clear.mjs).
+//
+//   node scripts/seed-community.mjs        (run from the web/ folder)
+
+import { readFileSync } from "fs";
+import { initializeApp, cert } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+
+// --- load the admin service account from web/.env.local ----------------------
+const env = {};
+for (const line of readFileSync(new URL("../.env.local", import.meta.url), "utf8").split("\n")) {
+  const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+  if (!m) continue;
+  let v = m[2];
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+  env[m[1]] = v;
+}
+initializeApp({
+  credential: cert({
+    projectId: env.FIREBASE_ADMIN_PROJECT_ID,
+    clientEmail: env.FIREBASE_ADMIN_CLIENT_EMAIL,
+    privateKey: (env.FIREBASE_ADMIN_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+  }),
+});
+const db = getFirestore();
+
+// --- demo users --------------------------------------------------------------
+const U = (n, name) => ({ uid: `seed_user_${n}`, author: name, picture: `https://i.pravatar.cc/160?u=seed_user_${n}` });
+const users = [
+  U(1, "Marcus Johnson"), U(2, "Deja Williams"), U(3, "Coach Tony"), U(4, "Ray Ray"),
+  U(5, "Gridiron Guru"), U(6, "Simone Carter"), U(7, "Tae from Tampa"), U(8, "Film Room Fanatic"),
+  U(9, "Nana B"), U(10, "QB1 Dreams"),
+];
+
+const DAY = 86400000, HR = 3600000;
+const base = Date.now();
+const ago = (d, h = 0) => base - d * DAY - h * HR;
+
+// --- posts (text, some with links for thumbnails, one poll) ------------------
+const posts = [
+  { by: 1, t: ago(0, 1), likes: 14, text: "Miami's O-line looked completely different in the second half. Hayes called it on the stream last week." },
+  { by: 2, t: ago(0, 3), likes: 9, text: "Who y'all got this weekend — Colorado or the field? 👀 no wrong answers (there's a wrong answer)." },
+  { by: 3, t: ago(0, 5), likes: 31, text: "Film don't lie. This kid's footwork at center is cleaner than half the guys getting P4 offers. https://www.espn.com/college-football/" },
+  { by: 4, t: ago(1, 2), likes: 6, text: "Call-in queue was crazy tonight lol. Coach stayed on for an extra hour, respect." },
+  { by: 5, t: ago(1, 4), likes: 22, text: "Breaking down the 24-team playoff math and honestly it kind of works? read this then argue with me https://www.cbssports.com/college-football/" },
+  { by: 6, t: ago(1, 7), likes: 11, text: "The Locker Room > every other football chat on the internet. it's not close." },
+  { by: 7, t: ago(2, 1), likes: 4, text: "somebody clip the part where Coach roasted the participation trophy take 😭" },
+  { by: 8, t: ago(2, 3), likes: 18, text: "If you're not watching the postgame room after the show you're missing the best part. That's where the real tape talk happens." },
+  { by: 9, t: ago(2, 6), likes: 27, text: "My grandson's highlight finally got evaluated and the breakdown was so detailed. Thank you Coach 🙏 Good read on recruiting too https://sports.yahoo.com/college-football/" },
+  { by: 10, t: ago(3, 2), likes: 8, text: "Hot take: a 3-star with a motor beats a 5-star who takes plays off every single time." },
+  { by: 2, t: ago(3, 5), likes: 15, text: "Bleacher Report actually got one right for once lol https://bleacherreport.com/college-football" },
+  { by: 5, t: ago(4, 1), likes: 12, text: "", poll: { options: ["Colorado", "Miami", "UCF", "The upset nobody sees"], votedBy: {} } },
+  { by: 3, t: ago(4, 4), likes: 19, text: "PSA for the young coaches in here: leverage and pad level win more reps than any scheme. Watch the hips, not the arms." },
+];
+
+// --- comment threads (flat; reads as a back-and-forth) -----------------------
+// keyed by post index (0-based)
+const threads = {
+  0: [[3, "Facts, their guard play was night and day"], [7, "the LT finally staying square helped too"], [1, "exactly, one adjustment changed the whole game"]],
+  2: [[5, "offers are gonna come, mark my words"], [3, "already got 2 FCS looks after this breakdown dropped"], [9, "love to see it 🙌"]],
+  4: [[10, "nah 24 is too many, dilutes it"], [5, "did you read it tho? the seeding fixes that"], [10, "...ok that part actually makes sense"]],
+  7: [[6, "the postgame room is elite"], [4, "wish it went even longer ngl"]],
+  8: [[1, "congrats!! what position?"], [9, "center, 2027 class 😁"], [8, "that breakdown was clean, saw it"]],
+  11: [[7, "Colorado all day"], [2, "upset special, you'll see"], [6, "putting my chips on Miami"]],
+};
+
+async function run() {
+  let np = 0, nc = 0;
+  for (let i = 0; i < posts.length; i++) {
+    const p = posts[i];
+    const u = users[p.by - 1];
+    const comments = threads[i] || [];
+    const id = `seed_post_${i + 1}`;
+    await db.collection("posts").doc(id).set({
+      uid: u.uid, author: u.author, picture: u.picture,
+      text: p.text || "", ts: p.t, likes: p.likes || 0, likedBy: [],
+      commentCount: comments.length, room: "general", savedBy: [],
+      image: null, clip: null, poll: p.poll || null, kind: null, player: null, show: null,
+    });
+    np++;
+    for (let j = 0; j < comments.length; j++) {
+      const [cby, ctext] = comments[j];
+      const cu = users[cby - 1];
+      await db.collection("posts").doc(id).collection("comments").doc(`seed_c_${i + 1}_${j + 1}`).set({
+        uid: cu.uid, author: cu.author, picture: cu.picture, text: ctext, ts: p.t + (j + 1) * 7 * 60000,
+      });
+      nc++;
+    }
+  }
+  console.log(`Seeded ${np} posts and ${nc} comments into the Locker Room (room: general).`);
+}
+
+run().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
