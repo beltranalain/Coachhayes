@@ -96,6 +96,13 @@ export type SiteContent = {
   portrait: string; // About-page portrait image (data URL) or ""
   series: Series[]; // the shows shown across the site (editable in admin)
 
+  // Which live source the site + app use (admin-controlled, to avoid clashes):
+  //   auto    — show the YouTube stream if live, else the phone/studio broadcast
+  //   youtube — only auto-detect the YouTube channel
+  //   studio  — only the phone/studio broadcast (ignore YouTube)
+  //   off     — never show live (keep the waiting screen)
+  liveSource: "auto" | "youtube" | "studio" | "off";
+
   // Editable page headings/intros. Each hero title is split into two lines so the
   // second line can render in the brand accent color (matches the site design).
   showsEyebrow: string;
@@ -123,6 +130,7 @@ export const DEFAULT_CONTENT: SiteContent = {
   emailBooking: BRAND.emailBooking,
   portrait: "",
   series: SERIES,
+  liveSource: "auto",
 
   showsEyebrow: "The slate",
   showsTitle1: "Our shows.",

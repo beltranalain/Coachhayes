@@ -20,20 +20,36 @@ export async function GET() {
   const now = Date.now();
   if (cache && now - cache.t < TTL) return NextResponse.json(cache.data);
 
-  // YouTube first — it's how the coach normally goes live. The resolver keeps the
-  // 100-unit search off during a show (confirms the known video with a 1-unit
-  // call), so a 3-4h broadcast barely touches the quota.
-  let youtubeLive = false, videoId: string | null = null, viewers: number | null = null;
+  // Admin-controlled live source (avoids a YouTube vs phone/studio clash).
+  let mode: "auto" | "youtube" | "studio" | "off" = "auto";
+  let channelId = PRIMARY_CHANNEL.channelId;
   try {
-    const { channels } = await getSiteConfig();
-    const channelId = channels[0]?.channelId || PRIMARY_CHANNEL.channelId;
-    const yt = await resolveYouTubeLive(channelId, now);
-    youtubeLive = yt.live; videoId = yt.videoId; viewers = yt.viewers;
-  } catch { /* ignore — fall through to Cloudflare / off */ }
+    const cfg = await getSiteConfig();
+    mode = cfg.content.liveSource || "auto";
+    channelId = cfg.channels[0]?.channelId || PRIMARY_CHANNEL.channelId;
+  } catch { /* use defaults */ }
 
-  // Cloudflare native broadcast (the phone studio) as the other source.
+  if (mode === "off") {
+    const data: Status = { live: false, source: "off", videoId: null, viewers: null };
+    cache = { t: now, data };
+    return NextResponse.json(data);
+  }
+
+  // YouTube — how the coach normally goes live. The resolver keeps the 100-unit
+  // search off during a show (confirms the known video with a 1-unit call), so a
+  // 3-4h broadcast barely touches the quota. Skipped in "studio" mode.
+  let youtubeLive = false, videoId: string | null = null, viewers: number | null = null;
+  if (mode === "auto" || mode === "youtube") {
+    try {
+      const yt = await resolveYouTubeLive(channelId, now);
+      youtubeLive = yt.live; videoId = yt.videoId; viewers = yt.viewers;
+    } catch { /* ignore — fall through to Cloudflare / off */ }
+  }
+
+  // Cloudflare native broadcast (the phone studio). Used in "auto" (when YouTube
+  // isn't live) or "studio" mode.
   let cfLive = false;
-  if (!youtubeLive) {
+  if (!youtubeLive && (mode === "auto" || mode === "studio")) {
     try {
       const uid = process.env.CLOUDFLARE_STREAM_LIVE_INPUT_UID || process.env.NEXT_PUBLIC_CF_STREAM_LIVE_INPUT_UID || "";
       if (uid) { const s = await getLiveInputStatus(uid); cfLive = Boolean(s?.connected); }

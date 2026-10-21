@@ -29,6 +29,8 @@ export default function GoLivePage() {
   const [restarts, setRestarts] = useState(0);
   const [tipsToday, setTipsToday] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [liveSource, setLiveSource] = useState<"auto" | "youtube" | "studio" | "off">("auto");
+  const [savingSource, setSavingSource] = useState(false);
 
   useEffect(() => {
     fetch("/api/site-config", { cache: "no-store" }).then((r) => r.json()).then((d) => {
@@ -36,6 +38,7 @@ export default function GoLivePage() {
       const s = (d?.content?.series || []).map((x: any) => ({ key: x.key, name: x.title })).filter((x: any) => x.name);
       setShows(s);
       if (s[0]) setPreset(s[0].key);
+      if (d?.content?.liveSource) setLiveSource(d.content.liveSource);
     }).catch(() => {});
     (async () => {
       try {
@@ -54,6 +57,15 @@ export default function GoLivePage() {
   async function pollSimulcast() { try { const token = await getIdToken(); const r = await fetch("/api/simulcast/status", { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store" }); const d = await r.json(); setRelayLive(Boolean(d.live)); const map: Record<string, Health> = {}; let rs = 0; for (const h of d.destinations || []) { map[h.id] = h; rs += Number(h.restarts) || 0; } setHealth(map); setRestarts(rs); } catch {} }
   async function toggleDest(id: string, enabled: boolean) { try { const token = await getIdToken(); const r = await fetch("/api/simulcast/destinations", { method: "PATCH", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ id, enabled }) }); const d = await r.json(); setDests(d.destinations || []); } catch {} }
   async function broadcast(action: "start" | "stop") { setBusy(true); try { const token = await getIdToken(); await fetch(`/api/simulcast/${action}`, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {} }); await Promise.all([pollStream(), pollSimulcast()]); } catch {} finally { setBusy(false); } }
+  async function saveLiveSource(mode: "auto" | "youtube" | "studio" | "off") {
+    const prev = liveSource;
+    setLiveSource(mode); setSavingSource(true);
+    try {
+      const token = await getIdToken();
+      const r = await fetch("/api/site-config", { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ section: "content", data: { liveSource: mode } }) });
+      if (!r.ok) setLiveSource(prev);
+    } catch { setLiveSource(prev); } finally { setSavingSource(false); }
+  }
 
   const onAir = live || relayLive;
   const enabledDests = dests.filter((d) => d.enabled);
@@ -71,6 +83,29 @@ export default function GoLivePage() {
         <div className="card kpi"><b>{onAir ? viewers.toLocaleString() : "0"}</b><span>On this site</span><div className="d">{brand.domain}</div></div>
         <div className="card kpi"><b>{money(tipsToday)}</b><span>Tips today</span><div className="d">From viewers</div></div>
         <div className="card kpi"><b>{enabledDests.length}</b><span>Destinations on</span><div className="d">{relayConfigured ? "Relay connected" : "Relay not set"}</div></div>
+      </div>
+
+      <div className="card">
+        <h3>Live source {savingSource && <span className="cs" style={{ fontWeight: 400 }}>· saving…</span>}</h3>
+        <p className="cs">What the website and app show as “live.” Switch to <b>Platform only</b> when you go live from the phone/studio so a YouTube stream doesn’t take over.</p>
+        <div className="chips" role="group" aria-label="Live source" style={{ marginTop: 4 }}>
+          {([
+            { id: "auto", label: "Auto", hint: "YouTube if live, else the studio" },
+            { id: "youtube", label: "YouTube only", hint: "Only the YouTube channel" },
+            { id: "studio", label: "Platform only", hint: "Only the phone/studio — ignore YouTube" },
+            { id: "off", label: "Off", hint: "Keep the waiting screen" },
+          ] as const).map((o) => (
+            <button key={o.id} className={`chipf${liveSource === o.id ? " on" : ""}`} disabled={savingSource} onClick={() => saveLiveSource(o.id)} title={o.hint}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <p className="cs" style={{ margin: "10px 0 0" }}>
+          {liveSource === "auto" && "Auto: shows your YouTube live stream when you’re live there; otherwise shows a broadcast from the phone/studio."}
+          {liveSource === "youtube" && "YouTube only: the site/app only follow your YouTube channel going live."}
+          {liveSource === "studio" && "Platform only: the site/app only show a broadcast you start from the phone/studio. YouTube is ignored — no clash."}
+          {liveSource === "off" && "Off: the site/app always show the waiting screen, even if you’re live."}
+        </p>
       </div>
 
       <div className="row2">
