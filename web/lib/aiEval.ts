@@ -26,12 +26,12 @@ export type EvalInput = {
   transcript?: string; // Coach's spoken evaluation, transcribed (preferred source)
 };
 
-const SYSTEM = `You are the writing assistant for "Honest Evaluations," Coach Kyle Hayes' recruiting evaluation service.
-You produce a thorough, position-specific film evaluation of a high school football recruit in Coach Hayes' honest, measured, football-literate voice.
+const SYSTEM = `You produce thorough, position-specific film evaluations of high school football recruits for a recruiting evaluation service.
+Write in a professional, honest, measured, football-literate voice. Use the THIRD PERSON throughout — describe the player ("the athlete", "he"). Never write in the first person ("I", "we", "my"), never speak as or quote any coach, and never attribute the evaluation to a named person.
 
 RULES:
-- When a COACH TRANSCRIPT is provided, that IS the evaluation — organize, expand and polish HIS observations into the report. Do not contradict him or invent grades he didn't give. You may add standard developmental framing, but keep his judgments.
-- DO NOT INVENT SKILLS. When a transcript is provided, do not credit the player with any technique, trait or result the coach did not actually mention (e.g. if he never talks about snap accuracy, pass protection, or a 40 time, do not praise those). If a position-standard skill wasn't addressed, you may note it as "not shown on this film / to be evaluated" — never as an established strength.
+- When a TRANSCRIPT is provided (a spoken read of the film), that IS the evaluation — organize, expand and polish those observations into the report. Do not contradict them or invent grades they didn't give. You may add standard developmental framing, but keep the stated judgments. Still write about the player in the third person; do not quote or name the person who recorded it.
+- DO NOT INVENT SKILLS. When a transcript is provided, do not credit the player with any technique, trait or result not actually mentioned in it (e.g. if snap accuracy, pass protection, or a 40 time is never addressed, do not praise those). If a position-standard skill wasn't addressed, you may note it as "not shown on this film / to be evaluated" — never as an established strength.
 - ONE CONSISTENT RECRUITING TIER. First decide the single realistic level this player projects to (e.g. Power Four, Division I/FCS, HBCU, Division II, Division III, NAIA, JUCO). Every section that references level — the ceiling language in "size", "recommendedTargets", "additionalComments", "finalAssessment" and "projection" — MUST agree with that one tier. Never imply Power Four in one section and FCS in another. "recommendedTargets" lists programs/levels AT or ADJACENT TO that tier, not above it.
 - When there is NO transcript, you are reasoning from thin signals (profile + film title/description). Stay conservative and measured; use honest hedging ("based on the available film", "appears", "would need to be evaluated more closely"). Never overhype.
 - Be position-specific. A center is judged on leverage, pad level, hand placement, movement in confined spaces and second-level blocking — not 40 times. A WR on routes, hands, separation, YAC. Tailor the whole report to the player's position.
@@ -73,8 +73,8 @@ export async function generateEvaluation(input: EvalInput): Promise<Evaluation> 
   ].filter(Boolean).join("\n");
 
   const coachBlock = input.transcript?.trim()
-    ? `\n\nCOACH TRANSCRIPT (Coach Hayes talking through the film — this is the source of truth for the evaluation):\n"""${input.transcript.trim().slice(0, 8000)}"""\n`
-    : `\n\n(No coach transcript was provided — reason conservatively from the limited signals above and keep the evaluation honest and measured.)\n`;
+    ? `\n\nTRANSCRIPT (a spoken read of the film — the source of truth for the evaluation; summarize its observations about the player in the third person, and do not quote or name the speaker):\n"""${input.transcript.trim().slice(0, 8000)}"""\n`
+    : `\n\n(No transcript was provided — reason conservatively from the limited signals above and keep the evaluation honest and measured.)\n`;
 
   const prompt = `${profile}${coachBlock}\nWrite the full ${input.position || "football"} evaluation now as JSON.\n\n${JSON_SHAPE}`;
 
