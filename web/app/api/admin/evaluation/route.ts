@@ -4,7 +4,9 @@ import { requireRole } from "@/lib/requireAdmin";
 import { generateEvaluation, aiEvalConfigured } from "@/lib/aiEval";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// 60s = the Vercel Hobby (free) function cap; the earlier 120 exceeded it. The AI
+// draft comes back in well under a minute. Raise to 300 on Vercel Pro.
+export const maxDuration = 60;
 
 function ytId(url: string): string | null {
   const m = String(url || "").match(/(?:youtube\.com\/(?:watch\?v=|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);

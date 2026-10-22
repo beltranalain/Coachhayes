@@ -45,7 +45,7 @@ export async function generateEvalText(prompt: string, opts: TextOptions = {}): 
   messages.push({ role: "user", content: prompt });
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90_000);
+  const timer = setTimeout(() => controller.abort(), 50_000);
   try {
     const res = await fetch(cfg.base, {
       method: "POST",
@@ -94,8 +94,11 @@ export async function transcribeClip(blob: Blob, filename = "audio.webm"): Promi
   form.append("response_format", "verbose_json");
   form.append("prompt", "Coach Hayes breaking down a high school football recruit's game film: position, technique, athleticism, strengths and areas to improve.");
 
+  // Abort the Groq call ~45s in — under the 60s function cap — so we return a
+  // clean "timed out" instead of a raw Vercel 504. Groq transcribes a few-minute
+  // clip in seconds, so this never fires for a normal 3-4 min take.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 120_000);
+  const timer = setTimeout(() => controller.abort(), 45_000);
   try {
     const res = await fetch(cfg.base, { method: "POST", headers: { Authorization: `Bearer ${cfg.key}` }, body: form, signal: controller.signal });
     if (!res.ok) { const t = await res.text().catch(() => ""); throw new Error(`Transcription ${res.status}: ${t.slice(0, 220)}`); }

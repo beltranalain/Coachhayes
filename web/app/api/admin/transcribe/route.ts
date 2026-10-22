@@ -3,7 +3,10 @@ import { requireRole } from "@/lib/requireAdmin";
 import { transcribeClip, transcribeConfigured } from "@/lib/aiProvider";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// 60s is the max a Vercel Hobby (free) function gets. A 3-4 min clip transcribes
+// in a few seconds on Groq, so this is plenty — the earlier 120 was above the
+// Hobby cap and could fall back to a low default. Raise to 300 on Vercel Pro.
+export const maxDuration = 60;
 
 // Admin: transcribe a recorded audio clip (Coach talking through the film) to
 // text via Whisper. Expects multipart/form-data with an "audio" file field.
