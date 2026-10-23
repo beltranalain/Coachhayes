@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPlayerBySlug, getPublishedPlayers, CHIP_META, CATEGORIES, recommendedOverall, type CategoryKey } from "@/lib/rankings";
+import { getPlayerBySlug, getPublishedPlayers, CHIP_META, CATEGORIES, ATTRIBUTES_PHRASE, recommendedOverall, type CategoryKey } from "@/lib/rankings";
 import { getSiteConfig } from "@/lib/siteConfig";
 import { CategoryIcon } from "@/components/hayes/CategoryChips";
 import PlayerEvaluation from "@/components/hayes/PlayerEvaluation";
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const titleMeta = [p.position, p.school].filter(Boolean).join(", ");
   const title = customTitle || `${p.name}${titleMeta ? ` — ${titleMeta}` : ""}${p.classYear ? ` ${p.classYear}` : ""} | Coach Hayes film grade`;
   const description = customDesc
-    || `Coach Hayes grades ${p.name}${p.position ? `, ${p.position}` : ""}${p.school ? ` from ${p.school}` : ""}, at ${chip.label}${score ? ` (${score}/4)` : ""} on film. Power, Speed, Motor, Technique and Football IQ, broken down play by play.`;
+    || `Coach Hayes grades ${p.name}${p.position ? `, ${p.position}` : ""}${p.school ? ` from ${p.school}` : ""}, at ${chip.label}${score ? ` (${score}/4)` : ""} on film. ${ATTRIBUTES_PHRASE}, broken down play by play.`;
   const url = `/rankings/${p.slug}`;
   const ogImg = `/rankings/${p.slug}/opengraph-image`;
   return {
@@ -71,7 +71,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
 
   // Factual one-paragraph summary from the grade — restates the grade, never
   // invents reasoning. (P1-1 §3)
-  const summary = `${p.name} is a ${p.position || "prospect"}${p.school ? ` from ${p.school}` : ""}${p.classYear ? ` in the class of ${p.classYear}` : ""}, graded ${chip.label.toLowerCase()}${score ? ` (${score} out of 4)` : ""} by ${site}. The grade comes only from film across five attributes — Power, Speed, Motor, Technique and Football IQ.`;
+  const summary = `${p.name} is a ${p.position || "prospect"}${p.school ? ` from ${p.school}` : ""}${p.classYear ? ` in the class of ${p.classYear}` : ""}, graded ${chip.label.toLowerCase()}${score ? ` (${score} out of 4)` : ""} by ${site}. The grade comes only from film across five attributes — ${ATTRIBUTES_PHRASE}.`;
 
   // Other published players in the same class (Related). (P1-1 §9)
   const related = (await getPublishedPlayers())
@@ -80,7 +80,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
 
   // Factual FAQ built from data — no fabricated analysis. (P1-1 §7)
   const faqItems: { q: string; a: string }[] = [
-    { q: `What is ${p.name}'s Coach Hayes grade?`, a: `${p.name} grades as a ${chip.label.toLowerCase()}${score ? ` with an overall film score of ${score} out of 4` : ""}, based on Power, Speed, Motor, Technique and Football IQ.` },
+    { q: `What is ${p.name}'s Coach Hayes grade?`, a: `${p.name} grades as a ${chip.label.toLowerCase()}${score ? ` with an overall film score of ${score} out of 4` : ""}, based on ${ATTRIBUTES_PHRASE}.` },
     ...(p.position || p.school ? [{ q: `What position does ${p.name} play and where?`, a: `${p.name} is a ${p.position || "football player"}${p.school ? ` at ${p.school}` : ""}${p.classYear ? `, class of ${p.classYear}` : ""}.` }] : []),
     { q: `How are these recruiting grades decided?`, a: `Coach Hayes grades five attributes from game tape and assigns each a chip; the five scores average into the overall chip. Grades come only from film — not stars, offers or camps.` },
   ];

@@ -4,8 +4,9 @@ import { CHIP_META, type Chip, type Categories, type CategoryNotes, sanitizeCate
 import { sanitizeEvaluation, sanitizeAccess, normalizeEmails, type Evaluation, type EvalAccess } from "./evaluation";
 
 // ============================================================================
-// Rankings domain. Each player is graded on 5 categories (Power/Speed/Motor/
-// Technique/Football IQ), each awarded a tier chip (bronze<silver<gold<blue).
+// Rankings domain. Each player is graded on 5 categories (Size/Speed/Effort/
+// Fundamentals & Tech/Intangibles — internal keys power/speed/motor/technique/iq
+// are unchanged), each awarded a tier chip (bronze<silver<gold<blue).
 // The category scores recommend an OVERALL chip (stored in `chip`) which the
 // coach can override; `chip` drives ranking + public display. Chip constants +
 // scoring live in ./chips (client-safe) and are re-exported here.

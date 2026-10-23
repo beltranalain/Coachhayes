@@ -1,4 +1,4 @@
-import { getPublishedPlayers, CHIP_META, CHIP_GRADE_QUESTION, CHIP_GRADE_DEFINITION } from "@/lib/rankings";
+import { getPublishedPlayers, CHIP_META, CHIP_GRADE_QUESTION, CHIP_GRADE_DEFINITION, ATTRIBUTES_LIST } from "@/lib/rankings";
 import { getSiteConfig } from "@/lib/siteConfig";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export async function GET() {
   lines.push("- **Silver chip** (2 pts) — solid D1 contributor / mid-major standout");
   lines.push("- **Bronze chip** (1 pt) — developmental prospect on the radar");
   lines.push("");
-  lines.push("The five graded attributes: Power, Speed, Motor, Technique, Football IQ.");
+  lines.push(`The five graded attributes: ${ATTRIBUTES_LIST}.`);
   lines.push("");
   lines.push(`- [Full rankings board](${base}/rankings)`);
   lines.push(`- [How the grade works](${base}/rankings/how-it-works)`);

@@ -465,7 +465,7 @@ export default function RankingsAdmin() {
         )}
 
         <div className="tbwrap" style={{ marginTop: 12 }}><table>
-          <thead><tr><th>#</th><th className="playercol">Player</th><th>Year</th><th>Commit</th><th>Chips (PWR · SPD · MTR · TEC · IQ)</th><th>Score</th><th>Film</th><th>Status</th><th>Order</th><th /></tr></thead>
+          <thead><tr><th>#</th><th className="playercol">Player</th><th>Year</th><th>Commit</th><th>Chips ({CATEGORIES.map((c) => c.abbr).join(" · ")})</th><th>Score</th><th>Film</th><th>Status</th><th>Order</th><th /></tr></thead>
           <tbody>
             {pageItems.map(({ p, rank }) => {
               const cats = catsOf(p);

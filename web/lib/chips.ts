@@ -2,10 +2,10 @@
 // client admin UI and server code can use it). lib/rankings.ts re-exports these.
 //
 // Chip model (client-confirmed):
-//   Each player is graded on 5 categories — Power, Speed, Motor, Technique,
-//   Football IQ — and each category is awarded a tier chip: bronze < silver <
-//   gold < blue. Every tier has a score (bronze 1 … blue 4). The 5 scores
-//   average into a RECOMMENDED overall chip, which the coach can override.
+//   Each player is graded on 5 categories — Size, Speed, Effort, Fundamentals &
+//   Tech, Intangibles — and each category is awarded a tier chip: bronze <
+//   silver < gold < blue. Every tier has a score (bronze 1 … blue 4). The 5
+//   scores average into a RECOMMENDED overall chip, which the coach can override.
 
 export type Chip = "bronze" | "silver" | "gold" | "blue";
 
@@ -21,15 +21,25 @@ export const CHIP_ORDER: Chip[] = ["blue", "gold", "silver", "bronze"];
 export const CHIP_SCORE: Record<Chip, number> = { bronze: 1, silver: 2, gold: 3, blue: 4 };
 export const SCORE_CHIP: Record<number, Chip> = { 1: "bronze", 2: "silver", 3: "gold", 4: "blue" };
 
-// The 5 grading categories (from the approved mock).
+// The 5 grading categories. NOTE: the internal keys (power/motor/technique/iq)
+// are permanent storage identifiers on every player doc — they are NOT renamed
+// when the display labels change, so existing data keeps working. Only `label`
+// and `abbr` are shown to users. Current labels: Size · Speed · Effort ·
+// Fundamentals & Tech · Intangibles.
 export type CategoryKey = "power" | "speed" | "motor" | "technique" | "iq";
 export const CATEGORIES: { key: CategoryKey; label: string; abbr: string }[] = [
-  { key: "power", label: "Power", abbr: "PWR" },
+  { key: "power", label: "Size", abbr: "SIZE" },
   { key: "speed", label: "Speed", abbr: "SPD" },
-  { key: "motor", label: "Motor", abbr: "MTR" },
-  { key: "technique", label: "Technique", abbr: "TEC" },
-  { key: "iq", label: "Football IQ", abbr: "IQ" },
+  { key: "motor", label: "Effort", abbr: "EFF" },
+  { key: "technique", label: "Fundamentals & Tech", abbr: "F&T" },
+  { key: "iq", label: "Intangibles", abbr: "INT" },
 ];
+
+// Human-readable list of the five attributes, single-sourced from CATEGORIES so
+// prose (player pages, llms.txt, the definition below) never drifts from the grid.
+export const CATEGORY_LABELS = CATEGORIES.map((c) => c.label);
+export const ATTRIBUTES_LIST = CATEGORY_LABELS.join(", ");
+export const ATTRIBUTES_PHRASE = CATEGORY_LABELS.slice(0, -1).join(", ") + " and " + CATEGORY_LABELS[CATEGORY_LABELS.length - 1];
 
 export type Categories = Partial<Record<CategoryKey, Chip>>;
 export type CategoryNotes = Partial<Record<CategoryKey, string>>;
@@ -41,7 +51,7 @@ export type CategoryNotes = Partial<Record<CategoryKey, string>>;
 export const CHIP_GRADE_QUESTION = "What is the Coach Hayes chip grade?";
 export const CHIP_GRADE_DEFINITION =
   "The Coach Hayes chip grade is a film-first evaluation of a high school football player. " +
-  "Coach Kyle Hayes grades five attributes from game tape — Power, Speed, Motor, Technique and Football IQ — " +
+  `Coach Kyle Hayes grades five attributes from game tape — ${ATTRIBUTES_PHRASE} — ` +
   "and assigns each one a chip worth four points for Blue, three for Gold, two for Silver and one for Bronze. " +
   "The five attribute scores are averaged into an overall score out of four, and that average sets the player's " +
   "overall chip. Grades come only from what the film shows, not from stars, scholarship offers or camp results.";

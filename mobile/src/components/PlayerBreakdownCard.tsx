@@ -15,11 +15,11 @@ export type PlayerPost = {
 };
 
 const CATS: { key: string; label: string }[] = [
-  { key: "power", label: "Power" },
+  { key: "power", label: "Size" },
   { key: "speed", label: "Speed" },
-  { key: "motor", label: "Motor" },
-  { key: "technique", label: "Technique" },
-  { key: "iq", label: "Football IQ" },
+  { key: "motor", label: "Effort" },
+  { key: "technique", label: "Fundamentals & Tech" },
+  { key: "iq", label: "Intangibles" },
 ];
 const CHIP_LABEL: Record<Chip, string> = { bronze: "Bronze chip", silver: "Silver chip", gold: "Gold chip", blue: "Blue chip" };
 const CHIP_WEIGHT: Record<Chip, number> = { bronze: 1, silver: 2, gold: 3, blue: 4 };
