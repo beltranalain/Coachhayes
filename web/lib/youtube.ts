@@ -146,6 +146,31 @@ export async function getPlaylistVideoIds(playlistId: string, maxPages = 7): Pro
   return ids;
 }
 
+export type YtItem = { id: string; title: string; description: string; publishedAt: string; thumbnail: string };
+
+// Every item in a playlist WITH title + description (paged, cached, capped).
+// Used by the WRE import to read recruit breakdown titles. 1 unit per 50.
+export async function getPlaylistItems(playlistId: string, maxPages = 20): Promise<YtItem[]> {
+  if (!KEY || !playlistId) return [];
+  const out: YtItem[] = []; let token = "", pages = 0;
+  try {
+    while (pages < maxPages) {
+      const url = `${API}/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${KEY}${token ? `&pageToken=${token}` : ""}`;
+      const res = await fetch(url, { next: { revalidate: 1800 } });
+      if (!res.ok) break;
+      const data = await res.json();
+      for (const it of data.items ?? []) {
+        const s = it.snippet ?? {}; const t = s.thumbnails ?? {};
+        const id = s.resourceId?.videoId || "";
+        if (id) out.push({ id, title: s.title ?? "", description: s.description ?? "", publishedAt: s.publishedAt ?? "", thumbnail: (t.medium ?? t.high ?? t.default ?? {}).url ?? "" });
+      }
+      token = data.nextPageToken ?? ""; pages++;
+      if (!token) break;
+    }
+  } catch { /* ignore */ }
+  return out;
+}
+
 function parseDuration(iso: string): number {
   const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(iso || "");
   if (!m) return 0;

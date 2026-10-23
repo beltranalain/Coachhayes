@@ -70,6 +70,17 @@ export default function RankingsAdmin() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
+  // WRE YouTube import
+  type YtPl = { id: string; title: string; itemCount: number; wre: boolean };
+  type Cand = { videoId: string; videoUrl: string; thumbnail: string; title: string; keep: boolean; name: string; position: string; commit: string; classYear: string; stars: number; exists: boolean; sel: boolean };
+  const [imp, setImp] = useState<"pick" | "review" | null>(null);
+  const [impPls, setImpPls] = useState<YtPl[]>([]);
+  const [impPlId, setImpPlId] = useState("");
+  const [impYear, setImpYear] = useState("");
+  const [impBusy, setImpBusy] = useState("");
+  const [impMsg, setImpMsg] = useState("");
+  const [cands, setCands] = useState<Cand[]>([]);
+
   const tok = async (): Promise<Record<string, string>> => { const t = await getIdToken(); return t ? { Authorization: `Bearer ${t}` } : {}; };
 
   async function loadAll() {
@@ -168,6 +179,37 @@ export default function RankingsAdmin() {
     } catch { setMsg("Save failed."); } finally { setBusy(""); }
   }
 
+  // ---- WRE YouTube import ----
+  async function openImport() {
+    setImp("pick"); setImpMsg(""); setCands([]); setImpPlId("");
+    setImpBusy("pls");
+    try {
+      const r = await fetch("/api/admin/rankings/import", { headers: await tok(), cache: "no-store" }).then((x) => x.json());
+      if (r.playlists) { setImpPls(r.playlists); const w = r.playlists.find((p: YtPl) => p.wre); if (w) setImpPlId(w.id); }
+      else setImpMsg(r.error || "Couldn't load playlists.");
+    } catch { setImpMsg("Couldn't load playlists."); } finally { setImpBusy(""); }
+  }
+  async function runPreview() {
+    if (!impPlId) { setImpMsg("Pick a playlist first."); return; }
+    setImpBusy("preview"); setImpMsg("");
+    try {
+      const r = await fetch("/api/admin/rankings/import", { method: "POST", headers: { "Content-Type": "application/json", ...(await tok()) }, body: JSON.stringify({ action: "preview", playlistId: impPlId, classYear: impYear.trim() }) }).then((x) => x.json());
+      if (r.ok) { setCands((r.candidates as Cand[]).map((c) => ({ ...c, sel: c.keep && !c.exists }))); setImp("review"); setImpMsg(`Parsed ${r.total} videos. Review and edit, then import.${r.truncated ? ` (Playlist has ${r.truncated} — import these, then run again for the rest.)` : ""}`); }
+      else setImpMsg(r.error || "Preview failed.");
+    } catch { setImpMsg("Preview failed."); } finally { setImpBusy(""); }
+  }
+  const editCand = (i: number, patch: Partial<Cand>) => setCands((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)));
+  async function runCommit() {
+    const picked = cands.filter((c) => c.sel && c.name.trim());
+    if (!picked.length) { setImpMsg("Tick at least one recruit to import."); return; }
+    setImpBusy("commit"); setImpMsg("");
+    try {
+      const r = await fetch("/api/admin/rankings/import", { method: "POST", headers: { "Content-Type": "application/json", ...(await tok()) }, body: JSON.stringify({ action: "commit", items: picked.map((c) => ({ name: c.name, position: c.position, commit: c.commit, classYear: c.classYear, videoUrl: c.videoUrl })) }) }).then((x) => x.json());
+      if (r.ok) { setMsg(`Imported ${r.created} recruit${r.created === 1 ? "" : "s"} as Pending${r.skipped ? ` · ${r.skipped} skipped (already on the board)` : ""}.`); setImp(null); setCands([]); loadAll(); }
+      else setImpMsg(r.error || "Import failed.");
+    } catch { setImpMsg("Import failed."); } finally { setImpBusy(""); }
+  }
+
   const pending = subs.filter((s) => s.status === "new" || s.status === "reviewing");
   // "Graded" = actually published to the public board. Pending = added but not
   // yet graded/published (they sit at the bottom with a Pending pill).
@@ -243,6 +285,7 @@ export default function RankingsAdmin() {
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <input className="boardsearch" placeholder="Search players…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             <button className="btn sm" onClick={autoRank}>Auto-rank by chip</button>
+            <button className="btn sm" onClick={openImport}>Import from YouTube</button>
             <button className="btn acc" onClick={openNew}>+ Add player</button>
           </div>
         </div>
@@ -336,6 +379,75 @@ export default function RankingsAdmin() {
             </div>
           </div>
         )}
+
+        {imp && (
+          <div className="modal" onClick={(e) => { if (e.target === e.currentTarget && impBusy === "") setImp(null); }}>
+            <div className="modalcard">
+              <div className="modalhead">
+                <h3>Import recruits from YouTube</h3>
+                <button className="modalx" onClick={() => setImp(null)} aria-label="Close">✕</button>
+              </div>
+              <div className="modalbody">
+                {impMsg && <div className="note" style={{ marginBottom: 12 }}>{impMsg}</div>}
+
+                {imp === "pick" && (
+                  <>
+                    <p className="cs" style={{ marginTop: 0 }}>Pick a WRE playlist. We read each video title, pull the recruit, position and commit, and add them to the board as <b>Pending</b> — you grade and publish them after.</p>
+                    <div className="fld"><label>Playlist</label>
+                      <select value={impPlId} onChange={(e) => setImpPlId(e.target.value)} disabled={impBusy === "pls"}>
+                        <option value="">{impBusy === "pls" ? "Loading playlists…" : "Select a playlist…"}</option>
+                        {impPls.map((p) => <option key={p.id} value={p.id}>{p.wre ? "★ " : ""}{p.title} ({p.itemCount})</option>)}
+                      </select>
+                    </div>
+                    <div className="fld"><label>Default class year (used when a title doesn’t say one)</label>
+                      <input value={impYear} onChange={(e) => setImpYear(e.target.value)} placeholder="2027" maxLength={4} />
+                    </div>
+                  </>
+                )}
+
+                {imp === "review" && (
+                  <>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+                      <button className="btn sm" onClick={() => setCands((cs) => cs.map((c) => ({ ...c, sel: c.keep && !c.exists })))}>Reset selection</button>
+                      <button className="btn sm" onClick={() => setCands((cs) => cs.map((c) => ({ ...c, sel: false })))}>Clear all</button>
+                      <span className="cs" style={{ marginLeft: "auto" }}>{cands.filter((c) => c.sel).length} selected · {cands.length} videos</span>
+                    </div>
+                    <div className="impwrap">
+                      {cands.map((c, i) => (
+                        <div key={c.videoId} className={`improw${c.sel ? " on" : ""}`}>
+                          <input type="checkbox" checked={c.sel} onChange={(e) => editCand(i, { sel: e.target.checked })} />
+                          <div className="impfields">
+                            <div className="impgrid">
+                              <input placeholder="Name" value={c.name} onChange={(e) => editCand(i, { name: e.target.value })} />
+                              <input placeholder="Pos" value={c.position} onChange={(e) => editCand(i, { position: e.target.value })} style={{ maxWidth: 70 }} />
+                              <input placeholder="Committed to" value={c.commit} onChange={(e) => editCand(i, { commit: e.target.value })} />
+                              <input placeholder="Year" value={c.classYear} onChange={(e) => editCand(i, { classYear: e.target.value })} style={{ maxWidth: 70 }} maxLength={4} />
+                            </div>
+                            <div className="impmeta">
+                              {c.exists && <span className="pill warn">On board</span>}
+                              {!c.keep && <span className="pill">Not a recruit?</span>}
+                              {c.stars > 0 && <span className="cs">{c.stars}★</span>}
+                              <a className="link" href={c.videoUrl} target="_blank" rel="noreferrer" title={c.title}>{c.title.slice(0, 70)}{c.title.length > 70 ? "…" : ""} ↗</a>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="modalfoot">
+                {imp === "pick" && <button className="btn acc" disabled={impBusy !== "" || !impPlId} onClick={runPreview}>{impBusy === "preview" ? "Reading titles…" : "Fetch & parse"}</button>}
+                {imp === "review" && <>
+                  <button className="btn acc" disabled={impBusy !== ""} onClick={runCommit}>{impBusy === "commit" ? "Importing…" : `Import ${cands.filter((c) => c.sel).length} as Pending`}</button>
+                  <button className="btn" onClick={() => { setImp("pick"); setImpMsg(""); }}>‹ Back</button>
+                </>}
+                <button className="btn" onClick={() => setImp(null)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="tbwrap" style={{ marginTop: 12 }}><table>
           <thead><tr><th>#</th><th className="playercol">Player</th><th>Year</th><th>Commit</th><th>Chips (PWR · SPD · MTR · TEC · IQ)</th><th>Score</th><th>Film</th><th>Status</th><th>Order</th><th /></tr></thead>
           <tbody>
