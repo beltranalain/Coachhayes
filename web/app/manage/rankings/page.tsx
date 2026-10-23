@@ -67,6 +67,7 @@ export default function RankingsAdmin() {
   const [msg, setMsg] = useState("");
   const [editor, setEditor] = useState<PForm | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "published">("all");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
@@ -217,7 +218,9 @@ export default function RankingsAdmin() {
   const pendingCount = players.length - publishedCount;
 
   // Board: filter by search, then paginate (25 per page). rank = position in the full list.
-  const rankedFiltered = players.map((p, i) => ({ p, rank: i + 1 })).filter(({ p }) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const rankedFiltered = players.map((p, i) => ({ p, rank: i + 1 }))
+    .filter(({ p }) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
+    .filter(({ p }) => statusFilter === "all" ? true : statusFilter === "pending" ? (p as any).published === false : (p as any).published !== false);
   const totalPages = Math.max(1, Math.ceil(rankedFiltered.length / PAGE_SIZE));
   const curPage = Math.min(page, totalPages);
   const pageItems = rankedFiltered.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
@@ -283,6 +286,13 @@ export default function RankingsAdmin() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div><h3>The board</h3><p className="cs" style={{ margin: 0 }}>Ranked highest first. Auto by chip; drag with the arrows to override.</p></div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span className="segfilter">
+              {(["all", "pending", "published"] as const).map((k) => (
+                <button key={k} className={`segbtn${statusFilter === k ? " on" : ""}`} onClick={() => { setStatusFilter(k); setPage(1); }}>
+                  {k === "all" ? `All (${players.length})` : k === "pending" ? `Pending (${pendingCount})` : `Published (${publishedCount})`}
+                </button>
+              ))}
+            </span>
             <input className="boardsearch" placeholder="Search players…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             <button className="btn sm" onClick={autoRank}>Auto-rank by chip</button>
             <button className="btn sm" onClick={openImport}>Import from YouTube</button>
@@ -497,7 +507,7 @@ export default function RankingsAdmin() {
               );
             })}
             {players.length === 0 && <tr><td colSpan={10} className="muted" style={{ padding: 16 }}>No players yet. Use “+ Add player” above, or publish one from a submission.</td></tr>}
-            {players.length > 0 && rankedFiltered.length === 0 && <tr><td colSpan={10} className="muted" style={{ padding: 16 }}>No players match “{search}”.</td></tr>}
+            {players.length > 0 && rankedFiltered.length === 0 && <tr><td colSpan={10} className="muted" style={{ padding: 16 }}>{search ? `No players match “${search}”.` : statusFilter === "pending" ? "No pending players — everything’s been graded and published." : statusFilter === "published" ? "No published players yet." : "No players."}</td></tr>}
           </tbody>
         </table></div>
 
