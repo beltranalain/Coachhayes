@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator, Alert } from "react-native";
 import {
   useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule, setAudioModeAsync, } from "expo-audio";
+import * as Clipboard from "expo-clipboard";
 
 import { colors, fonts, type ThemeColors } from "../../lib/theme";
 import { useColors, useThemedStyles } from "../../lib/ThemeContext";
@@ -43,6 +44,8 @@ function Inner() {
   const [price, setPrice] = useState("");
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  const [paste, setPaste] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recState = useAudioRecorderState(recorder);
@@ -54,9 +57,62 @@ function Inner() {
   useEffect(() => { load(); }, []);
 
   function pick(s: Submission) {
-    setSel(s); setTranscript(""); setDraft(null); setAccess("free"); setPrice(""); setMsg("");
+    setSel(s); setTranscript(""); setDraft(null); setAccess("free"); setPrice(""); setMsg(""); setPaste(""); setCopied(false);
   }
-  function reset() { setSel(null); setTranscript(""); setDraft(null); setMsg(""); }
+  function reset() { setSel(null); setTranscript(""); setDraft(null); setMsg(""); setPaste(""); setCopied(false); }
+
+  // ---- ChatGPT fallback (no server AI / no timeout) ----
+  // Build a prompt the coach can paste into the ChatGPT app, then paste the
+  // reply back here to fill the draft. Same JSON shape the AI writer returns.
+  function chatGptPrompt(): string {
+    if (!sel) return "";
+    const ht = sel.heightIn ? `${Math.floor(sel.heightIn / 12)}'${sel.heightIn % 12}"` : "";
+    const lines = [
+      `Player: ${sel.playerName || "—"}`,
+      sel.position && `Position: ${sel.position}`,
+      [sel.school, sel.city, sel.state].filter(Boolean).join(", ") && `School: ${[sel.school, sel.city, sel.state].filter(Boolean).join(", ")}`,
+      sel.classYear && `Class: ${sel.classYear}`,
+      ht && `Height: ${ht}`,
+      sel.weightLb && `Weight: ${sel.weightLb} lb`,
+      sel.videoUrl && `Film: ${sel.videoUrl}`,
+      sel.notes && `Notes: ${sel.notes}`,
+    ].filter(Boolean).join("\n");
+    return [
+      "You are an experienced high school football recruiting evaluator. Write an honest scouting evaluation of this recruit from the profile and film below. Use a neutral third-person voice — do NOT write in the first person and do NOT attribute it to any person. Pick ONE overall tier. No emojis.",
+      "",
+      lines,
+      "",
+      'Reply with ONLY a JSON object (no markdown, no extra text) using exactly these keys: {"size": string, "speed": string, "effort": string, "positionAnalysis": string, "strengths": string[], "improvements": string[], "recommendedTargets": string[], "additionalComments": string, "developmentPriorities": string[], "finalAssessment": string, "projection": string}.',
+    ].join("\n");
+  }
+
+  async function copyPrompt() {
+    const p = chatGptPrompt();
+    if (!p) return;
+    try { await Clipboard.setStringAsync(p); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { setMsg("Couldn't copy — long-press the box above to copy it manually."); }
+  }
+
+  function fillFromPaste() {
+    const t = paste.trim();
+    if (!t) { setMsg("Paste ChatGPT's reply into the box first."); return; }
+    const a = t.indexOf("{"), b = t.lastIndexOf("}");
+    if (a < 0 || b < 0) { setMsg("Paste ChatGPT's full reply (it should include the { … } block)."); return; }
+    let j: any;
+    try { j = JSON.parse(t.slice(a, b + 1)); } catch { setMsg("Couldn't read that — copy ChatGPT's whole reply and try again."); return; }
+    const s = (x: any) => (typeof x === "string" ? x : "");
+    const arr = (x: any): string[] =>
+      Array.isArray(x) ? x.map(String).map((v) => v.trim()).filter(Boolean)
+      : typeof x === "string" ? x.split("\n").map((v) => v.trim()).filter(Boolean)
+      : [];
+    setDraft({
+      size: s(j.size), speed: s(j.speed), effort: s(j.effort), positionAnalysis: s(j.positionAnalysis),
+      strengths: arr(j.strengths), improvements: arr(j.improvements), recommendedTargets: arr(j.recommendedTargets),
+      additionalComments: s(j.additionalComments), developmentPriorities: arr(j.developmentPriorities),
+      finalAssessment: s(j.finalAssessment), projection: s(j.projection), evaluatedOn: "",
+    });
+    setPaste(""); setMsg("Filled from ChatGPT. Review below, set access, then publish.");
+  }
 
   async function toggleRecord() {
     try {
@@ -171,6 +227,27 @@ function Inner() {
         style={styles.transcript}
       />
 
+      <View style={styles.gptBox}>
+        <Text style={styles.gptLabel}>Or use ChatGPT</Text>
+        <Text style={styles.gptHint}>No internet AI needed here. Copy the prompt, paste it into ChatGPT, then paste its reply back below and tap Fill.</Text>
+        <View style={styles.recRow}>
+          <Pressable onPress={copyPrompt} style={({ pressed }) => [styles.gptCopy, pressed && { opacity: 0.85 }]}>
+            <Text style={styles.gptCopyText}>{copied ? "Copied ✓" : "Copy ChatGPT prompt"}</Text>
+          </Pressable>
+          <Pressable onPress={fillFromPaste} style={({ pressed }) => [styles.gptFill, pressed && { opacity: 0.9 }]}>
+            <Text style={styles.gptFillText}>Fill from paste</Text>
+          </Pressable>
+        </View>
+        <TextInput
+          value={paste}
+          onChangeText={setPaste}
+          placeholder="Paste ChatGPT's reply here…"
+          placeholderTextColor={colors.dim}
+          multiline
+          style={styles.transcript}
+        />
+      </View>
+
       {draft && (
         <View style={styles.preview}>
           <Text style={styles.previewLabel}>Generated evaluation</Text>
@@ -221,6 +298,14 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   genText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onAccent },
 
   transcript: { minHeight: 90, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 12, fontFamily: fonts.body, fontSize: 13, color: colors.cream, textAlignVertical: "top" },
+
+  gptBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 14, marginTop: 12 },
+  gptLabel: { fontFamily: fonts.bold, fontSize: 13, color: colors.cream, marginBottom: 4 },
+  gptHint: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, lineHeight: 17, marginBottom: 10 },
+  gptCopy: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingVertical: 11 },
+  gptCopyText: { fontFamily: fonts.bold, fontSize: 13, color: colors.cream },
+  gptFill: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.amber, borderRadius: 12, paddingVertical: 11 },
+  gptFillText: { fontFamily: fonts.bold, fontSize: 13, color: colors.onAccent },
 
   preview: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 14, marginTop: 12 },
   previewLabel: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1, color: colors.amber, textTransform: "uppercase", marginBottom: 8 },
