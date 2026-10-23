@@ -608,7 +608,10 @@ class StudioEngine {
     // Each tile carries its video, display name, and a stable key ("host" or the
     // guest sessionId) used for name labels and active-speaker highlighting.
     const tiles: { video: HTMLVideoElement; name: string; key: string }[] = [];
-    if (this.hostVideo) tiles.push({ video: this.hostVideo, name: this.hostName, key: "host" });
+    // The host tile is intentionally UNLABELED — the host is self-evident, and a
+    // default "Host" chip looked wrong on air. Guest/call-in tiles still show
+    // names so viewers can tell who's who.
+    if (this.hostVideo) tiles.push({ video: this.hostVideo, name: "", key: "host" });
     // Only ADMITTED guests composite into the program. Others may have a video
     // pulled for the host's pre-admit preview, but must not go on air.
     this.guestVideos.forEach((v, sid) => { if (this.admitted.has(sid)) tiles.push({ video: v, name: this.guestName(sid), key: sid }); });
