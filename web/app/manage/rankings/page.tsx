@@ -206,8 +206,14 @@ export default function RankingsAdmin() {
     setImpBusy("commit"); setImpMsg("");
     try {
       const r = await fetch("/api/admin/rankings/import", { method: "POST", headers: { "Content-Type": "application/json", ...(await tok()) }, body: JSON.stringify({ action: "commit", items: picked.map((c) => ({ name: c.name, position: c.position, commit: c.commit, classYear: c.classYear, videoUrl: c.videoUrl })) }) }).then((x) => x.json());
-      if (r.ok) { setMsg(`Imported ${r.created} recruit${r.created === 1 ? "" : "s"} as Pending${r.skipped ? ` · ${r.skipped} skipped (already on the board)` : ""}.`); setImp(null); setCands([]); loadAll(); }
-      else setImpMsg(r.error || "Import failed.");
+      if (r.ok && r.created > 0) {
+        // Jump straight to the Pending view so the imported recruits are visible.
+        setMsg(`Imported ${r.created} recruit${r.created === 1 ? "" : "s"} as Pending${r.skipped ? ` · ${r.skipped} already on the board` : ""}${r.failed ? ` · ${r.failed} failed to save` : ""}. Showing Pending below.`);
+        setImp(null); setCands([]); setStatusFilter("pending"); setPage(1); loadAll();
+      } else if (r.ok) {
+        // created === 0 — keep the modal open and say why, don't imply success.
+        setImpMsg(r.skipped ? `All ${r.skipped} were already on the board — nothing new to add.` : r.failed ? `Couldn’t save ${r.failed} — the database may be rate-limited. Try again in a bit.` : "Nothing was imported — tick at least one recruit with a name.");
+      } else setImpMsg(r.error || "Import failed.");
     } catch { setImpMsg("Import failed."); } finally { setImpBusy(""); }
   }
 
