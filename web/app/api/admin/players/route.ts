@@ -101,12 +101,27 @@ export async function POST(request: Request) {
 
   try {
     if (id) {
-      await g.db!.collection("players").doc(id).set(fields, { merge: true });
+      const docRef = g.db!.collection("players").doc(id);
+      const prev = (await docRef.get()).data() as Record<string, any> | undefined;
+      const extra: Record<string, unknown> = {};
+      // Publishing a previously-Pending player for the first time: give them a
+      // real chip-based rank now (Pending players carry a bottom-sorting order).
+      if (fields.published === true && prev && prev.published === false) {
+        extra.order = defaultOrder(chip, Number(prev.createdAt) || now);
+      } else if (fields.published === false && prev && prev.published !== false) {
+        // Un-publishing (back to Pending) sinks the player to the bottom.
+        extra.order = -now;
+      }
+      await docRef.set({ ...fields, ...extra }, { merge: true });
       // If a submission was the source, mark it published.
       if (b.fromSubmissionId) await g.db!.collection("submissions").doc(String(b.fromSubmissionId)).set({ status: "published", playerId: id }, { merge: true });
       return NextResponse.json({ ok: true, id });
     }
-    const ref = await g.db!.collection("players").add({ ...fields, order: defaultOrder(chip, now), createdAt: now });
+    // Pending (unpublished) players get a negative order so they sink to the
+    // BOTTOM of the board instead of jumping to the top; published players get
+    // their chip-weighted rank.
+    const order = fields.published ? defaultOrder(chip, now) : -now;
+    const ref = await g.db!.collection("players").add({ ...fields, order, createdAt: now });
     if (b.fromSubmissionId) await g.db!.collection("submissions").doc(String(b.fromSubmissionId)).set({ status: "published", playerId: ref.id }, { merge: true });
     // Auto-announce the new player in the community feed (published players only).
     if (fields.published && !fields.removed && b.announce !== false) await announcePlayer(g.db!, ref.id, fields);

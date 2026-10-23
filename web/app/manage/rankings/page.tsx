@@ -53,7 +53,9 @@ type PForm = {
 };
 const blankCats = (base: Chip = "bronze"): Record<CategoryKey, Chip> => ({ power: base, speed: base, motor: base, technique: base, iq: base });
 const blankNotes = (): Record<CategoryKey, string> => ({ power: "", speed: "", motor: "", technique: "", iq: "" });
-const blankForm = (): PForm => ({ name: "", position: "", school: "", city: "", state: "", classYear: "", commit: "", commitLogo: "", videoUrl: "", heightIn: "", weightLb: "", fortyYd: "", categories: blankCats(), categoryNotes: blankNotes(), overall: "bronze", bio: "", strengths: "", traits: "", seoTitle: "", seoDescription: "", published: true });
+// New players start UNPUBLISHED (Pending) so they don't jump onto the public
+// board — or to the top of it — before the coach has actually graded them.
+const blankForm = (): PForm => ({ name: "", position: "", school: "", city: "", state: "", classYear: "", commit: "", commitLogo: "", videoUrl: "", heightIn: "", weightLb: "", fortyYd: "", categories: blankCats(), categoryNotes: blankNotes(), overall: "bronze", bio: "", strengths: "", traits: "", seoTitle: "", seoDescription: "", published: false });
 
 export default function RankingsAdmin() {
   const [brand, setBrand] = useState({ name: "Coach Hayes Football", logo: "" });
@@ -167,6 +169,10 @@ export default function RankingsAdmin() {
   }
 
   const pending = subs.filter((s) => s.status === "new" || s.status === "reviewing");
+  // "Graded" = actually published to the public board. Pending = added but not
+  // yet graded/published (they sit at the bottom with a Pending pill).
+  const publishedCount = players.filter((p) => (p as any).published !== false).length;
+  const pendingCount = players.length - publishedCount;
 
   // Board: filter by search, then paginate (25 per page). rank = position in the full list.
   const rankedFiltered = players.map((p, i) => ({ p, rank: i + 1 })).filter(({ p }) => p.name.toLowerCase().includes(search.trim().toLowerCase()));
@@ -175,12 +181,12 @@ export default function RankingsAdmin() {
   const pageItems = rankedFiltered.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
 
   return (
-    <Shell title="Rankings" sub={`${players.length} graded · ${pending.length} awaiting review`} brandName={brand.name} logo={brand.logo}>
+    <Shell title="Rankings" sub={`${publishedCount} graded · ${pendingCount} pending`} brandName={brand.name} logo={brand.logo}>
       {msg && <div className="note" style={{ marginBottom: 14 }}>{msg}</div>}
 
       <div className="row4">
-        <div className="card kpi"><b>{players.length}</b><span>Players graded</span><div className="d">Published pages</div></div>
-        <div className="card kpi"><b>{pending.length}</b><span>Awaiting review</span><div className="d">In the queue</div></div>
+        <div className="card kpi"><b>{publishedCount}</b><span>Players graded</span><div className="d">Published pages</div></div>
+        <div className="card kpi"><b>{pendingCount}</b><span>Pending</span><div className="d">Added, not yet graded</div></div>
         <div className="card kpi"><b>{players.filter((p) => p.chip === "blue").length}</b><span>Blue chips</span><div className="d">Top of the board</div></div>
         <div className="card kpi"><b>4</b><span>Chip tiers</span><div className="d">Blue · Gold · Silver · Bronze</div></div>
       </div>
@@ -372,7 +378,7 @@ export default function RankingsAdmin() {
                     {(p as any).videoUrl ? <a className="link" href={(p as any).videoUrl} target="_blank" rel="noreferrer" title="Open film">↗</a> : null}
                   </span>
                 </td>
-                <td>{p.published !== false ? <span className="pill ok">Published</span> : <span className="pill warn">Draft</span>}</td>
+                <td>{p.published !== false ? <span className="pill ok">Published</span> : <span className="pill warn">Pending</span>}</td>
                 <td className="ordcell"><button className="btn xs" onClick={() => move(p.id, "up")} aria-label="Move up">↑</button><button className="btn xs" onClick={() => move(p.id, "down")} aria-label="Move down">↓</button></td>
                 <td className="row-actions"><button className="btn sm" onClick={() => openEdit(p)}>Edit</button></td>
               </tr>
