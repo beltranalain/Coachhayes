@@ -102,6 +102,10 @@ export default function EvaluationsAdmin() {
 
   const ed = (patch: Partial<EForm>) => setEditor((e) => (e ? { ...e, ...patch } : e));
 
+  // ---- Paste from ChatGPT (no server AI needed) ----
+  const [paste, setPaste] = useState("");
+  const [copied, setCopied] = useState(false);
+
   // ---- Voice capture → Whisper transcription ----
   const [recording, setRecording] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
@@ -167,6 +171,59 @@ export default function EvaluationsAdmin() {
       if (d.ok && d.evaluation) { ed(evalToForm(d.evaluation)); setMsg("Draft written by AI. Review and edit, then publish."); }
       else setMsg(d.error || "Could not generate the evaluation.");
     } catch { setMsg("Could not generate the evaluation."); } finally { setBusy(""); }
+  }
+
+  // ---- ChatGPT workaround: copy a ready-made prompt, paste the reply back ----
+  function chatGptPrompt(): string {
+    if (!editor) return "";
+    const ht = editor.heightIn ? `${Math.floor(Number(editor.heightIn) / 12)}'${Number(editor.heightIn) % 12}"` : "";
+    const profile = [
+      editor.name ? `Player: ${editor.name}` : "",
+      editor.position ? `Position: ${editor.position}` : "",
+      [editor.school, editor.city, editor.state].filter(Boolean).join(", ") ? `School: ${[editor.school, editor.city, editor.state].filter(Boolean).join(", ")}` : "",
+      editor.classYear ? `Class of ${editor.classYear}` : "",
+      ht ? `Height: ${ht}` : "", editor.weightLb ? `Weight: ${editor.weightLb} lb` : "",
+      editor.videoUrl ? `Film: ${editor.videoUrl}` : "", editor.notes ? `Notes: ${editor.notes}` : "",
+    ].filter(Boolean).join("\n");
+    return `Write a high school football recruit evaluation. Write in the THIRD PERSON about the player — never first person, never as a coach. Keep every section on ONE consistent recruiting tier. No emojis.
+
+PLAYER:
+${profile || "(no profile provided)"}
+
+Reply with ONLY a JSON object (no markdown, no extra text) using EXACTLY these keys:
+{
+  "size": "1-3 paragraphs on frame, measurables and physical projection",
+  "speed": "1-3 paragraphs on movement / athleticism for the position",
+  "effort": "1-3 paragraphs on motor, finish and competitiveness",
+  "positionAnalysis": "1-2 paragraphs reading the player at their position",
+  "strengths": ["4-6 short bullet strings"],
+  "improvements": ["4-6 bullets, each 'Area: what to improve'"],
+  "recommendedTargets": ["3-6 realistic recruiting levels/programs on the same tier"],
+  "additionalComments": "1-2 paragraphs of recruiting-process context",
+  "developmentPriorities": ["4-6 priority strings"],
+  "finalAssessment": "2-3 paragraph closing summary",
+  "projection": "one short line naming the tier, e.g. 'Division II or below · select HBCU opportunities'"
+}`;
+  }
+  async function copyPrompt() {
+    try { await navigator.clipboard.writeText(chatGptPrompt()); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { setMsg("Couldn't copy — select the text manually."); }
+  }
+  function fillFromPaste() {
+    const t = paste.trim();
+    if (!t) { setMsg("Paste ChatGPT's reply first."); return; }
+    const a = t.indexOf("{"), b = t.lastIndexOf("}");
+    if (a < 0 || b < 0) { setMsg("That doesn't look right — paste ChatGPT's full reply (it should be a { … } block)."); return; }
+    let j: any;
+    try { j = JSON.parse(t.slice(a, b + 1)); } catch { setMsg("Couldn't read that — make sure you copied ChatGPT's whole reply, nothing cut off."); return; }
+    const s = (x: any) => (typeof x === "string" ? x : "");
+    const arr = (x: any) => (Array.isArray(x) ? x.map(String).join("\n") : typeof x === "string" ? x : "");
+    ed({
+      size: s(j.size), speed: s(j.speed), effort: s(j.effort), positionAnalysis: s(j.positionAnalysis),
+      additionalComments: s(j.additionalComments), finalAssessment: s(j.finalAssessment), projection: s(j.projection),
+      strengths: arr(j.strengths), improvements: arr(j.improvements), recommendedTargets: arr(j.recommendedTargets), developmentPriorities: arr(j.developmentPriorities),
+    });
+    setPaste(""); setMsg("Filled from ChatGPT. Review the sections below, then Save & publish.");
   }
 
   async function save() {
@@ -295,6 +352,18 @@ export default function EvaluationsAdmin() {
                   </div>
                 </div>
                 <textarea rows={4} value={editor.transcript} onChange={(e) => ed({ transcript: e.target.value })} placeholder="Record your read, or type/paste notes here. AI builds the evaluation from this (plus the profile above). Leave blank to let it draft conservatively from the film metadata." />
+              </div>
+
+              {/* Or: write it in ChatGPT and paste the reply back (no server AI needed) */}
+              <div className="evgen">
+                <div className="evgen-top">
+                  <div><b>Or use ChatGPT</b><p className="cs" style={{ margin: "2px 0 0" }}>Copy the prompt, paste it into ChatGPT, then paste ChatGPT&apos;s reply back here to fill every section.</p></div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <button type="button" className="btn sm" onClick={copyPrompt}>{copied ? "Copied ✓" : "Copy ChatGPT prompt"}</button>
+                    <button type="button" className="btn acc sm" onClick={fillFromPaste} disabled={!paste.trim()}>Fill from paste</button>
+                  </div>
+                </div>
+                <textarea rows={4} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="Paste ChatGPT's reply here (the whole { … } block), then hit “Fill from paste.”" />
               </div>
 
               {/* Long-form sections */}
