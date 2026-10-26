@@ -57,6 +57,10 @@ const blankNotes = (): Record<CategoryKey, string> => ({ power: "", speed: "", m
 // board — or to the top of it — before the coach has actually graded them.
 const blankForm = (): PForm => ({ name: "", position: "", school: "", city: "", state: "", classYear: "", commit: "", commitLogo: "", videoUrl: "", heightIn: "", weightLb: "", fortyYd: "", categories: blankCats(), categoryNotes: blankNotes(), overall: "bronze", bio: "", strengths: "", traits: "", seoTitle: "", seoDescription: "", published: false });
 
+// Excel template columns — the same fields as the manual Add form. The server
+// matches these headers loosely, so the order/casing here is just for humans.
+const XL_COLS = ["Name", "Position", "Class Year", "High School", "City", "State", "Committed To", "Film URL", "Height (in)", "Weight (lb)", "40 Time", "Size", "Speed", "Effort", "Fundamentals & Tech", "Intangibles", "Overall Chip", "Scouting Report", "Strengths", "Traits", "Size Note", "Speed Note", "Effort Note", "Fundamentals & Tech Note", "Intangibles Note", "SEO Title", "SEO Description", "Published"];
+
 export default function RankingsAdmin() {
   const [brand, setBrand] = useState({ name: "Coach Hayes Football", logo: "" });
   const [subs, setSubs] = useState<Sub[]>([]);
@@ -81,6 +85,13 @@ export default function RankingsAdmin() {
   const [impBusy, setImpBusy] = useState("");
   const [impMsg, setImpMsg] = useState("");
   const [cands, setCands] = useState<Cand[]>([]);
+
+  // Excel import
+  const [excel, setExcel] = useState<boolean>(false);
+  const [xlRows, setXlRows] = useState<Record<string, any>[]>([]);
+  const [xlFile, setXlFile] = useState("");
+  const [xlBusy, setXlBusy] = useState("");
+  const [xlMsg, setXlMsg] = useState("");
 
   const tok = async (): Promise<Record<string, string>> => { const t = await getIdToken(); return t ? { Authorization: `Bearer ${t}` } : {}; };
 
@@ -217,6 +228,65 @@ export default function RankingsAdmin() {
     } catch { setImpMsg("Import failed."); } finally { setImpBusy(""); }
   }
 
+  // ---- Excel import ----
+  function openExcel() { setExcel(true); setXlRows([]); setXlFile(""); setXlMsg(""); }
+  async function downloadTemplate() {
+    const XLSX = await import("xlsx");
+    const example: Record<string, any> = {
+      "Name": "Jordan Example (delete this row)", "Position": "WR", "Class Year": "2027", "High School": "Central High",
+      "City": "Miami", "State": "FL", "Committed To": "Miami", "Film URL": "https://www.youtube.com/watch?v=xxxxxxxxxxx",
+      "Height (in)": 73, "Weight (lb)": 190, "40 Time": "4.5",
+      "Size": "Gold", "Speed": "Blue", "Effort": "Gold", "Fundamentals & Tech": "Gold", "Intangibles": "Silver",
+      "Overall Chip": "", "Scouting Report": "Explosive route runner who separates late and finishes through contact.",
+      "Strengths": "Hands\nRoute running\nBall tracking", "Traits": "Hands, Speed, Competitor",
+      "Size Note": "", "Speed Note": "", "Effort Note": "", "Fundamentals & Tech Note": "", "Intangibles Note": "",
+      "SEO Title": "", "SEO Description": "", "Published": "No",
+    };
+    const ws = XLSX.utils.json_to_sheet([example], { header: XL_COLS });
+    ws["!cols"] = XL_COLS.map((c) => ({ wch: Math.max(12, c.length + 2) }));
+    const guide = XLSX.utils.aoa_to_sheet([
+      ["How to fill this in"],
+      ["Name is required. Everything else is optional — fill what you have."],
+      ["Grades (Size, Speed, Effort, Fundamentals & Tech, Intangibles) use: Bronze, Silver, Gold, or Blue."],
+      ["Leave Overall Chip blank to set it automatically from the five grades, or force it with Bronze/Silver/Gold/Blue."],
+      ["Committed To: just the school name (e.g. Miami) — the logo is found for you."],
+      ["Strengths: one per line (Alt+Enter) or comma-separated. Traits: comma-separated."],
+      ["Published: No (default) keeps the player Pending for review. Yes puts them live on the public board."],
+      ["Delete the example row, then add one row per player and upload the file back."],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Players");
+    XLSX.utils.book_append_sheet(wb, guide, "Guide");
+    XLSX.writeFile(wb, "coach-hayes-rankings-template.xlsx");
+  }
+  async function onExcelPick(file: File | null) {
+    if (!file) return;
+    setXlBusy("parse"); setXlMsg(""); setXlFile(file.name);
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const sheet = wb.Sheets["Players"] || wb.Sheets[wb.SheetNames[0]];
+      const rows = (XLSX.utils.sheet_to_json(sheet, { defval: "" }) as Record<string, any>[])
+        .filter((r) => Object.values(r).some((v) => String(v).trim() !== ""))
+        .filter((r) => !/^jordan example/i.test(String(r["Name"] ?? r["name"] ?? "")));
+      setXlRows(rows);
+      setXlMsg(rows.length ? `${rows.length} player row${rows.length === 1 ? "" : "s"} ready to import.` : "No filled rows found — fill the template and try again.");
+    } catch { setXlMsg("Couldn’t read that file. Make sure it’s the .xlsx template."); } finally { setXlBusy(""); }
+  }
+  async function runExcelImport() {
+    if (!xlRows.length) { setXlMsg("Download the template, fill it in, and upload it first."); return; }
+    setXlBusy("import"); setXlMsg("");
+    try {
+      const r = await fetch("/api/admin/rankings/import", { method: "POST", headers: { "Content-Type": "application/json", ...(await tok()) }, body: JSON.stringify({ action: "excel", rows: xlRows }) }).then((x) => x.json());
+      if (r.ok && r.created > 0) {
+        setMsg(`Imported ${r.created} player${r.created === 1 ? "" : "s"} from Excel${r.skipped ? ` · ${r.skipped} skipped (already on the board)` : ""}${r.failed ? ` · ${r.failed} failed` : ""}. Showing Pending below.`);
+        setExcel(false); setXlRows([]); setStatusFilter("pending"); setPage(1); loadAll();
+      } else if (r.ok) {
+        setXlMsg(r.skipped ? `Nothing new — ${r.skipped} were already on the board or blank.` : r.failed ? `Couldn’t save ${r.failed} rows.` : "Nothing imported.");
+      } else setXlMsg(r.error || "Import failed.");
+    } catch { setXlMsg("Import failed."); } finally { setXlBusy(""); }
+  }
+
   const pending = subs.filter((s) => s.status === "new" || s.status === "reviewing");
   // "Graded" = actually published to the public board. Pending = added but not
   // yet graded/published (they sit at the bottom with a Pending pill).
@@ -302,6 +372,7 @@ export default function RankingsAdmin() {
             <input className="boardsearch" placeholder="Search players…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             <button className="btn sm" onClick={autoRank}>Auto-rank by chip</button>
             <button className="btn sm" onClick={openImport}>Import from YouTube</button>
+            <button className="btn sm" onClick={openExcel}>Import with Excel</button>
             <button className="btn acc" onClick={openNew}>+ Add player</button>
           </div>
         </div>
@@ -459,6 +530,36 @@ export default function RankingsAdmin() {
                   <button className="btn" onClick={() => { setImp("pick"); setImpMsg(""); }}>‹ Back</button>
                 </>}
                 <button className="btn" onClick={() => setImp(null)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {excel && (
+          <div className="modal" onClick={(e) => { if (e.target === e.currentTarget && xlBusy === "") setExcel(false); }}>
+            <div className="modalcard">
+              <div className="modalhead">
+                <h3>Import with Excel</h3>
+                <button className="modalx" onClick={() => setExcel(false)} aria-label="Close">✕</button>
+              </div>
+              <div className="modalbody">
+                {xlMsg && <div className="note" style={{ marginBottom: 12 }}>{xlMsg}</div>}
+                <p className="cs" style={{ marginTop: 0 }}>Two steps: download the template, fill one row per player, then upload it back. It has every field from the Add-player form. Players come in as <b>Pending</b> unless you set <b>Published</b> to Yes.</p>
+
+                <div className="fld"><label>1 · Get the template</label>
+                  <button className="btn" onClick={downloadTemplate}>⬇ Download Excel template</button>
+                </div>
+
+                <div className="fld"><label>2 · Upload your filled file</label>
+                  <label className="btn" style={{ cursor: "pointer", display: "inline-block" }}>
+                    {xlBusy === "parse" ? "Reading…" : xlFile ? `Change file (${xlFile})` : "Choose .xlsx file…"}
+                    <input type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={(e) => onExcelPick(e.target.files?.[0] || null)} />
+                  </label>
+                </div>
+              </div>
+              <div className="modalfoot">
+                <button className="btn acc" disabled={xlBusy !== "" || !xlRows.length} onClick={runExcelImport}>{xlBusy === "import" ? "Importing…" : xlRows.length ? `Import ${xlRows.length} player${xlRows.length === 1 ? "" : "s"}` : "Import"}</button>
+                <button className="btn" onClick={() => setExcel(false)}>Cancel</button>
               </div>
             </div>
           </div>

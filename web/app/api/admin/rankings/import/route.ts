@@ -108,5 +108,81 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, created, skipped, failed: errors.length });
   }
 
+  // Bulk import from the downloadable Excel template. Each row is a raw object
+  // keyed by the template's column headers; we map them to the full player
+  // field set (same as the manual Add form), resolve commit logos, and dedup.
+  if (b.action === "excel") {
+    const db = getAdminDb();
+    if (!db) return NextResponse.json({ error: "No database." }, { status: 500 });
+    const rows: any[] = Array.isArray(b.rows) ? b.rows : [];
+    if (!rows.length) return NextResponse.json({ error: "No rows found in the file. Fill the template and upload it." }, { status: 400 });
+
+    let existing = new Set<string>();
+    try { const snap = await db.collection("players").get(); for (const d of snap.docs) existing.add(norm(d.data()?.name || "")); }
+    catch { return NextResponse.json({ error: "Could not read the board (database is rate-limited). Try again shortly." }, { status: 503 }); }
+
+    const CHIPSET = ["bronze", "silver", "gold", "blue"];
+    const chipOf = (s: unknown): Chip => { const v = String(s ?? "").trim().toLowerCase(); return (CHIPSET.includes(v) ? v : "bronze") as Chip; };
+    const asBool = (s: unknown) => /^(y|yes|true|1|published|live|public)$/i.test(String(s ?? "").trim());
+    const num = (s: unknown) => { const n = Number(String(s ?? "").replace(/[^0-9.]/g, "")); return Number.isFinite(n) ? n : 0; };
+    const splitList = (s: unknown) => String(s ?? "").split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
+    const field = (row: Record<string, any>, aliases: string[]): string => {
+      for (const k of Object.keys(row)) { if (aliases.includes(norm(k))) { const v = row[k]; if (v != null && String(v).trim() !== "") return String(v).trim(); } }
+      return "";
+    };
+
+    const now = Date.now();
+    let created = 0, skipped = 0, i = 0; const errors: string[] = [];
+    for (const r of rows) {
+      const name = field(r, ["name", "athletename", "playername"]).slice(0, 80);
+      if (!name || /^jordan example/i.test(name)) { skipped++; continue; } // skip blanks + the template's sample row
+      if (existing.has(norm(name))) { skipped++; continue; }
+      existing.add(norm(name));
+
+      const categories: Record<string, Chip> = {
+        power: chipOf(field(r, ["size"])),
+        speed: chipOf(field(r, ["speed"])),
+        motor: chipOf(field(r, ["effort"])),
+        technique: chipOf(field(r, ["fundamentalstech", "fundamentalstechnique", "fundamentals", "ft", "tech", "technique"])),
+        iq: chipOf(field(r, ["intangibles", "int", "iq"])),
+      };
+      const overallRaw = field(r, ["overallchip", "overall", "chip"]).toLowerCase();
+      const chip: Chip = CHIPSET.includes(overallRaw) ? (overallRaw as Chip) : recommendedOverall(categories as any).chip;
+      const categoryNotes: Record<string, string> = {
+        power: field(r, ["sizenote"]), speed: field(r, ["speednote"]), motor: field(r, ["effortnote"]),
+        technique: field(r, ["fundamentalstechnote", "ftnote", "fundamentalsnote"]), iq: field(r, ["intangiblesnote", "intnote"]),
+      };
+      const commit = field(r, ["committedto", "commit", "commitment", "college"]).slice(0, 80);
+      let commitLogo = "";
+      if (commit) { try { const hit = await resolveSchoolLogo(commit); if (hit.found) commitLogo = hit.logo; } catch {} }
+      const classYear = field(r, ["classyear", "year", "class"]).slice(0, 8);
+      const published = asBool(field(r, ["published", "publish", "live"]));
+      try {
+        await db.collection("players").add({
+          name, classYear, chip, categories, categoryNotes,
+          position: field(r, ["position", "pos"]).slice(0, 24),
+          school: field(r, ["highschool", "school"]).slice(0, 120),
+          city: field(r, ["city"]).slice(0, 80),
+          state: field(r, ["state"]).slice(0, 40),
+          commit, commitLogo,
+          slug: slugify(name, classYear),
+          bio: field(r, ["scoutingreport", "bio", "report"]).slice(0, 4000),
+          strengths: splitList(field(r, ["strengths"])).slice(0, 8),
+          traits: splitList(field(r, ["traits"])).slice(0, 10),
+          videoUrl: field(r, ["filmurl", "film", "videourl", "video", "highlighturl", "youtube", "hudl"]).slice(0, 500),
+          heightIn: num(field(r, ["heightin", "height", "heightinches"])),
+          weightLb: num(field(r, ["weightlb", "weight", "weightlbs"])),
+          fortyYd: field(r, ["40time", "fortytime", "forty", "fortyyd", "time40", "40"]).slice(0, 12),
+          seoTitle: field(r, ["seotitle"]).slice(0, 80),
+          seoDescription: field(r, ["seodescription", "seodesc"]).slice(0, 200),
+          published, removed: false, source: "excel-import",
+          order: published ? defaultOrder(chip, now) : -now - i, createdAt: now, updatedAt: now,
+        });
+        created++; i++;
+      } catch { errors.push(name); }
+    }
+    return NextResponse.json({ ok: true, created, skipped, failed: errors.length });
+  }
+
   return NextResponse.json({ error: "Unknown action." }, { status: 400 });
 }
