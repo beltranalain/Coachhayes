@@ -72,6 +72,8 @@ export default function RankingsAdmin() {
   const [editor, setEditor] = useState<PForm | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "published">("all");
+  const [yearFilter, setYearFilter] = useState("all");
+  const [posFilter, setPosFilter] = useState("all");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
@@ -294,9 +296,15 @@ export default function RankingsAdmin() {
   const pendingCount = players.length - publishedCount;
 
   // Board: filter by search, then paginate (25 per page). rank = position in the full list.
+  // Filter option lists, derived from the players actually on the board.
+  const yearOptions = Array.from(new Set(players.map((p) => p.classYear).filter(Boolean))).sort().reverse();
+  const posOptions = Array.from(new Set(players.map((p) => (p as any).position as string).filter(Boolean))).sort();
+
   const rankedFiltered = players.map((p, i) => ({ p, rank: i + 1 }))
     .filter(({ p }) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
-    .filter(({ p }) => statusFilter === "all" ? true : statusFilter === "pending" ? (p as any).published === false : (p as any).published !== false);
+    .filter(({ p }) => statusFilter === "all" ? true : statusFilter === "pending" ? (p as any).published === false : (p as any).published !== false)
+    .filter(({ p }) => yearFilter === "all" || p.classYear === yearFilter)
+    .filter(({ p }) => posFilter === "all" || (p as any).position === posFilter);
   const totalPages = Math.max(1, Math.ceil(rankedFiltered.length / PAGE_SIZE));
   const curPage = Math.min(page, totalPages);
   const pageItems = rankedFiltered.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
@@ -369,6 +377,14 @@ export default function RankingsAdmin() {
                 </button>
               ))}
             </span>
+            <select className="boardsel" value={yearFilter} onChange={(e) => { setYearFilter(e.target.value); setPage(1); }} aria-label="Filter by class year">
+              <option value="all">All years</option>
+              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select className="boardsel" value={posFilter} onChange={(e) => { setPosFilter(e.target.value); setPage(1); }} aria-label="Filter by position">
+              <option value="all">All positions</option>
+              {posOptions.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
             <input className="boardsearch" placeholder="Search players…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
             <button className="btn sm" onClick={autoRank}>Auto-rank by chip</button>
             <button className="btn sm" onClick={openImport}>Import from YouTube</button>
@@ -615,7 +631,7 @@ export default function RankingsAdmin() {
               );
             })}
             {players.length === 0 && <tr><td colSpan={10} className="muted" style={{ padding: 16 }}>No players yet. Use “+ Add player” above, or publish one from a submission.</td></tr>}
-            {players.length > 0 && rankedFiltered.length === 0 && <tr><td colSpan={10} className="muted" style={{ padding: 16 }}>{search ? `No players match “${search}”.` : statusFilter === "pending" ? "No pending players — everything’s been graded and published." : statusFilter === "published" ? "No published players yet." : "No players."}</td></tr>}
+            {players.length > 0 && rankedFiltered.length === 0 && <tr><td colSpan={10} className="muted" style={{ padding: 16 }}>{search ? `No players match “${search}”.` : (yearFilter !== "all" || posFilter !== "all") ? "No players match these filters." : statusFilter === "pending" ? "No pending players — everything’s been graded and published." : statusFilter === "published" ? "No published players yet." : "No players."}</td></tr>}
           </tbody>
         </table></div>
 
