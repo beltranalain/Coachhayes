@@ -201,16 +201,28 @@ export async function classifyVideos(ids: string[]): Promise<Record<string, { du
 }
 
 // Returns the videoId of an active live broadcast for a channel, or null.
-// search.list costs 100 quota units, so the result is cached (revalidate) and
-// shared across all callers — one real call per window regardless of traffic.
+//
+// We deliberately AVOID search.list here: it costs 100 units AND draws from a
+// small, separate "Search Queries per day" quota that idle Live-page polling can
+// exhaust — which silently breaks live detection even while the general quota is
+// fine. Instead we read the channel's uploads playlist (1 unit), where a live
+// stream appears near the top, and ask videos.list (1 unit) which recent upload
+// is live right now. ~2 general-quota units instead of 100 search units.
 export async function getLiveVideoId(channelId: string): Promise<string | null> {
-  if (!KEY) return null;
-  const url = `${API}/search?part=id&channelId=${channelId}&eventType=live&type=video&key=${KEY}`;
+  if (!KEY || !channelId) return null;
+  const uploads = /^UC/.test(channelId) ? "UU" + channelId.slice(2) : "";
+  if (!uploads) return null;
   try {
-    const res = await fetch(url, { next: { revalidate: 90 } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.items?.[0]?.id?.videoId ?? null;
+    const plRes = await fetch(`${API}/playlistItems?part=contentDetails&maxResults=15&playlistId=${uploads}&key=${KEY}`, { next: { revalidate: 45 } });
+    if (!plRes.ok) return null;
+    const plData = await plRes.json();
+    const ids: string[] = (plData.items ?? []).map((it: any) => it.contentDetails?.videoId).filter(Boolean);
+    if (!ids.length) return null;
+    const vRes = await fetch(`${API}/videos?part=snippet&id=${ids.join(",")}&key=${KEY}`, { next: { revalidate: 30 } });
+    if (!vRes.ok) return null;
+    const vData = await vRes.json();
+    const liveItem = (vData.items ?? []).find((it: any) => it?.snippet?.liveBroadcastContent === "live");
+    return liveItem?.id ?? null;
   } catch {
     return null;
   }
