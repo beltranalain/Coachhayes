@@ -479,7 +479,7 @@ export default function RankingsAdmin() {
 
                 {imp === "pick" && (
                   <>
-                    <p className="cs" style={{ marginTop: 0 }}>Pick a WRE playlist. We read each video title, pull the recruit, position and commit, and add them to the board as <b>Pending</b> — you grade and publish them after.</p>
+                    <p className="cs" style={{ marginTop: 0 }}>Pick a WRE playlist. We read each video title, pull the recruit, position and commit, and add them to the board as <b>Pending</b> — you grade and publish them after. Importing only <b>adds</b> players; it never changes or removes anyone already on the board.</p>
                     <div className="fld"><label>Playlist</label>
                       <select value={impPlId} onChange={(e) => setImpPlId(e.target.value)} disabled={impBusy === "pls"}>
                         <option value="">{impBusy === "pls" ? "Loading playlists…" : "Select a playlist…"}</option>
@@ -545,6 +545,7 @@ export default function RankingsAdmin() {
               <div className="modalbody">
                 {xlMsg && <div className="note" style={{ marginBottom: 12 }}>{xlMsg}</div>}
                 <p className="cs" style={{ marginTop: 0 }}>Two steps: download the template, fill one row per player, then upload it back. It has every field from the Add-player form. Players come in as <b>Pending</b> unless you set <b>Published</b> to Yes.</p>
+                <p className="cs" style={{ marginTop: 0, color: "var(--green)" }}>Safe to run: importing only <b>adds</b> players and skips names already on the board — it never changes or removes anyone you already have.</p>
 
                 <div className="fld"><label>1 · Get the template</label>
                   <button className="btn" onClick={downloadTemplate}>⬇ Download Excel template</button>
